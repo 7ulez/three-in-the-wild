@@ -53,6 +53,7 @@ func _ready() -> void:
 	var sfx := Sfx.new()
 	sfx.name = "Sfx"
 	add_child(sfx)
+	Batcher.run(self)
 	player = Player.new()
 	player.character_name = Game.start_char
 	add_child(player)
