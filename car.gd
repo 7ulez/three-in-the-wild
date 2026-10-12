@@ -1,0 +1,109 @@
+class_name Car
+extends Node3D
+## Ein Auto mit Heckklappe. Beim ersten Öffnen purzelt das Gepäck heraus.
+## Das Auto schaut nach -Z, das Heck (mit Kofferraum) zeigt nach +Z.
+
+var car_name: String = ""
+var trunk_open: bool = false
+var car_length: float = 4.0
+var car_width: float = 1.7
+var loot: Array = []
+var loot_spawned: bool = false
+var trunk_pivot: Node3D
+
+
+## Unsichtbare Interaktionszone am Heck.
+class TrunkButton:
+	extends StaticBody3D
+	var car: Car
+
+	func get_prompt() -> String:
+		return "E: Heckklappe %s (%s)" % ["schließen" if car.trunk_open else "öffnen", car.car_name]
+
+	func interact(_player: Node) -> void:
+		car.toggle_trunk()
+
+
+func build(p_name: String, color: Color, length: float, width: float, p_loot: Array) -> void:
+	car_name = p_name
+	car_length = length
+	car_width = width
+	loot = p_loot
+
+	# Karosserie und Kabine
+	Util.add_box(self, Vector3(width, 0.6, length), color, Vector3(0, 0.65, 0))
+	Util.add_box(self, Vector3(width * 0.92, 0.5, length * 0.5), Color(0.12, 0.16, 0.2), Vector3(0, 1.2, -length * 0.05))
+
+	# Räder
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			var wheel := Util.add_cylinder(self, 0.32, 0.25, Color(0.05, 0.05, 0.05),
+				Vector3(sx * width * 0.5, 0.32, sz * length * 0.32))
+			wheel.rotation_degrees.z = 90.0
+
+	# Scheinwerfer vorne, Rücklichter hinten, Stoßstange
+	for sx in [-1.0, 1.0]:
+		Util.add_box(self, Vector3(0.25, 0.12, 0.05), Color(1.0, 0.95, 0.7), Vector3(sx * width * 0.35, 0.75, -length / 2.0))
+		Util.add_box(self, Vector3(0.2, 0.1, 0.05), Color(0.8, 0.05, 0.05), Vector3(sx * width * 0.38, 0.8, length / 2.0))
+	Util.add_box(self, Vector3(width, 0.2, 0.12), Color(0.15, 0.15, 0.16), Vector3(0, 0.48, length / 2.0 + 0.04))
+
+	# Kollision des Autos
+	var chassis := StaticBody3D.new()
+	add_child(chassis)
+	var s1 := CollisionShape3D.new()
+	var b1 := BoxShape3D.new()
+	b1.size = Vector3(width, 0.6, length)
+	s1.shape = b1
+	s1.position = Vector3(0, 0.65, 0)
+	chassis.add_child(s1)
+	var s2 := CollisionShape3D.new()
+	var b2 := BoxShape3D.new()
+	b2.size = Vector3(width * 0.92, 0.5, length * 0.5)
+	s2.shape = b2
+	s2.position = Vector3(0, 1.2, -length * 0.05)
+	chassis.add_child(s2)
+
+	# Heckklappe (oben angelenkt, schwingt nach hinten oben)
+	trunk_pivot = Node3D.new()
+	trunk_pivot.position = Vector3(0, 0.95, length / 2.0)
+	add_child(trunk_pivot)
+	Util.add_box(trunk_pivot, Vector3(width * 0.92, 0.55, 0.05), color.lightened(0.08), Vector3(0, -0.275, 0))
+
+	# Interaktionszone
+	var button := TrunkButton.new()
+	button.car = self
+	var bs := CollisionShape3D.new()
+	var bb := BoxShape3D.new()
+	bb.size = Vector3(width * 0.9, 0.6, 0.5)
+	bs.shape = bb
+	button.add_child(bs)
+	button.position = Vector3(0, 0.65, length / 2.0 + 0.3)
+	add_child(button)
+
+
+func toggle_trunk() -> void:
+	trunk_open = not trunk_open
+	var tw := create_tween()
+	tw.tween_property(trunk_pivot, "rotation_degrees:x", -125.0 if trunk_open else 0.0, 0.5)
+	if trunk_open and not loot_spawned:
+		loot_spawned = true
+		Game.cars_opened += 1
+		_spawn_loot()
+
+
+func _spawn_loot() -> void:
+	var count := loot.size()
+	for i in range(count):
+		await get_tree().create_timer(0.3).timeout
+		var d: Dictionary = loot[i]
+		var item := Item.new().setup(d["name"], d["weight"], d["size"], d["color"])
+		get_parent().add_child(item)
+		if d.has("owner"):
+			item.set_owner_name(d["owner"])
+		# In Reihen zu je 4 Teilen hinter dem Heck verteilen
+		var row := i / 4
+		var in_row := mini(4, count - row * 4)
+		var col := i % 4
+		var spread := (float(col) - (in_row - 1) / 2.0) * 0.95
+		item.global_position = global_transform * Vector3(spread, 1.0, car_length / 2.0 + 1.0 + row * 1.0)
+		item.rotation.y = randf_range(-0.4, 0.4)

@@ -1,0 +1,19 @@
+# Three in the Wild - Server + Cloudflare Tunnel
+# Vorher ausfüllen: DEINE-DOMAIN, PASSWORT, TUNNEL-TOKEN
+services:
+  game:
+    build: .
+    restart: unless-stopped
+    environment:
+      GAME_PASSWORD: "PASSWORT"                    # leer lassen = kein Passwort
+      WS_URL: "wss://ws.DEINE-DOMAIN"              # Adresse, über die der Browser das Spiel erreicht
+    # Ports müssen nicht veröffentlicht werden, der Tunnel erreicht den Container intern.
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "TUNNEL-TOKEN"
+    depends_on:
+      - game

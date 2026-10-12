@@ -1,0 +1,164 @@
+class_name Nutria
+extends Node3D
+## Wildes Nutria: kommt nachts ins Lager, klaut Zutaten aus dem Rucksack, plündert die Kühlbox
+## oder raschelt am Zelt. Wer ihm nahe kommt, verscheucht es (es lässt dann die Beute fallen).
+
+enum S { APPROACH, EAT, FLEE }
+
+var main: Node
+var state: int = S.APPROACH
+var target: Node3D = null
+var action: String = "rustle"       # "steal", "rustle"
+var carried: String = ""
+var eat_t: float = 0.0
+var steal_pos: Vector3 = Vector3.ZERO
+var life: float = 0.0
+var _anim: float = 0.0
+var _rustles: int = 0
+var _body: Node3D
+var flee_dir: Vector3 = Vector3.ZERO
+
+
+func setup(p_main: Node, pos: Vector3) -> void:
+	main = p_main
+	position = pos
+	_body = Node3D.new()
+	add_child(_body)
+	var fur := Color(0.42, 0.28, 0.16)
+	var b := Util.add_sphere(_body, 0.5, fur, Vector3(0, 0.3, 0))
+	b.scale = Vector3(0.55, 0.34, 0.34)
+	var h := Util.add_sphere(_body, 0.5, fur.lightened(0.05), Vector3(0, 0.34, -0.36))
+	h.scale = Vector3(0.3, 0.26, 0.28)
+	Util.add_box(_body, Vector3(0.1, 0.05, 0.04), Color(0.95, 0.5, 0.1), Vector3(-0.04, 0.27, -0.5))
+	Util.add_box(_body, Vector3(0.1, 0.05, 0.04), Color(0.95, 0.5, 0.1), Vector3(0.04, 0.27, -0.5))
+	Util.add_sphere(_body, 0.03, Color.BLACK, Vector3(-0.1, 0.4, -0.5))
+	Util.add_sphere(_body, 0.03, Color.BLACK, Vector3(0.1, 0.4, -0.5))
+	Util.add_sphere(_body, 0.05, fur.darkened(0.2), Vector3(-0.12, 0.5, -0.32))
+	Util.add_sphere(_body, 0.05, fur.darkened(0.2), Vector3(0.12, 0.5, -0.32))
+	var tail := Util.add_cylinder(_body, 0.04, 0.5, fur.darkened(0.35), Vector3(0, 0.2, 0.55))
+	tail.rotation_degrees.x = 80.0
+	for sx in [-1.0, 1.0]:
+		for sz in [-0.15, 0.2]:
+			Util.add_box(_body, Vector3(0.07, 0.14, 0.09), fur.darkened(0.25), Vector3(sx * 0.14, 0.07, sz))
+	_choose_target()
+
+
+func _choose_target() -> void:
+	# Beute: Rucksack mit Zutaten oder offene/volle Kühlbox, sonst am Zelt rascheln
+	var cands: Array = []
+	for o in Game.placed:
+		if not is_instance_valid(o):
+			continue
+		if o.item_name == "Rucksack mit Proviant" and not o.pack.is_empty():
+			cands.append(o)
+		elif o.item_name == "Kühlbox":
+			cands.append(o)
+	var fires: Array = Game.placed.filter(func(p): return is_instance_valid(p) and p.item_name == "Feuerschale" and p.burning)
+	cands = cands.filter(func(c): return fires.all(func(f): return f.global_position.distance_to(c.global_position) > 6.0))
+	if not cands.is_empty():
+		target = cands.pick_random()
+		action = "steal"
+		return
+	for t in Game.tents:
+		if is_instance_valid(t):
+			target = t
+			action = "rustle"
+			return
+	target = null
+	action = "leave"
+
+
+func _process(delta: float) -> void:
+	life += delta
+	_anim += delta * 9.0
+	var player: Node3D = main.player if main != null else null
+	var ppos: Vector3 = player.global_position if player != null else Vector3(9999, 0, 9999)
+	var dir := Vector3.ZERO
+	var speed := 2.6
+	match state:
+		S.APPROACH:
+			if target == null or not is_instance_valid(target):
+				_start_flee(ppos)
+			else:
+				var tp := target.global_position
+				var to := tp - global_position
+				to.y = 0
+				if to.length() < (1.6 if action == "rustle" else 1.0):
+					state = S.EAT
+					eat_t = 0.0
+					if action == "steal":
+						_toast_near(ppos, "Ein Nutria schleicht sich an die Vorräte heran!")
+				else:
+					dir = to.normalized()
+			if global_position.distance_to(ppos) < 4.5 and state == S.APPROACH:
+				_start_flee(ppos)
+		S.EAT:
+			eat_t += delta
+			_body.rotation.z = sin(_anim * 1.5) * 0.12
+			if action == "rustle":
+				if target is Tent:
+					(target as Tent).shake()
+				if eat_t > 3.5 and _rustles < 2:
+					_rustles += 1
+					eat_t = 0.0
+					_toast_near(ppos, "Es raschelt am Zelt...")
+				if _rustles >= 2 and eat_t > 3.0:
+					_start_flee(ppos)
+			else:
+				if eat_t > 2.5:
+					_do_steal(ppos)
+			if global_position.distance_to(ppos) < 4.0:
+				_start_flee(ppos)
+		S.FLEE:
+			speed = 5.0
+			dir = flee_dir
+			if carried != "" and (global_position.distance_to(steal_pos) > 14.0 or global_position.distance_to(ppos) < 6.0 and life > 0.0 and global_position.distance_to(steal_pos) > 2.0):
+				_drop_loot(ppos)
+			if global_position.distance_to(ppos) > 45.0 or global_position.distance_to(Game.camp_center) > 70.0:
+				_drop_loot(ppos)
+				queue_free()
+	if dir != Vector3.ZERO:
+		global_position += dir * speed * delta
+		global_position.y = 0.0
+		var yaw := atan2(-dir.x, -dir.z)
+		rotation.y = lerp_angle(rotation.y, yaw, minf(delta * 8.0, 1.0))
+		_body.position.y = absf(sin(_anim)) * 0.05
+	if life > 240.0:
+		_drop_loot(ppos)
+		queue_free()
+
+
+func _toast_near(ppos: Vector3, msg: String) -> void:
+	if main.player != null and global_position.distance_to(ppos) < 35.0:
+		main.player.toast(msg, 3.0)
+
+
+func _do_steal(ppos: Vector3) -> void:
+	steal_pos = global_position
+	if target != null and is_instance_valid(target):
+		if target.item_name == "Rucksack mit Proviant":
+			carried = target.steal_one()
+			if carried != "":
+				_toast_near(ppos, "Das Nutria hat %s aus dem Rucksack geklaut! Verjag es!" % carried)
+		else:
+			_toast_near(ppos, "Das Nutria knabbert an den Würstchen in der Kühlbox. Frechheit!")
+	_start_flee(ppos)
+
+
+func _start_flee(ppos: Vector3) -> void:
+	state = S.FLEE
+	var away := global_position - ppos
+	away.y = 0
+	if away.length() < 1.0:
+		away = Vector3(randf_range(-1, 1), 0, randf_range(-1, 1))
+	flee_dir = (away.normalized() + Vector3(randf_range(-0.4, 0.4), 0, randf_range(-0.4, 0.4))).normalized()
+
+
+func _drop_loot(ppos: Vector3) -> void:
+	if carried == "":
+		return
+	var it := Item.new().setup(carried, 0.5, Vector3(0.18, 0.14, 0.18), Game.INGREDIENT_COLORS[carried])
+	main.add_child(it)
+	it.global_position = global_position + Vector3(0, 0.5, 0)
+	_toast_near(ppos, "Das Nutria hat %s fallen lassen!" % carried)
+	carried = ""

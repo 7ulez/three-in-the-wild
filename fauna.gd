@@ -1,0 +1,340 @@
+class_name Fauna
+extends Node3D
+## Tiere im Spiel: Enten und Fische im See, Frösche am Ufer, Rehe und Hasen im Wald, Vögel am Himmel,
+## nachts Glühwürmchen. Alles Low-Poly und per Code gebaut.
+
+var main: Node
+var player: Node3D
+var lake_off: Vector3 = Vector3(0, 0, 15)
+var animals: Array = []
+var fireflies: Array = []
+var _fish_t: float = 8.0
+var _t: float = 0.0
+
+
+func start(p_main: Node) -> void:
+	main = p_main
+	lake_off = (main.lake_root as Node3D).global_position
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 777
+	for i in range(5):
+		_add("duck", _lake_point(rng, 0.8))
+	for i in range(4):
+		_add("frog", _shore_point(rng))
+	for i in range(4):
+		_add("deer", _forest_point(rng))
+	for i in range(6):
+		_add("hare", _meadow_point(rng))
+	for i in range(4):
+		_add("bird", Vector3(rng.randf_range(-40, 40), 0, rng.randf_range(-90, -10)))
+	for i in range(26):
+		var fl := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.04
+		sm.height = 0.08
+		sm.radial_segments = 4
+		sm.rings = 2
+		fl.mesh = sm
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = Color(0.85, 1.0, 0.35)
+		fl.material_override = m
+		var sp := _shore_point(rng) + Vector3(rng.randf_range(-3, 3), 0, rng.randf_range(-3, 3))
+		fl.position = sp + Vector3(0, rng.randf_range(0.6, 1.8), 0)
+		fl.set_meta("base", fl.position)
+		fl.set_meta("ph", rng.randf() * TAU)
+		fl.visible = false
+		add_child(fl)
+		fireflies.append(fl)
+
+
+func _in_lake(world: Vector3, factor: float = 1.0) -> bool:
+	var lp := world - lake_off
+	var v := Vector2(lp.x, lp.z)
+	if factor == 1.0:
+		return LakeShape.contains(v)
+	return LakeShape.contains(LakeShape.CENTER + (v - LakeShape.CENTER) / factor)
+
+
+func _lake_point(rng: RandomNumberGenerator, factor: float) -> Vector3:
+	for i in range(200):
+		var v := LakeShape.CENTER + Vector2(rng.randf_range(-24, 24), rng.randf_range(-15, 15))
+		if LakeShape.contains(LakeShape.CENTER + (v - LakeShape.CENTER) / factor):
+			return Vector3(v.x, 0.0, v.y) + lake_off
+	return Vector3(0, 0, -35) + lake_off
+
+
+func _shore_point(rng: RandomNumberGenerator) -> Vector3:
+	var a := rng.randf() * TAU
+	var dir := Vector2(cos(a), sin(a))
+	var r := 8.0
+	while r < 60.0 and LakeShape.contains(LakeShape.CENTER + dir * r * Vector2(1.0, 0.66)):
+		r += 0.4
+	var v := LakeShape.CENTER + dir * (r + 0.5) * Vector2(1.0, 0.66)
+	return Vector3(v.x, 0.0, v.y) + lake_off
+
+
+func _forest_point(rng: RandomNumberGenerator) -> Vector3:
+	for i in range(300):
+		var p := Vector3(rng.randf_range(-60, 60), 0, rng.randf_range(-100, -20))
+		if not main.call("_tree_blocked", p):
+			return p
+	return Vector3(-45, 0, -60)
+
+
+func _meadow_point(rng: RandomNumberGenerator) -> Vector3:
+	for i in range(300):
+		var p := Vector3(rng.randf_range(-45, 45), 0, rng.randf_range(-10, 45))
+		if not _in_lake(p, 1.15):
+			return p
+	return Vector3(20, 0, 25)
+
+
+func _add(kind: String, pos: Vector3) -> void:
+	var a := Animal.new()
+	add_child(a)
+	a.setup(self, kind)
+	a.global_position = pos
+	animals.append(a)
+
+
+func _process(delta: float) -> void:
+	_t += delta
+	if player == null or not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("local_player") as Node3D
+	var night := Game.is_night()
+	for fl in fireflies:
+		var f: MeshInstance3D = fl
+		f.visible = night
+		if night:
+			var b: Vector3 = f.get_meta("base")
+			var ph: float = f.get_meta("ph")
+			f.position = b + Vector3(sin(_t * 0.7 + ph) * 0.8, sin(_t * 1.3 + ph * 2.0) * 0.3, cos(_t * 0.5 + ph) * 0.8)
+	_fish_t -= delta
+	if _fish_t <= 0.0:
+		_fish_t = randf_range(10.0, 28.0)
+		_fish_jump()
+
+
+func _fish_jump() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var p := _lake_point(rng, 0.85)
+	var fish := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.45, 0.13, 0.1)
+	fish.mesh = bm
+	fish.material_override = Util.mat(Color(0.7, 0.72, 0.65))
+	add_child(fish)
+	fish.global_position = p
+	var dir := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
+	fish.look_at(fish.global_position + dir, Vector3.UP)
+	var tw := create_tween()
+	tw.tween_method(func(t: float) -> void:
+		fish.global_position = p + dir * t * 1.2 + Vector3(0, sin(t * PI) * 0.9, 0)
+		fish.rotation.x = cos(t * PI) * 0.8, 0.0, 1.0, 0.8)
+	tw.tween_callback(func() -> void:
+		Sfx.play("splash_small", p, -2.0)
+		fish.queue_free())
+	Sfx.play("splash_small", p, -4.0)
+
+
+class Animal extends Node3D:
+	var fauna: Fauna
+	var kind: String = ""
+	var target: Vector3 = Vector3.ZERO
+	var wait: float = 0.0
+	var speed: float = 1.0
+	var _t: float = 0.0
+	var hidden_until: float = 0.0
+	var body: Node3D
+	var wing_l: Node3D
+	var wing_r: Node3D
+	var orbit_c: Vector3
+	var orbit_r: float = 10.0
+	var orbit_a: float = 0.0
+	var hop: float = 0.0
+	var _snd_cd: float = 0.0
+
+	func setup(f: Fauna, k: String) -> void:
+		fauna = f
+		kind = k
+		_t = randf() * 10.0
+		body = Node3D.new()
+		add_child(body)
+		match kind:
+			"duck":
+				Util.add_sphere(body, 0.22, Color(0.55, 0.4, 0.25)).scale = Vector3(1.0, 0.7, 1.4)
+				Util.add_sphere(body, 0.11, Color(0.1, 0.45, 0.3), Vector3(0, 0.22, -0.22))
+				Util.add_box(body, Vector3(0.07, 0.03, 0.12), Color(0.95, 0.65, 0.1), Vector3(0, 0.2, -0.36))
+				Util.add_box(body, Vector3(0.12, 0.05, 0.12), Color(0.5, 0.36, 0.22), Vector3(0, 0.12, 0.28))
+				speed = 0.7
+			"frog":
+				Util.add_sphere(body, 0.1, Color(0.25, 0.6, 0.2)).scale = Vector3(1.0, 0.6, 1.2)
+				Util.add_sphere(body, 0.03, Color(0.9, 0.9, 0.3), Vector3(0.05, 0.08, -0.07))
+				Util.add_sphere(body, 0.03, Color(0.9, 0.9, 0.3), Vector3(-0.05, 0.08, -0.07))
+				speed = 2.0
+			"deer":
+				var c := Color(0.62, 0.42, 0.24)
+				Util.add_box(body, Vector3(0.45, 0.5, 1.0), c, Vector3(0, 0.95, 0))
+				Util.add_box(body, Vector3(0.22, 0.5, 0.25), c, Vector3(0, 1.3, -0.5)).rotation_degrees.x = -25.0
+				Util.add_box(body, Vector3(0.22, 0.24, 0.35), c.lightened(0.05), Vector3(0, 1.6, -0.68))
+				Util.add_box(body, Vector3(0.04, 0.2, 0.04), Color(0.3, 0.2, 0.1), Vector3(0.07, 1.8, -0.62))
+				Util.add_box(body, Vector3(0.04, 0.2, 0.04), Color(0.3, 0.2, 0.1), Vector3(-0.07, 1.8, -0.62))
+				Util.add_box(body, Vector3(0.14, 0.14, 0.08), Color(0.95, 0.95, 0.9), Vector3(0, 1.0, 0.52))
+				for lx in [-0.15, 0.15]:
+					for lz in [-0.35, 0.35]:
+						Util.add_box(body, Vector3(0.09, 0.7, 0.09), c.darkened(0.15), Vector3(lx, 0.35, lz))
+				speed = 1.2
+			"hare":
+				var hc := Color(0.62, 0.52, 0.42)
+				Util.add_sphere(body, 0.17, hc, Vector3(0, 0.17, 0)).scale = Vector3(0.8, 0.8, 1.3)
+				Util.add_sphere(body, 0.1, hc, Vector3(0, 0.27, -0.2))
+				Util.add_box(body, Vector3(0.04, 0.2, 0.03), hc.darkened(0.1), Vector3(0.04, 0.45, -0.2))
+				Util.add_box(body, Vector3(0.04, 0.2, 0.03), hc.darkened(0.1), Vector3(-0.04, 0.45, -0.2))
+				Util.add_sphere(body, 0.05, Color(0.95, 0.95, 0.95), Vector3(0, 0.2, 0.22))
+				speed = 1.5
+			"bird":
+				Util.add_sphere(body, 0.12, Color(0.12, 0.12, 0.14)).scale = Vector3(0.8, 0.8, 1.6)
+				wing_l = Node3D.new()
+				wing_r = Node3D.new()
+				body.add_child(wing_l)
+				body.add_child(wing_r)
+				Util.add_box(wing_l, Vector3(0.5, 0.02, 0.18), Color(0.2, 0.2, 0.24), Vector3(-0.25, 0, 0))
+				Util.add_box(wing_r, Vector3(0.5, 0.02, 0.18), Color(0.2, 0.2, 0.24), Vector3(0.25, 0, 0))
+				orbit_c = Vector3(randf_range(-40, 40), 0, randf_range(-90, -10))
+				orbit_r = randf_range(8.0, 22.0)
+				orbit_a = randf() * TAU
+		target = global_position
+
+	func _pdist() -> float:
+		if fauna.player == null or not is_instance_valid(fauna.player):
+			return 999.0
+		return Vector2(fauna.player.global_position.x - global_position.x, fauna.player.global_position.z - global_position.z).length()
+
+	func _away_from_player(dist: float) -> Vector3:
+		var d := global_position - fauna.player.global_position
+		d.y = 0
+		return global_position + d.normalized() * dist
+
+	func _valid(p: Vector3) -> bool:
+		match kind:
+			"duck":
+				return fauna._in_lake(p, 0.92)
+			"frog":
+				return true
+			"deer":
+				return not fauna.main.call("_tree_blocked", p) and not fauna._in_lake(p, 1.2) and absf(p.x) < 100.0 and p.z > -110.0
+			"hare":
+				return not fauna._in_lake(p, 1.2) and absf(p.x) < 70.0 and p.z > -105.0 and p.z < 60.0 and not (p.x > 50.0 and p.z < -35.0)
+		return true
+
+	func _step_to(delta: float, spd: float) -> bool:
+		var d := target - global_position
+		d.y = 0
+		if d.length() < 0.15:
+			return true
+		var dir := d.normalized()
+		var np := global_position + dir * spd * delta
+		if not _valid(np):
+			# Nicht ins Wasser (oder in den Sperrbereich) laufen: Ziel verwerfen
+			target = global_position
+			wait = randf_range(0.5, 2.0)
+			return true
+		global_position = np
+		var ang := atan2(-dir.x, -dir.z)
+		rotation.y = lerp_angle(rotation.y, ang, minf(delta * 8.0, 1.0))
+		return false
+
+	func _process(delta: float) -> void:
+		_t += delta
+		_snd_cd -= delta
+		var night := Game.is_night()
+		var pd := _pdist()
+		match kind:
+			"duck":
+				var flee := pd < 7.0
+				if flee and fauna.player != null:
+					var away := _away_from_player(6.0)
+					if _valid(away):
+						target = away
+					if _snd_cd <= 0.0 and pd < 5.0:
+						_snd_cd = 4.0
+						Sfx.play("quack", global_position, -2.0, randf_range(0.9, 1.3))
+				elif wait > 0.0:
+					wait -= delta
+				elif _step_to(delta, speed):
+					wait = randf_range(2.0, 7.0)
+					for i in range(20):
+						var cand := global_position + Vector3(randf_range(-9, 9), 0, randf_range(-6, 6))
+						if _valid(cand):
+							target = cand
+							break
+				if flee or wait <= 0.0:
+					_step_to(delta, speed * (3.5 if flee else 1.0))
+				global_position.y = 0.0
+				body.position.y = sin(_t * 2.0) * 0.015
+				body.rotation.z = sin(_t * 1.3) * 0.04
+			"frog":
+				if hidden_until > 0.0:
+					hidden_until -= delta
+					if hidden_until <= 0.0:
+						visible = true
+						global_position = fauna._shore_point(RandomNumberGenerator.new())
+				elif pd < 3.2:
+					var lp := global_position - fauna.lake_off
+					var to_lake := (Vector3(LakeShape.CENTER.x, 0, LakeShape.CENTER.y) - Vector3(lp.x, 0, lp.z)).normalized()
+					Sfx.play("splash_small", global_position, -3.0)
+					global_position += to_lake * 1.6
+					visible = false
+					hidden_until = 40.0
+				else:
+					hop = maxf(hop - delta, 0.0)
+					wait -= delta
+					if wait <= 0.0:
+						wait = randf_range(2.0, 6.0)
+						hop = 0.35
+					body.position.y = sin(hop / 0.35 * PI) * 0.08 if hop > 0.0 else 0.0
+					if night and _snd_cd <= 0.0 and pd < 28.0:
+						_snd_cd = randf_range(3.0, 8.0)
+						Sfx.play("croak", global_position, -4.0, randf_range(0.8, 1.2))
+			"deer", "hare":
+				var flee_d := 14.0 if kind == "deer" else 8.0
+				var fleeing := pd < flee_d
+				if fleeing and fauna.player != null:
+					var tries := 0
+					var away := _away_from_player(18.0)
+					while not _valid(away) and tries < 8:
+						away = _away_from_player(18.0).rotated(Vector3.UP, 0.0)
+						away = global_position + (away - global_position).rotated(Vector3.UP, randf_range(-1.4, 1.4))
+						tries += 1
+					if _valid(away):
+						target = away
+					_step_to(delta, speed * (5.0 if kind == "deer" else 4.0))
+				elif wait > 0.0:
+					wait -= delta
+				elif _step_to(delta, speed):
+					wait = randf_range(3.0, 9.0)
+					for i in range(20):
+						var cand2 := global_position + Vector3(randf_range(-10, 10), 0, randf_range(-10, 10))
+						if _valid(cand2):
+							target = cand2
+							break
+				if kind == "hare":
+					var moving := fleeing or wait <= 0.0
+					body.position.y = absf(sin(_t * (9.0 if fleeing else 5.0))) * 0.25 if moving else 0.0
+					if moving and not fleeing:
+						_step_to(delta, speed)
+				else:
+					if not fleeing and wait <= 0.0:
+						_step_to(delta, speed)
+					body.rotation.z = sin(_t * (12.0 if fleeing else 4.0)) * 0.03
+			"bird":
+				visible = not night
+				orbit_a += delta * (0.35 + 1.0 / orbit_r)
+				var p := orbit_c + Vector3(cos(orbit_a) * orbit_r, 0, sin(orbit_a) * orbit_r)
+				p.y = 14.0 + sin(_t * 0.4) * 2.0
+				global_position = p
+				rotation.y = -orbit_a
+				wing_l.rotation.z = sin(_t * 12.0) * 0.6
+				wing_r.rotation.z = -sin(_t * 12.0) * 0.6
