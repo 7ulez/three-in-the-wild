@@ -273,6 +273,7 @@ func vape() -> void:
 	if _vape_cd > 0.0:
 		return
 	_vape_cd = 3.0
+	player.vape_t = 2.7
 	puffs += 1
 	vape_particles.restart()
 	vape_particles.emitting = true

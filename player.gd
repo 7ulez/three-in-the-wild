@@ -69,6 +69,7 @@ var item_snap: PlacedItem = null      # Grill, auf den der Dutch Oven gesetzt wi
 
 # Sitzen
 var seat: PlacedItem = null
+var vape_t: float = 0.0          # Dauer der Vape-Animation
 var hammock: Hammock = null
 var stones: int = 0
 var crouching: bool = false
@@ -198,7 +199,7 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 		var ap := _find_anim(inst)
 		if ap != null:
 			for n in ap.get_animation_list():
-				ap.get_animation(n).loop_mode = Animation.LOOP_NONE if (n == "Jump" or n == "FishCast" or n == "Squat") else Animation.LOOP_LINEAR
+				ap.get_animation(n).loop_mode = Animation.LOOP_NONE if (n == "Jump" or n == "FishCast" or n == "Squat" or n == "Vape") else Animation.LOOP_LINEAR
 			if ap.has_animation("Idle"):
 				ap.play("Idle")
 			parent.set_meta("ap", ap)
@@ -242,12 +243,24 @@ static func _find_anim(n: Node) -> AnimationPlayer:
 
 
 ## Wählt die passende Animation für das Lauftempo (Stehen / Gehen / Rennen).
-static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0, squat: bool = false) -> void:
+static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0, squat: bool = false, sit: bool = false, vape: bool = false) -> void:
 	var ap: AnimationPlayer = parent.get_meta("ap", null) as AnimationPlayer
 	if ap == null:
 		return
 	var want := "Idle"
 	var sc := 1.0
+	if vape and speed < 0.5 and ap.has_animation("Vape"):
+		if not parent.get_meta("vaping", false):
+			parent.set_meta("vaping", true)
+			ap.play("Vape", 0.15)
+		ap.speed_scale = 1.0
+		return
+	parent.set_meta("vaping", false)
+	if sit and ap.has_animation("Sit"):
+		if ap.current_animation != "Sit":
+			ap.play("Sit", 0.2)
+		ap.speed_scale = 1.0
+		return
 	var hose: Node3D = parent.get_meta("hose", null) as Node3D
 	var hose_down: Node3D = parent.get_meta("hose_down", null) as Node3D
 	if squat and ap.has_animation("Squat"):
@@ -308,6 +321,10 @@ func anim_flags() -> int:
 	f |= (_fish_anim() & 3) << 2
 	if needs != null and needs.squatting:
 		f |= 16
+	if seat != null:
+		f |= 32
+	if vape_t > 0.0:
+		f |= 64
 	return f
 
 
@@ -576,11 +593,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	vape_t = maxf(vape_t - delta, 0.0)
 	if sleeping:
 		velocity = Vector3.ZERO
 		return
 	if seat != null:
 		velocity = Vector3.ZERO
+		Player.animate_body(body_visual, 0.0, false, false, 0, false, true, vape_t > 0.0)
 		_drink_cd = maxf(_drink_cd - delta, 0.0)
 		promille = maxf(promille - delta * 0.005, 0.0)
 		if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_A) \
@@ -661,7 +680,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
-	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim(), needs != null and needs.squatting)
+	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim(), needs != null and needs.squatting, false, vape_t > 0.0)
 	if is_on_floor():
 		var drop := _peak_y - global_position.y
 		if _airborne and drop > 5.0:
@@ -1179,8 +1198,8 @@ func sit(chair: PlacedItem) -> void:
 	chair.seated_by = self
 	collision_layer = 0
 	collision_mask = 0
-	global_position = chair.global_position + Vector3(0, 0.5, 0)
-	head.position.y = 0.6
+	global_position = chair.global_position + Vector3(0, 0.45, 0)
+	head.position.y = 0.65
 	toast("Du sitzt. E oder WASD zum Aufstehen.", 2.5)
 
 
