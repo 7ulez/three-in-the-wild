@@ -981,9 +981,13 @@ func _build_vm() -> void:
 	Util.add_box(vm_hand, Vector3(0.025, 0.03, 0.1), SKIN.darkened(0.08), Vector3(-0.05, 0.03, -0.02))
 	var tool_holder := Node3D.new()
 	tool_holder.position = Vector3(0.0, 0.0, 0.0)
-	tool_holder.rotation_degrees = Vector3(0.0, 0.0, 78.0)
+	tool_holder.rotation_degrees = Vector3(-20.0, 0.0, 78.0)
+	tool_holder.scale = Vector3.ONE * 1.5
 	vm_hand.add_child(tool_holder)
-	ItemModels.add_visual(tool_holder, "Hammer", Vector3(0.4, 0.12, 0.1), Color(0.45, 0.3, 0.15))
+	var hv := Node3D.new()
+	hv.position = Vector3(0.15, 0.0, 0.0)    # Griffende des Stiels liegt in der Faust
+	tool_holder.add_child(hv)
+	ItemModels.add_visual(hv, "Hammer", Vector3(0.4, 0.12, 0.1), Color(0.45, 0.3, 0.15))
 	for n in vm_hand.find_children("*", "MeshInstance3D", true, false):
 		(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
