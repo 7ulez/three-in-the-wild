@@ -169,6 +169,15 @@ class Animal extends Node3D:
 		add_child(body)
 		match kind:
 			"duck":
+				if ResourceLoader.exists("res://assets/fauna/ente.glb"):
+					var dk := (load("res://assets/fauna/ente.glb") as PackedScene).instantiate() as Node3D
+					dk.scale = Vector3.ONE * 1.25
+					_darken(dk, 0.15)
+					dk.position.y = 0.03
+					body.add_child(dk)
+					speed = 0.7
+					target = global_position
+					return
 				Util.add_sphere(body, 0.22, Color(0.55, 0.4, 0.25)).scale = Vector3(1.0, 0.7, 1.4)
 				Util.add_sphere(body, 0.11, Color(0.1, 0.45, 0.3), Vector3(0, 0.22, -0.22))
 				Util.add_box(body, Vector3(0.07, 0.03, 0.12), Color(0.95, 0.65, 0.1), Vector3(0, 0.2, -0.36))
@@ -180,6 +189,19 @@ class Animal extends Node3D:
 				Util.add_sphere(body, 0.03, Color(0.9, 0.9, 0.3), Vector3(-0.05, 0.08, -0.07))
 				speed = 2.0
 			"deer":
+				if ResourceLoader.exists("res://assets/fauna/reh.glb"):
+					var dr := (load("res://assets/fauna/reh.glb") as PackedScene).instantiate() as Node3D
+					dr.scale = Vector3.ONE * 1.2
+					_darken(dr, 0.3)
+					body.add_child(dr)
+					ap = _find_ap(dr)
+					if ap != null:
+						for an in ap.get_animation_list():
+							ap.get_animation(an).loop_mode = Animation.LOOP_LINEAR
+						ap.play("Idle")
+					speed = 1.2
+					target = global_position
+					return
 				var c := Color(0.62, 0.42, 0.24)
 				Util.add_box(body, Vector3(0.45, 0.5, 1.0), c, Vector3(0, 0.95, 0))
 				Util.add_box(body, Vector3(0.22, 0.5, 0.25), c, Vector3(0, 1.3, -0.5)).rotation_degrees.x = -25.0
@@ -222,6 +244,18 @@ class Animal extends Node3D:
 				orbit_r = randf_range(8.0, 22.0)
 				orbit_a = randf() * TAU
 		target = global_position
+
+	## Modellfarben im hellen Spiellicht etwas abdunkeln
+	func _darken(root: Node, amount: float) -> void:
+		for mi in root.find_children("*", "MeshInstance3D", true, false):
+			var m3 := mi as MeshInstance3D
+			for i in range(m3.mesh.get_surface_count()):
+				var sm := m3.mesh.surface_get_material(i) as BaseMaterial3D
+				if sm != null:
+					var dm := sm.duplicate() as BaseMaterial3D
+					dm.albedo_color = dm.albedo_color.darkened(amount)
+					dm.metallic = 0.0
+					m3.set_surface_override_material(i, dm)
 
 	func _find_ap(n: Node) -> AnimationPlayer:
 		if n is AnimationPlayer:
@@ -369,7 +403,15 @@ class Animal extends Node3D:
 				else:
 					if not fleeing and wait <= 0.0:
 						_step_to(delta, speed)
-					body.rotation.z = sin(_t * (12.0 if fleeing else 4.0)) * 0.03
+					if ap != null:
+						if fleeing:
+							_play("Run", 1.0)
+						elif wait <= 0.0:
+							_play("Walk", 1.0)
+						else:
+							_play("Eat" if int(_t / 9.0) % 2 == 0 else "Idle")
+					else:
+						body.rotation.z = sin(_t * (12.0 if fleeing else 4.0)) * 0.03
 			"bird":
 				visible = not night
 				orbit_a += delta * (0.35 + 1.0 / orbit_r)

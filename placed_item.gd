@@ -101,6 +101,7 @@ func build(p_name: String, p_weight: float, p_size: Vector3, p_color: Color, sta
 
 	if p_name == "Kiste mit Proviant":
 		pack = (state["pack"] as Array).duplicate() if state.has("pack") else Game.RECIPE.duplicate()
+		_refresh_pack()
 
 	if p_name == "Gasgrill":
 		light = OmniLight3D.new()
@@ -584,6 +585,7 @@ func _take_ingredient(player: Node) -> void:
 	var nm: String = pack[idx]
 	pack.remove_at(idx)
 	sel = 0
+	_refresh_pack()
 	var pivot: Node3D = parts.get("lid", null)
 	if pivot != null and not open:
 		open = true
@@ -594,6 +596,12 @@ func _take_ingredient(player: Node) -> void:
 	player.pick_up(it)
 
 
+func _refresh_pack() -> void:
+	var pv: Node3D = parts.get("proviant", null)
+	if pv != null:
+		pv.visible = not pack.is_empty()
+
+
 func steal_one() -> String:
 	if pack.is_empty():
 		return ""
@@ -601,6 +609,7 @@ func steal_one() -> String:
 	var nm: String = pack[idx]
 	pack.remove_at(idx)
 	sel = 0
+	_refresh_pack()
 	return nm
 
 

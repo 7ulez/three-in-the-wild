@@ -297,7 +297,7 @@ func _build_cars() -> void:
 			"loot": [
 				_loot("Kühlbox", 10.0, Vector3(0.6, 0.4, 0.4), Color(0.2, 0.45, 0.85)),
 				_loot("Gasgrill", 18.0, Vector3(0.7, 0.9, 0.5), Color(0.3, 0.3, 0.33)),
-				_loot("Kiste mit Proviant", 7.0, Vector3(0.5, 0.35, 0.35), Color(0.75, 0.2, 0.15)),
+				_loot("Kiste mit Proviant", 7.0, Vector3(0.5, 0.27, 0.34), Color(0.75, 0.2, 0.15)),
 				_backpack_loot(Color(0.25, 0.42, 0.22), [
 					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[1], "Steffen"),
 					_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
@@ -451,7 +451,7 @@ func _build_trees() -> void:
 	add_child(forest)
 
 	var parts := {}
-	for key in ["bush", "s_trunk", "s_c1", "s_c2", "s_c3", "b_trunk", "b_c1", "b_c2", "l_trunk", "l_c1", "l_c2", "p_trunk", "p_c1", "p_c2", "p_c3", "p_c4", "d_trunk", "d_b1", "d_b2", "sap", "sap_t"]:
+	for key in ["bush", "s_trunk", "s_leaf", "b_trunk", "b_leaf", "b_mark", "l_trunk", "l_leaf", "p_trunk", "p_leaf", "d_trunk", "sap", "sap_t"]:
 		parts[key] = {"x": [], "c": []}
 
 	var shape := CylinderShape3D.new()
@@ -472,16 +472,11 @@ func _build_trees() -> void:
 		if kind < 0.18:
 			# Hohe schlanke Kiefer
 			var g2 := rng.randf_range(0.0, 0.06)
-			_part(parts, "p_trunk", base, 1.5, Color(0.42, 0.26, 0.15))
-			_part(parts, "p_c1", base, 2.6, Color(0.1 + g2, 0.34, 0.2))
-			_part(parts, "p_c2", base, 3.6, Color(0.12 + g2, 0.38, 0.22))
-			_part(parts, "p_c3", base, 4.6, Color(0.14 + g2, 0.42, 0.24))
-			_part(parts, "p_c4", base, 5.5, Color(0.16 + g2, 0.46, 0.27))
+			_part(parts, "p_trunk", base, 0.0, Color.WHITE)
+			_part(parts, "p_leaf", base, 0.0, Color(0.12 + g2, 0.4 + g2, 0.22))
 		elif kind < 0.24:
 			# Toter Baum
-			_part(parts, "d_trunk", base, 2.0, Color(0.4, 0.34, 0.28))
-			_branch(parts["d_b1"], base, 2.5, 0.9, 0.0, 0.7, Color(0.38, 0.32, 0.26))
-			_branch(parts["d_b2"], base, 3.1, -0.8, 2.4, 0.6, Color(0.38, 0.32, 0.26))
+			_part(parts, "d_trunk", base, 0.0, Color.WHITE)
 		elif kind < 0.34:
 			# Junger Baum
 			var sb := Transform3D(Basis.from_euler(tilt).scaled(Vector3(0.6, 0.6, 0.6)), pos)
@@ -490,21 +485,19 @@ func _build_trees() -> void:
 		elif kind < 0.6:
 			# Fichte
 			var g := rng.randf_range(0.0, 0.08)
-			_part(parts, "s_trunk", base, 1.0, Color(0.35, 0.22, 0.12))
-			_part(parts, "s_c1", base, 2.2, Color(0.12 + g, 0.42, 0.25))
-			_part(parts, "s_c2", base, 3.2, Color(0.14 + g, 0.46, 0.27))
-			_part(parts, "s_c3", base, 4.1, Color(0.16 + g, 0.5, 0.3))
+			_part(parts, "s_trunk", base, 0.0, Color.WHITE)
+			_part(parts, "s_leaf", base, 0.0, Color(0.1 + g, 0.38 + g, 0.22))
 		elif kind < 0.82:
 			# Birke mit goldener Krone
-			_part(parts, "b_trunk", base, 2.0, Color(0.92, 0.92, 0.88))
-			_part(parts, "b_c1", base, 4.3, Color(0.75, 0.8, 0.25))
-			_part(parts, "b_c2", base, 3.6, Color(0.85, 0.75, 0.2), Vector3(0.6, 0, 0.3))
+			var bg := rng.randf()
+			_part(parts, "b_trunk", base, 0.0, Color.WHITE)
+			_part(parts, "b_mark", base, 0.0, Color.WHITE)
+			_part(parts, "b_leaf", base, 0.0, Color(0.55 + bg * 0.3, 0.72 + bg * 0.08, 0.2))
 		else:
 			# Laubbaum in Herbstfarben
 			var crown: Color = autumn[rng.randi() % autumn.size()]
-			_part(parts, "l_trunk", base, 1.5, Color(0.4, 0.26, 0.14))
-			_part(parts, "l_c1", base, 3.8, crown)
-			_part(parts, "l_c2", base, 3.0, crown.darkened(0.12), Vector3(0.9, 0, 0.4))
+			_part(parts, "l_trunk", base, 0.0, Color.WHITE)
+			_part(parts, "l_leaf", base, 0.0, crown)
 
 		# Unterholz: Büsche (ohne Kollision)
 		if rng.randf() < 0.55 and not Game.low:
@@ -523,30 +516,45 @@ func _build_trees() -> void:
 
 	var fol := Scenery.foliage_material(0.06)
 	_add_multimesh(_sphere_mesh(0.7), parts["bush"], fol)
-	_add_multimesh(_cyl_mesh(0.25, 2.0), parts["s_trunk"])
-	_add_multimesh(_cone_mesh(1.5, 1.8), parts["s_c1"], fol)
-	_add_multimesh(_cone_mesh(1.1, 1.8), parts["s_c2"], fol)
-	_add_multimesh(_cone_mesh(0.7, 1.6), parts["s_c3"], fol)
-	_add_multimesh(_cyl_mesh(0.2, 4.0), parts["b_trunk"])
-	_add_multimesh(_sphere_mesh(1.4), parts["b_c1"], fol)
-	_add_multimesh(_sphere_mesh(1.0), parts["b_c2"], fol)
-	_add_multimesh(_cyl_mesh(0.3, 3.0), parts["l_trunk"])
-	_add_multimesh(_sphere_mesh(1.8), parts["l_c1"], fol)
-	_add_multimesh(_sphere_mesh(1.2), parts["l_c2"], fol)
-	_add_multimesh(_cyl_mesh(0.18, 3.0), parts["p_trunk"])
-	_add_multimesh(_cone_mesh(1.25, 1.7), parts["p_c1"], fol)
-	_add_multimesh(_cone_mesh(1.0, 1.6), parts["p_c2"], fol)
-	_add_multimesh(_cone_mesh(0.75, 1.5), parts["p_c3"], fol)
-	_add_multimesh(_cone_mesh(0.45, 1.3), parts["p_c4"], fol)
-	_add_multimesh(_cyl_mesh(0.22, 4.0), parts["d_trunk"])
-	_add_multimesh(_cyl_mesh(0.07, 1.4), parts["d_b1"])
-	_add_multimesh(_cyl_mesh(0.06, 1.2), parts["d_b2"])
+	for tk in [["fichte", "s"], ["kiefer", "p"], ["birke", "b"], ["eiche", "l"], ["tot", "d"]]:
+		_add_tree_model(tk[0], tk[1], parts, fol)
 	_add_multimesh(_sphere_mesh(0.55), parts["sap"], fol)
 	_add_multimesh(_cyl_mesh(0.06, 1.0), parts["sap_t"])
 
 	var cover_rng := RandomNumberGenerator.new()
 	cover_rng.seed = 4242
 	Scenery.build_ground_cover(self, lake_root, _tree_blocked, cover_rng)
+
+
+## Baummodell (Blender) als MultiMesh: Stamm mit eigenem Material, Laub mit Wind-Shader.
+func _add_tree_model(model: String, pre: String, parts: Dictionary, fol: Material) -> void:
+	var path := "res://assets/trees/baum_%s.glb" % model
+	var inst := (load(path) as PackedScene).instantiate() as Node3D
+	for mi in inst.find_children("*", "MeshInstance3D", true, false):
+		var m3 := mi as MeshInstance3D
+		var nm := String(m3.name).to_lower()
+		var key := ""
+		if nm.contains("laub"):
+			key = pre + "_leaf"
+		elif nm.contains("marken"):
+			key = pre + "_mark"
+		else:
+			key = pre + "_trunk"
+		if not parts.has(key):
+			continue
+		var mat: Material = null
+		if key.ends_with("_leaf"):
+			mat = fol
+		else:
+			var sm := m3.mesh.surface_get_material(0) as BaseMaterial3D
+			var dm := StandardMaterial3D.new()
+			dm.vertex_color_use_as_albedo = true
+			dm.roughness = 0.9
+			if sm != null:
+				dm.albedo_color = sm.albedo_color.darkened(0.3)
+			mat = dm
+		_add_multimesh(m3.mesh, parts[key], mat)
+	inst.free()
 
 
 ## Ast, der unten am Stamm (Höhe y0) ansetzt und schräg nach außen wächst. half = halbe Astlänge.

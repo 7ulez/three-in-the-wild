@@ -16,6 +16,8 @@ static func placed_size(kind: String, size: Vector3) -> Vector3:
 		return Vector3(0.6, 0.9, 0.6)
 	if kind == "Gasgrill":
 		return Vector3(0.66, 0.9, 0.55)
+	if kind == "Kiste mit Proviant":
+		return Vector3(0.5, 0.27, 0.34)
 	if kind == "Feuerschale":
 		return Vector3(0.46, 0.62, 0.46)
 	if kind == "Brennholz":
@@ -292,6 +294,9 @@ static func _firewood(parent: Node3D, size: Vector3) -> Dictionary:
 
 ## Holzkiste mit Klappdeckel (Proviant)
 static func _crate(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
+	var cm := _glb(parent, "kiste")
+	if cm != null:
+		return {"proviant": cm.find_child("Proviant", true, false)}
 	var wood := Color(0.55, 0.38, 0.2)
 	Util.add_box(parent, Vector3(size.x, size.y - 0.06, size.z), wood, Vector3(0, -0.03, 0))
 	for sy in [-0.1, 0.0, 0.1]:
