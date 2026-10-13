@@ -41,8 +41,14 @@ class RemoteAvatar:
 		label.position = Vector3(0, 2.25, 0)
 		add_child(label)
 
+	var _last_pos: Vector3 = Vector3.ZERO
+
 	func _process(delta: float) -> void:
 		global_position = global_position.lerp(target_pos, minf(delta * 12.0, 1.0))
+		if delta > 0.0:
+			var sp := Vector2(global_position.x - _last_pos.x, global_position.z - _last_pos.z).length() / delta
+			Player.animate_body(self, minf(sp, 9.0))
+		_last_pos = global_position
 		rotation.y = lerp_angle(rotation.y, target_yaw, minf(delta * 12.0, 1.0))
 
 

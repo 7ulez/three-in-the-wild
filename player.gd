@@ -182,6 +182,22 @@ func _build_visual() -> void:
 
 ## Baut die Figur (auch für die Avatare der Mitspieler).
 static func build_body(parent: Node3D, char_name: String) -> void:
+	# Fertiges, animiertes Modell (aus Blender), falls vorhanden.
+	var path := "res://assets/chars/%s.glb" % char_name.to_lower()
+	if ResourceLoader.exists(path):
+		var ps: PackedScene = load(path)
+		var inst := ps.instantiate() as Node3D
+		inst.rotation.y = PI          # Modell schaut nach +Z, das Spiel nach -Z
+		inst.scale = Vector3.ONE * 0.92
+		parent.add_child(inst)
+		var ap := _find_anim(inst)
+		if ap != null:
+			for n in ap.get_animation_list():
+				ap.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+			if ap.has_animation("Idle"):
+				ap.play("Idle")
+			parent.set_meta("ap", ap)
+		return
 	var d: Dictionary = CHARS[char_name]
 	var shirt: Color = d["shirt"]
 	Util.add_box(parent, Vector3(0.42, 0.8, 0.26), d["pants"], Vector3(0, 0.4, 0))
@@ -202,6 +218,36 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 	var pack: Color = d["pack"]
 	if pack != Color(0.0, 0.0, 0.0):
 		Util.add_box(parent, Vector3(0.4, 0.5, 0.2), pack, Vector3(0, 1.15, 0.25))
+
+
+static func _find_anim(n: Node) -> AnimationPlayer:
+	if n is AnimationPlayer:
+		return n as AnimationPlayer
+	for c in n.get_children():
+		var r := _find_anim(c)
+		if r != null:
+			return r
+	return null
+
+
+## Wählt die passende Animation für das Lauftempo (Stehen / Gehen / Rennen).
+static func animate_body(parent: Node3D, speed: float) -> void:
+	var ap: AnimationPlayer = parent.get_meta("ap", null) as AnimationPlayer
+	if ap == null:
+		return
+	var want := "Idle"
+	var sc := 1.0
+	if speed > 2.8:
+		want = "Run"
+		sc = clampf(speed / 3.4, 0.7, 2.2)
+	elif speed > 0.3:
+		want = "Walk"
+		sc = clampf(speed / 1.8, 0.6, 1.8)
+	if not ap.has_animation(want):
+		return
+	if ap.current_animation != want:
+		ap.play(want, 0.2)
+	ap.speed_scale = sc
 
 
 func _apply_view() -> void:
@@ -525,6 +571,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = target.x
 		velocity.z = target.z
 	move_and_slide()
+	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length())
 	if is_on_floor():
 		var drop := _peak_y - global_position.y
 		if _airborne and drop > 5.0:
