@@ -14,6 +14,8 @@ func _ready() -> void:
 	if "--server" in OS.get_cmdline_user_args():
 		_start_dedicated()
 		return
+	if OS.has_feature("web"):
+		Game.touch = bool(JavaScriptBridge.eval("window.matchMedia('(pointer: coarse)').matches || window.location.search.includes('touch')"))
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var bg := ColorRect.new()

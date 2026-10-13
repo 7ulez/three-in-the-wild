@@ -162,7 +162,10 @@ func _ready() -> void:
 	_build_hud()
 	set_character(character_name)
 	_apply_view()
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	if Game.touch:
+		add_child(TouchControls.new())
+	else:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func set_character(p_name: String) -> void:
@@ -374,19 +377,22 @@ func _update_help() -> void:
 	if Net.instance != null:
 		net_txt = "  |  Netz: %s, %d Mitspieler" % [Net.instance.status, Net.instance.avatars.size()]
 	help_label.text = "%s  |  trägt: %s  |  Lager: %s  |  %s Tag %d  |  Promille: %.2f%s\nZunder %d · Äste %d · Holz %d · Steine %d  |  Bier %d · Wasser %d  |  Fänge: %d  |  Chili: %d\nWASD laufen · Shift rennen · Space springen · E benutzen · F trinken · R aufstellen · X abbauen · G werfen/Stein flitschen · C ducken · L Kopflampe\nP pinkeln (halten) · H großes Geschäft · Q Vape (Julian) · T Angelmethode · Z Zutat wechseln · V Ansicht · 1/2/3 Charakter · Esc Maus frei" % [character_name, carrying, camp, Game.clock_text(), Game.day_count, promille, net_txt, tinder, sticks, logs, stones, beers_drunk, water_drunk, Game.catches.size(), Game.chili_served]
+	if Game.touch:
+		var hl: PackedStringArray = help_label.text.split("\n")
+		help_label.text = hl[0] + "\n" + hl[1] + "\nLinks: Joystick laufen (ganz raus = rennen) · Rechts wischen: umschauen · Mehr: alle weiteren Aktionen"
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if sleeping:
 		return
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if event is InputEventMouseMotion and Game.is_captured():
 		var mm := event as InputEventMouseMotion
-		rotate_y(-mm.relative.x * MOUSE_SENS)
-		pitch = clampf(pitch - mm.relative.y * MOUSE_SENS, -1.45, 1.45)
+		rotate_y(-mm.screen_relative.x * MOUSE_SENS)
+		pitch = clampf(pitch - mm.screen_relative.y * MOUSE_SENS, -1.45, 1.45)
 		head.rotation.x = pitch
 	elif event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
-		if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+		if not Game.is_captured():
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		elif placing:
 			match mb.button_index:

@@ -26,6 +26,15 @@ static var slept: bool = false
 static var summit: bool = false
 static var all_done_shown: bool = false
 
+# Tablet/Handy: Bildschirm-Steuerung statt Maus und Tastatur
+static var touch: bool = false
+static var touch_reel: bool = false   # "Aktion"-Knopf wird gehalten (Angel einholen)
+
+
+static func is_captured() -> bool:
+	return touch or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+
+
 # Startoptionen (aus dem Menü)
 static var start_char: String = "Marian"
 static var player_name: String = "Spieler"

@@ -187,7 +187,7 @@ func aim_point() -> Vector3:
 func _unhandled_input(event: InputEvent) -> void:
 	if player == null or player.placing or player.seat != null or player.sleeping:
 		return
-	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
+	if not Game.is_captured():
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if (event as InputEventKey).keycode == KEY_T and has_rod():
@@ -369,6 +369,8 @@ func _process(delta: float) -> void:
 func _reeling() -> bool:
 	if test_reel >= 0:
 		return test_reel == 1
+	if Game.touch:
+		return Game.touch_reel
 	return Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
