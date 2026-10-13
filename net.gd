@@ -26,6 +26,9 @@ class RemoteAvatar:
 	var _pee: CPUParticles3D = null
 	var _pee_on: bool = false
 	var _wet_cd: float = 0.0
+	var _vom: CPUParticles3D = null
+	var _vom_on: bool = false
+	var _vom_cd: float = 0.0
 
 	func set_look(p_char: String, p_name: String) -> void:
 		if p_char == char_name:
@@ -52,6 +55,26 @@ class RemoteAvatar:
 		if delta > 0.0:
 			var sp := Vector2(global_position.x - _last_pos.x, global_position.z - _last_pos.z).length() / delta
 			Player.animate_body(self, minf(sp, 9.0), (anim & 1) != 0, (anim & 2) != 0, (anim >> 2) & 3, (anim & 16) != 0, (anim & 32) != 0, (anim & 64) != 0, 1 if (anim & 256) != 0 else (2 if (anim & 512) != 0 else 0))
+		# Kotzen der anderen: gebeugte Haltung, Strahl, Lache
+		var vom_now := (anim & 1024) != 0
+		Player.vomit_pose(self, vom_now, delta)
+		if _vom == null:
+			_vom = Fx.vomit_stream()
+			add_child(_vom)
+		if vom_now != _vom_on:
+			_vom_on = vom_now
+			if vom_now:
+				Sfx.play("retch", global_position, 2.0)
+				get_tree().create_timer(1.0).timeout.connect(func() -> void:
+					if _vom_on:
+						Sfx.play("vomit", global_position, 4.0))
+		_vom.emitting = vom_now
+		if vom_now:
+			_vom_cd -= delta
+			if _vom_cd <= 0.0:
+				_vom_cd = 0.25
+				var vp := global_position - global_transform.basis.z * 1.5
+				Fx.vomit_puddle(get_parent(), Vector3(vp.x, 0.0, vp.z))
 		# Pinkeln der anderen: Strahl + nasse Stelle
 		var pee_now := (anim & 128) != 0
 		if _pee == null:

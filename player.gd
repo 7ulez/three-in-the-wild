@@ -52,6 +52,11 @@ var pitch: float = 0.0
 
 # Bier und Betrunkenheit
 var promille: float = 0.0
+var vomit_t: float = 0.0           # >0: gerade am Übergeben
+var sober_t: float = 0.0           # >0: nach dem Kotzen baut sich der Alkohol schneller ab
+var vomit_tilt: float = 0.0
+var _vomit_fx: CPUParticles3D = null
+var _vomit_cd: float = 0.0
 var beers_drunk: int = 0
 var drink_tilt: float = 0.0
 var _drink_cd: float = 0.0
@@ -198,6 +203,7 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 		inst.rotation.y = PI          # Modell schaut nach +Z, das Spiel nach -Z
 		inst.scale = Vector3.ONE * 0.92
 		parent.add_child(inst)
+		parent.set_meta("inst", inst)
 		var ap := _find_anim(inst)
 		if ap != null:
 			for n in ap.get_animation_list():
@@ -268,6 +274,18 @@ static func _paint_bottle(b: Node3D, kind: int) -> void:
 	for mi in b.find_children("*", "MeshInstance3D", true, false):
 		if mi.name == "glass":
 			(mi as MeshInstance3D).material_override = Util.mat(glass, 0.2)
+
+
+## Vornübergebeugt kotzen: Oberkörper kippt nach vorn, im Rhythmus des Würgens.
+static func vomit_pose(parent: Node3D, on: bool, delta: float) -> void:
+	var inst: Node3D = parent.get_meta("inst", null) as Node3D
+	if inst == null:
+		return
+	var target := 0.0
+	if on:
+		var t := Time.get_ticks_msec() / 1000.0
+		target = deg_to_rad(26.0 + 10.0 * maxf(sin(t * 7.0), 0.0))
+	inst.rotation.x = lerp_angle(inst.rotation.x, target, minf(delta * 9.0, 1.0))
 
 
 static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0, squat: bool = false, sit: bool = false, vape: bool = false, drink: int = 0) -> void:
@@ -371,6 +389,8 @@ func anim_flags() -> int:
 		f |= 64
 	if needs != null and needs.peeing:
 		f |= 128
+	if vomit_t > 0.0:
+		f |= 1024
 	if drink_t > 0.0:
 		f |= 256 if drink_kind == 1 else 512
 	return f
@@ -643,6 +663,15 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	vape_t = maxf(vape_t - delta, 0.0)
 	drink_t = maxf(drink_t - delta, 0.0)
+	if sober_t > 0.0:
+		sober_t -= delta
+		promille = maxf(promille - delta * 0.03, 0.0)
+	if vomit_t > 0.0:
+		_vomit_tick(delta)
+	elif promille > 2.2 and seat == null and hammock == null and not sleeping and randf() < delta * 0.06:
+		start_vomit()
+	vomit_tilt = lerpf(vomit_tilt, 0.85 if vomit_t > 0.0 else 0.0, minf(delta * 6.0, 1.0))
+	Player.vomit_pose(body_visual, vomit_t > 0.0, delta)
 	if sleeping:
 		velocity = Vector3.ZERO
 		return
@@ -718,7 +747,11 @@ func _physics_process(delta: float) -> void:
 	speed *= 1.0 - 0.45 * water_d
 	speed *= 1.0 - 0.25 * minf(drunk, 1.0)
 	var target := dir * speed
-	if drunk > 0.0:
+	if vomit_t > 0.0:
+		target = Vector3.ZERO
+		velocity.x = 0.0
+		velocity.z = 0.0
+	if drunk > 0.0 and vomit_t <= 0.0:
 		# Schwammige Steuerung: die Figur reagiert verzögert
 		var k := 1.0 - exp(-delta * lerpf(14.0, 2.2, minf(drunk, 1.0)))
 		velocity.x = lerpf(velocity.x, target.x, k)
@@ -759,7 +792,7 @@ func _process(delta: float) -> void:
 			toast("Der Gestank ist weg.", 2.5)
 	var t := Time.get_ticks_msec() / 1000.0
 	var drunk := clampf(promille / 1.5, 0.0, 1.5)
-	head.rotation.x = clampf(pitch + drink_tilt + sin(t * 0.7) * 0.06 * drunk, -1.55, 1.55)
+	head.rotation.x = clampf(pitch + drink_tilt + vomit_tilt + sin(t * 0.7) * 0.06 * drunk, -1.55, 1.55)
 	camera.rotation.z = sin(t * 0.9) * 0.12 * drunk + sin(t * 2.3) * 0.04 * drunk
 	camera.fov = 75.0 + sin(t * 0.5) * 8.0 * drunk
 	blur_rect.visible = drunk > 0.05
@@ -811,6 +844,8 @@ func _drink() -> void:
 		promille = maxf(promille - 0.12, 0.0)
 		msg = "Ahh, frisches Wasser." if promille < 0.3 else "Wasser hilft. Ein bisschen."
 	Sfx.play("gulp" if kind == "water" else "pop", Vector3.INF, -2.0)
+	if kind == "beer" and promille > 1.4 and randf() < clampf((promille - 1.4) * 0.6, 0.0, 1.0):
+		get_tree().create_timer(1.7).timeout.connect(start_vomit)
 	if kind == "beer" and randf() < 0.3:
 		get_tree().create_timer(1.2).timeout.connect(func() -> void: Sfx.play("burp", global_position, -3.0, randf_range(0.8, 1.2)))
 	var tw := create_tween()
@@ -819,6 +854,42 @@ func _drink() -> void:
 	tw.tween_property(self, "drink_tilt", 0.0, 0.35)
 	toast("%s  (noch %d)" % [msg, src.drinks_left()], 3.0)
 	_update_help()
+
+
+## Übergeben: kurz vornübergebeugt würgen, dann kommt es raus. Danach geht es einem besser.
+func start_vomit() -> void:
+	if vomit_t > 0.0 or seat != null or hammock != null or sleeping or trapped_t > 0.0 or (needs != null and needs.squatting):
+		return
+	vomit_t = 3.6
+	_vomit_cd = 0.0
+	toast("Oh nein ... dir wird schlecht!", 3.0)
+	Sfx.play("retch", global_position, 2.0)
+
+
+func _vomit_tick(delta: float) -> void:
+	var before := vomit_t
+	vomit_t -= delta
+	if _vomit_fx == null:
+		_vomit_fx = Fx.vomit_stream()
+		add_child(_vomit_fx)
+	var spewing := vomit_t < 2.6 and vomit_t > 0.4
+	_vomit_fx.emitting = spewing
+	if before >= 2.6 and vomit_t < 2.6:
+		Sfx.play("vomit", global_position, 4.0)
+	if spewing:
+		_vomit_cd -= delta
+		if _vomit_cd <= 0.0:
+			_vomit_cd = 0.25
+			var tp := global_position - global_transform.basis.z * 1.5
+			Fx.vomit_puddle(get_parent(), Vector3(tp.x, 0.0, tp.z))
+	if vomit_t <= 0.0:
+		vomit_t = 0.0
+		_vomit_fx.emitting = false
+		promille *= 0.55
+		sober_t = 90.0
+		if needs != null:
+			needs.hunger = minf(needs.hunger + 0.15, 1.0)
+		toast("Puh ... jetzt geht es dir schon besser.", 4.0)
 
 
 ## Zufälliges Stolpern bei starker Trunkenheit
