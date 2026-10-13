@@ -71,12 +71,6 @@ func interact(player: Node) -> void:
 	queue_free()
 
 
-## Konsistenz je nach Zustand: Alkohol und Hunger machen es weicher
-static func pick_variant(promille: float, hunger: float) -> int:
-	var r := randf()
-	var soft := clampf(promille * 0.35 + hunger * 0.2, 0.0, 0.8)
-	if r < soft * 0.45:
-		return 2
-	if r < soft + 0.2:
-		return 1
-	return 0
+## Zufällig eine der drei Varianten
+static func pick_variant(_promille: float = 0.0, _hunger: float = 0.0) -> int:
+	return randi() % 3
