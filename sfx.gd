@@ -3,7 +3,11 @@ extends Node
 ## Alle Geräusche werden beim Spielstart per Code erzeugt (keine Audiodateien nötig).
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
-const RATE: int = 22050
+static var SR: float = 32000.0
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "pop": 2, "spark": 2}
+const LOWRATE: Array = ["wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak"]
+var _warm: Array = []
+var _warm_t: float = 2.0
 static var inst: Sfx = null
 static var cache: Dictionary = {}
 var _amb_wind: AudioStreamPlayer
@@ -18,9 +22,12 @@ func _ready() -> void:
 	inst = self
 	_amb_wind = AudioStreamPlayer.new()
 	_amb_wind.stream = get_stream("wind")
-	_amb_wind.volume_db = -26.0
+	_amb_wind.volume_db = -22.0
 	add_child(_amb_wind)
 	_amb_wind.play()
+	for k in VARIANTS:
+		for v in range(int(VARIANTS[k])):
+			_warm.append([k, v])
 
 
 func _exit_tree() -> void:
@@ -29,6 +36,12 @@ func _exit_tree() -> void:
 
 
 func _process(delta: float) -> void:
+	# Geräusche nach und nach im Hintergrund vorbereiten (ein Stück pro Bild, kein Ruckeln)
+	if not _warm.is_empty():
+		_warm_t -= delta
+		if _warm_t <= 0.0:
+			var w: Array = _warm.pop_back()
+			_variant(w[0], w[1])
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("local_player") as Node3D
 		return
@@ -38,7 +51,7 @@ func _process(delta: float) -> void:
 		_amb_birds_t = randf_range(2.5, 7.0)
 		if not night:
 			var a := randf() * TAU
-			play("chirp", _player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(8.0, 25.0) + Vector3(0, 6, 0), -4.0)
+			play("chirp", _player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(8.0, 25.0) + Vector3(0, 6, 0), -6.0, randf_range(0.85, 1.2))
 	_amb_night_t -= delta
 	if _amb_night_t <= 0.0:
 		_amb_night_t = randf_range(0.5, 1.6)
@@ -47,7 +60,7 @@ func _process(delta: float) -> void:
 			play("cricket", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * randf_range(4.0, 20.0), -10.0)
 			if randf() < 0.12:
 				play("owl", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * 30.0 + Vector3(0, 5, 0), -6.0)
-	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -26.0 if not night else -30.0, 0.02)
+	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -22.0 if not night else -27.0, 0.02)
 
 
 static func play(sound: String, pos: Vector3 = Vector3.INF, vol_db: float = 0.0, pitch: float = 1.0) -> void:
@@ -56,6 +69,8 @@ static func play(sound: String, pos: Vector3 = Vector3.INF, vol_db: float = 0.0,
 	var st := get_stream(sound)
 	if st == null:
 		return
+	if VARIANTS.has(sound):
+		pitch *= randf_range(0.96, 1.04)
 	if pos == Vector3.INF:
 		var p := AudioStreamPlayer.new()
 		p.stream = st
@@ -71,6 +86,7 @@ static func play(sound: String, pos: Vector3 = Vector3.INF, vol_db: float = 0.0,
 		p3.pitch_scale = pitch
 		p3.unit_size = 8.0
 		p3.max_distance = 70.0
+		p3.attenuation_filter_cutoff_hz = 9000.0
 		inst.add_child(p3)
 		p3.global_position = pos
 		p3.finished.connect(p3.queue_free)
@@ -90,21 +106,35 @@ static func loop_at(parent: Node, sound: String, vol_db: float = -6.0, unit: flo
 
 
 static func get_stream(sound: String) -> AudioStreamWAV:
-	if cache.has(sound):
-		return cache[sound]
-	var s := _generate(sound)
-	cache[sound] = s
+	var n: int = int(VARIANTS.get(sound, 1))
+	return _variant(sound, randi() % n)
+
+
+static func _variant(sound: String, v: int) -> AudioStreamWAV:
+	var key := "%s#%d" % [sound, v]
+	if cache.has(key):
+		return cache[key]
+	SR = 16000.0 if LOWRATE.has(sound) else 32000.0
+	var s := _generate(sound, v)
+	if s != null:
+		cache[key] = s
 	return s
 
 
-static func _wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStreamWAV:
+# ---------- Bausteine ----------
+
+static func _wav(samples: PackedFloat32Array, peak: float = 0.8, loop: bool = false) -> AudioStreamWAV:
+	var mx := 0.0001
+	for x in samples:
+		mx = maxf(mx, absf(x))
+	var g := peak / mx
 	var data := PackedByteArray()
 	data.resize(samples.size() * 2)
 	for i in range(samples.size()):
-		data.encode_s16(i * 2, int(clampf(samples[i], -1.0, 1.0) * 30000.0))
+		data.encode_s16(i * 2, int(clampf(samples[i] * g, -1.0, 1.0) * 32000.0))
 	var w := AudioStreamWAV.new()
 	w.format = AudioStreamWAV.FORMAT_16_BITS
-	w.mix_rate = RATE
+	w.mix_rate = int(SR)
 	w.data = data
 	if loop:
 		w.loop_mode = AudioStreamWAV.LOOP_FORWARD
@@ -113,130 +143,427 @@ static func _wav(samples: PackedFloat32Array, loop: bool = false) -> AudioStream
 	return w
 
 
-## Rauschen mit Tiefpass (k klein = dumpf), Hüllkurve exp(-decay*t)
-static func _noise(dur: float, k: float, decay: float, attack: float = 0.0) -> PackedFloat32Array:
-	var n := int(RATE * dur)
+static func _white(dur: float) -> PackedFloat32Array:
+	var n := int(SR * dur)
 	var out := PackedFloat32Array()
 	out.resize(n)
-	var lp := 0.0
 	for i in range(n):
-		var t := float(i) / RATE
-		lp += (randf_range(-1.0, 1.0) - lp) * k
-		var env := exp(-decay * t)
-		if attack > 0.0:
-			env *= minf(t / attack, 1.0)
-		out[i] = lp * env
+		out[i] = randf_range(-1.0, 1.0)
 	return out
 
 
-static func _tone(dur: float, f0: float, f1: float, decay: float, wave: int = 0, vol: float = 0.6) -> PackedFloat32Array:
-	var n := int(RATE * dur)
+## Zustandsvariablenfilter: mode 0 = Tiefpass, 1 = Bandpass, 2 = Hochpass. q klein = schmal/resonant.
+static func _filt(x: PackedFloat32Array, mode: int, fc: float, q: float = 0.7) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(x.size())
+	var f := 2.0 * sin(PI * minf(fc, SR * 0.2) / SR)
+	var damp := 1.0 / maxf(q, 0.05)
+	var low := 0.0
+	var band := 0.0
+	for i in range(x.size()):
+		low += f * band
+		var high := x[i] - low - damp * band
+		band += f * high
+		out[i] = low if mode == 0 else (band * damp * 0.5 if mode == 1 else high)
+	return out
+
+
+## Gefiltertes Rauschen, auf gleiche Lautheit normiert (damit Tiefpass-Rauschen nicht im Hochton-Rauschen untergeht)
+static func _nf(x: PackedFloat32Array, mode: int, fc: float, q: float = 0.7) -> PackedFloat32Array:
+	var y := _filt(x, mode, fc, q)
+	var e := 0.0001
+	for v in y:
+		e += v * v
+	var g := 0.3 / sqrt(e / y.size())
+	for i in range(y.size()):
+		y[i] *= g
+	return y
+
+
+## Bandpass-Rauschen, dessen Mittenfrequenz von f0 nach f1 wandert (Wind, Zischen, Wusch).
+static func _sweep(dur: float, f0: float, f1: float, q: float) -> PackedFloat32Array:
+	var n := int(SR * dur)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var low := 0.0
+	var band := 0.0
+	var damp := 1.0 / q
+	for i in range(n):
+		var fc := lerpf(f0, f1, float(i) / n)
+		var f := 2.0 * sin(PI * minf(fc, SR * 0.2) / SR)
+		low += f * band
+		var high := randf_range(-1.0, 1.0) - low - damp * band
+		band += f * high
+		out[i] = band * damp * 0.5
+	var e := 0.0001
+	for v in out:
+		e += v * v
+	var g := 0.3 / sqrt(e / out.size())
+	for i in range(out.size()):
+		out[i] *= g
+	return out
+
+
+## Hüllkurve: Einschwingen (attack) und exponentielles Ausklingen (decay)
+static func _env(x: PackedFloat32Array, attack: float, decay: float, vol: float = 1.0) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(x.size())
+	for i in range(x.size()):
+		var t := float(i) / SR
+		var e := exp(-decay * t)
+		if attack > 0.0:
+			e *= minf(t / attack, 1.0)
+		out[i] = x[i] * e * vol
+	return out
+
+
+static func _sine(dur: float, f0: float, f1: float, decay: float, vol: float = 0.6, attack: float = 0.002, harm: float = 0.0) -> PackedFloat32Array:
+	var n := int(SR * dur)
 	var out := PackedFloat32Array()
 	out.resize(n)
 	var ph := 0.0
 	for i in range(n):
-		var t := float(i) / RATE
-		var f := lerpf(f0, f1, t / dur)
-		ph += TAU * f / RATE
-		var v := sin(ph)
-		if wave == 1:
-			v = fposmod(ph / TAU, 1.0) * 2.0 - 1.0     # Säge
-		elif wave == 2:
-			v = 1.0 if sin(ph) > 0.0 else -1.0         # Rechteck
-		out[i] = v * vol * exp(-decay * t)
+		var t := float(i) / SR
+		ph += TAU * lerpf(f0, f1, t / dur) / SR
+		var v := sin(ph) + harm * sin(2.0 * ph) + harm * 0.4 * sin(3.0 * ph)
+		out[i] = v * vol * exp(-decay * t) * minf(t / maxf(attack, 0.0001), 1.0)
 	return out
 
 
-static func _mix(a: PackedFloat32Array, b: PackedFloat32Array, offset: int = 0) -> PackedFloat32Array:
-	var n := maxi(a.size(), b.size() + offset)
+## Wasserblase: kurzer Sinus, dessen Tonhöhe schnell ansteigt
+static func _bubble(f: float, vol: float) -> PackedFloat32Array:
+	var d := 0.012 + 3.0 / f
+	return _sine(d * 2.5, f, f * randf_range(1.5, 2.2), 38.0 + f * 0.012, vol, 0.001)
+
+
+static func _add(dst: PackedFloat32Array, src: PackedFloat32Array, offset_s: float = 0.0, gain: float = 1.0) -> PackedFloat32Array:
+	var off := int(offset_s * SR)
+	if dst.size() < src.size() + off:
+		dst.resize(src.size() + off)
+	for i in range(src.size()):
+		dst[i + off] += src[i] * gain
+	return dst
+
+
+static func _sat(x: PackedFloat32Array, drive: float) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(x.size())
+	for i in range(x.size()):
+		out[i] = tanh(x[i] * drive)
+	return out
+
+
+## Kleiner Hall aus vier Kammfiltern (für Eule, Höhle, Donnern).
+static func _reverb(x: PackedFloat32Array, wet: float, tail: float = 0.5) -> PackedFloat32Array:
+	var n := x.size() + int(SR * tail)
 	var out := PackedFloat32Array()
 	out.resize(n)
-	for i in range(a.size()):
-		out[i] += a[i]
-	for j in range(b.size()):
-		out[j + offset] += b[j]
+	for i in range(x.size()):
+		out[i] = x[i]
+	for d in [0.0297, 0.0371, 0.0411, 0.0533]:
+		var dl := int(SR * d)
+		var buf := PackedFloat32Array()
+		buf.resize(n)
+		for i in range(n):
+			var inp := x[i] if i < x.size() else 0.0
+			buf[i] = inp + (buf[i - dl] * 0.62 if i >= dl else 0.0)
+			out[i] += buf[i] * wet * 0.35
 	return out
 
 
-static func _generate(sound: String) -> AudioStreamWAV:
+## Macht aus einem längeren Stück eine nahtlose Schleife (Überblenden von Ende und Anfang).
+static func _loopify(x: PackedFloat32Array, fade_s: float) -> PackedFloat32Array:
+	var fade := int(SR * fade_s)
+	var n := x.size() - fade
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in range(n):
+		out[i] = x[i]
+	for i in range(fade):
+		var w := float(i) / fade
+		out[i] = x[i] * sin(w * PI * 0.5) + x[n + i] * cos(w * PI * 0.5)
+	return out
+
+
+static func _lfo(i: int, n: int, cycles: float, phase: float = 0.0) -> float:
+	return 0.5 + 0.5 * sin(TAU * (cycles * float(i) / n + phase))
+
+
+# ---------- die Geräusche ----------
+
+static func _generate(sound: String, v: int) -> AudioStreamWAV:
 	match sound:
 		"step":
-			return _wav(_noise(0.14, 0.18, 30.0))
+			# Schritt auf Gras/Waldboden: dumpfer Tritt + raschelndes Laub
+			var thud := _env(_nf(_white(0.2), 0, randf_range(220.0, 320.0), 0.8), 0.004, 28.0, 1.0)
+			thud = _add(thud, _sine(0.12, randf_range(95.0, 130.0), 55.0, 34.0, 0.5, 0.003))
+			var leaf := _env(_nf(_white(0.25), 1, randf_range(1800.0, 2800.0), 1.5), 0.012, 16.0, 0.7)
+			return _wav(_add(thud, leaf, randf_range(0.01, 0.035)), 0.6)
 		"step_gravel":
-			return _wav(_noise(0.12, 0.5, 38.0))
+			var s := _env(_nf(_white(0.15), 0, 400.0, 0.8), 0.004, 40.0, 0.7)
+			var grains := int(randf_range(7, 12))
+			for k in range(grains):
+				var gr := _env(_nf(_white(0.02), 1, randf_range(2000.0, 5500.0), 1.2), 0.001, 150.0, randf_range(0.3, 1.0) * (1.0 - float(k) / grains * 0.6))
+				s = _add(s, gr, randf_range(0.0, 0.13))
+			return _wav(s, 0.6)
 		"splash":
-			return _wav(_mix(_noise(0.7, 0.35, 5.0, 0.01), _tone(0.25, 400.0, 120.0, 12.0, 0, 0.3)))
+			var s := _env(_nf(_white(1.2), 1, 800.0, 1.0), 0.02, 4.5, 1.2)
+			s = _add(s, _env(_sweep(0.6, 3000.0, 1200.0, 1.5), 0.004, 9.0, 0.5))
+			s = _add(s, _sine(0.3, 150.0, 45.0, 11.0, 0.9, 0.004))
+			for k in range(18):
+				s = _add(s, _bubble(randf_range(320.0, 1500.0), randf_range(0.15, 0.4)), randf_range(0.04, 0.8))
+			return _wav(s, 0.85)
 		"splash_small":
-			return _wav(_mix(_noise(0.3, 0.4, 12.0, 0.005), _tone(0.12, 600.0, 250.0, 25.0, 0, 0.25)))
+			var s := _env(_nf(_white(0.5), 1, 1500.0, 1.2), 0.004, 13.0, 0.6)
+			s = _add(s, _sine(0.14, 260.0, 110.0, 24.0, 0.5, 0.003))
+			for k in range(int(randf_range(3, 6))):
+				s = _add(s, _bubble(randf_range(500.0, 1800.0), randf_range(0.2, 0.45)), randf_range(0.02, 0.3))
+			return _wav(s, 0.7)
 		"pop":
-			return _wav(_tone(0.1, 500.0, 250.0, 30.0, 0, 0.5))
+			# Flasche öffnen: Plopp + feines Zischen
+			var s := _sine(0.12, 520.0, 260.0, 45.0, 0.9, 0.001, 0.2)
+			s = _add(s, _env(_nf(_white(0.05), 0, 1600.0, 0.7), 0.0005, 70.0, 0.9))
+			s = _add(s, _env(_nf(_white(0.6), 2, 4500.0, 0.7), 0.01, 5.5, 0.18), 0.03)
+			return _wav(s, 0.75)
 		"thunk":
-			return _wav(_mix(_tone(0.25, 110.0, 60.0, 14.0, 0, 0.8), _noise(0.1, 0.3, 40.0)))
+			var s := _sine(0.4, randf_range(95.0, 115.0), 48.0, 15.0, 0.9, 0.002, 0.15)
+			s = _add(s, _env(_nf(_white(0.15), 0, 650.0, 0.8), 0.001, 40.0, 1.0))
+			s = _add(s, _env(_nf(_white(0.3), 1, randf_range(380.0, 520.0), 5.0), 0.001, 22.0, 0.6))
+			return _wav(s, 0.85)
 		"whoosh":
-			return _wav(_noise(0.5, 0.12, 4.0, 0.15))
+			var s := _filt(_sweep(0.65, 500.0, 2400.0, 2.0), 0, 3200.0, 0.7)
+			var out := PackedFloat32Array()
+			out.resize(s.size())
+			for i in range(s.size()):
+				var w := float(i) / s.size()
+				out[i] = s[i] * sin(w * PI) * sin(w * PI)
+			return _wav(out, 0.6)
 		"plop":
-			return _wav(_tone(0.25, 320.0, 70.0, 9.0, 0, 0.7))
+			var s := _sine(0.3, 300.0, 120.0, 13.0, 0.8, 0.003, 0.1)
+			s = _add(s, _env(_nf(_white(0.12), 0, 500.0, 0.8), 0.002, 30.0, 0.8))
+			s = _add(s, _bubble(randf_range(260.0, 420.0), 0.4), 0.07)
+			s = _add(s, _bubble(randf_range(500.0, 800.0), 0.25), 0.13)
+			return _wav(s, 0.8)
 		"gulp":
-			return _wav(_mix(_tone(0.12, 300.0, 150.0, 18.0, 0, 0.6), _tone(0.12, 260.0, 120.0, 18.0, 0, 0.6), 4000))
+			var s := PackedFloat32Array()
+			for k in range(2):
+				var o := k * randf_range(0.2, 0.28)
+				var body := _sine(0.14, randf_range(170.0, 210.0), 90.0, 16.0, 0.8, 0.012, 0.3)
+				s = _add(s, body, o)
+				s = _add(s, _env(_nf(_white(0.14), 1, 750.0, 2.0), 0.01, 18.0, 0.6), o)
+				s = _add(s, _bubble(randf_range(500.0, 900.0), 0.2), o + 0.05)
+			return _wav(s, 0.75)
 		"crunch":
-			return _wav(_mix(_noise(0.08, 0.7, 40.0), _noise(0.08, 0.7, 40.0), 2200))
+			var s := PackedFloat32Array()
+			for k in range(int(randf_range(4, 7))):
+				var o := randf_range(0.0, 0.28)
+				s = _add(s, _env(_nf(_white(0.04), 2, randf_range(1200.0, 2800.0), 0.8), 0.001, randf_range(70.0, 130.0), randf_range(0.5, 1.0)), o)
+				s = _add(s, _env(_nf(_white(0.05), 0, 700.0, 0.8), 0.001, 70.0, 0.5), o)
+			return _wav(s, 0.8)
 		"snap":
-			return _wav(_mix(_noise(0.15, 0.9, 30.0), _tone(0.3, 160.0, 50.0, 10.0, 1, 0.5)))
+			var s := _env(_nf(_white(0.12), 2, 1800.0, 0.7), 0.0003, 60.0, 1.2)
+			for pair in [[1180.0, 22.0, 0.35], [2310.0, 30.0, 0.25], [3470.0, 42.0, 0.15]]:
+				s = _add(s, _sine(0.4, pair[0], pair[0], pair[1], pair[2], 0.0005))
+			s = _add(s, _sine(0.3, 150.0, 60.0, 16.0, 0.4, 0.001), 0.003)
+			s = _add(s, _sine(0.5, 640.0, 560.0, 11.0, 0.12, 0.001), 0.02)
+			return _wav(s, 0.9)
 		"click":
-			return _wav(_noise(0.04, 0.9, 80.0))
+			var s := _env(_nf(_white(0.05), 1, randf_range(2600.0, 3600.0), 2.5), 0.0003, 110.0, 1.0)
+			s = _add(s, _sine(0.04, 1700.0, 1500.0, 140.0, 0.4, 0.0003))
+			s = _add(s, _env(_nf(_white(0.06), 1, 1200.0, 2.0), 0.0003, 90.0, 0.4), 0.03)
+			return _wav(s, 0.6)
 		"spark":
-			return _wav(_noise(0.12, 0.9, 25.0))
+			# Feuerstahl: kratzendes Schaben mit hellen Funken
+			var s := _env(_nf(_white(0.3), 2, 3500.0, 0.7), 0.01, 9.0, 0.35)
+			s = _add(s, _env(_nf(_white(0.28), 1, 5500.0, 1.5), 0.02, 12.0, 0.25))
+			for k in range(22):
+				s = _add(s, _env(_nf(_white(0.012), 1, randf_range(4500.0, 9000.0), 2.0), 0.0003, 200.0, randf_range(0.3, 1.0)), randf_range(0.0, 0.26))
+			return _wav(s, 0.65)
 		"ignite":
-			return _wav(_noise(0.9, 0.15, 3.0, 0.1))
+			var s := _env(_nf(_white(1.6), 0, 550.0, 0.7), 0.12, 2.4, 1.4)
+			s = _add(s, _env(_nf(_white(1.2), 1, 1600.0, 0.6), 0.05, 4.0, 0.4))
+			for k in range(14):
+				s = _add(s, _env(_nf(_white(0.02), 1, randf_range(1500.0, 4000.0), 1.5), 0.0003, 160.0, randf_range(0.3, 0.9)), randf_range(0.15, 1.3))
+			return _wav(s, 0.8)
 		"chirp":
-			return _wav(_mix(_tone(0.09, 2600.0, 3800.0, 14.0, 0, 0.3), _tone(0.09, 3200.0, 2400.0, 14.0, 0, 0.3), 3500))
+			return _wav(_bird(v), 0.6)
 		"cricket":
-			var c := PackedFloat32Array()
-			for k in range(4):
-				c = _mix(c, _tone(0.05, 4300.0, 4300.0, 20.0, 0, 0.18), k * 2000)
-			return _wav(c)
+			var s := PackedFloat32Array()
+			var f := randf_range(4300.0, 4900.0)
+			for burst in range(2 + v % 2):
+				for k in range(3):
+					var pulse := _sine(0.016, f, f, 0.0, 0.5, 0.004)
+					for i in range(pulse.size()):
+						pulse[i] *= sin(PI * float(i) / pulse.size())
+					s = _add(s, pulse, burst * 0.21 + k * 0.032)
+			return _wav(s, 0.45)
 		"owl":
-			return _wav(_mix(_tone(0.4, 380.0, 330.0, 4.0, 0, 0.4), _tone(0.5, 380.0, 300.0, 3.5, 0, 0.4), 12000))
+			var s := PackedFloat32Array()
+			s = _add(s, _hoot(0.16, 430.0, 400.0), 0.0)
+			s = _add(s, _hoot(0.55, 420.0, 340.0), 0.3)
+			s = _add(s, _hoot(0.16, 430.0, 400.0), 1.3)
+			s = _add(s, _hoot(0.55, 420.0, 340.0), 1.6)
+			return _wav(_reverb(s, 0.8, 0.9), 0.7)
 		"croak":
-			return _wav(_mix(_tone(0.18, 170.0, 120.0, 8.0, 2, 0.25), _tone(0.14, 190.0, 130.0, 10.0, 2, 0.25), 5000))
+			var s := PackedFloat32Array()
+			for k in range(1 + v % 2 + 1):
+				s = _add(s, _croak(), k * 0.3)
+			return _wav(s, 0.7)
 		"quack":
-			return _wav(_tone(0.22, 520.0, 300.0, 8.0, 1, 0.35))
+			var s := PackedFloat32Array()
+			for k in range(2 if v == 2 else 1):
+				s = _add(s, _quack(), k * 0.28)
+			return _wav(s, 0.75)
 		"burp":
-			return _wav(_tone(0.5, 130.0, 70.0, 3.0, 1, 0.5))
+			var n := int(SR * 0.7)
+			var raw := PackedFloat32Array()
+			raw.resize(n)
+			var ph := 0.0
+			for i in range(n):
+				var t := float(i) / SR
+				ph += TAU * (95.0 - 40.0 * t + 6.0 * sin(t * 40.0)) / SR
+				var saw := fposmod(ph / TAU, 1.0) * 2.0 - 1.0
+				raw[i] = saw * minf(t / 0.06, 1.0) * exp(-2.8 * t)
+			var f1 := _filt(raw, 1, 520.0, 2.5)
+			var f2 := _filt(raw, 1, 1000.0, 3.0)
+			var s := _add(f1, f2, 0.0, 0.5)
+			s = _add(s, _env(_nf(_white(0.5), 0, 400.0, 0.7), 0.05, 5.0, 0.3))
+			return _wav(_sat(s, 1.8), 0.8)
 		"rumble":
-			return _wav(_noise(1.6, 0.05, 1.5, 0.1))
+			var s := _env(_nf(_white(2.2), 0, 110.0, 0.7), 0.25, 1.4, 5.0)
+			s = _add(s, _env(_nf(_white(2.0), 0, 260.0, 0.7), 0.1, 2.0, 1.2))
+			s = _add(s, _sine(2.0, 42.0, 34.0, 1.6, 0.5, 0.2))
+			return _wav(_reverb(s, 0.4, 0.5), 0.85)
 		"buzz":
-			return _wav(_mix(_tone(1.0, 210.0, 230.0, 0.8, 1, 0.3), _noise(1.0, 0.5, 0.8)))
+			var n := int(SR * 1.2)
+			var raw := PackedFloat32Array()
+			raw.resize(n)
+			var ph := 0.0
+			for i in range(n):
+				var t := float(i) / SR
+				ph += TAU * (190.0 + 12.0 * sin(t * 9.0) + 25.0 * sin(t * 2.3)) / SR
+				var saw := fposmod(ph / TAU, 1.0) * 2.0 - 1.0
+				raw[i] = saw * (0.65 + 0.35 * sin(t * TAU * 38.0)) * minf(t / 0.1, 1.0) * minf((1.2 - t) / 0.2, 1.0)
+			var s := _filt(raw, 1, 900.0, 0.9)
+			s = _add(s, _filt(raw, 2, 2400.0, 0.7), 0.0, 0.3)
+			return _wav(s, 0.7)
 		"trickle":
-			return _wav(_noise(0.8, 0.3, 1.0, 0.1))
+			var n := 1.4
+			var s := _env(_nf(_white(n), 1, 2600.0, 0.8), 0.12, 0.0, 0.6)
+			var wob := _nf(_white(n), 0, 12.0, 0.7)
+			for i in range(s.size()):
+				s[i] *= 0.6 + 2.5 * wob[i]
+			for k in range(26):
+				s = _add(s, _bubble(randf_range(500.0, 2000.0), randf_range(0.1, 0.3)), randf_range(0.1, n - 0.2))
+			for i in range(s.size()):
+				s[i] *= minf(float(s.size() - i) / (SR * 0.25), 1.0)
+			return _wav(s, 0.55)
 		"toast":
-			return _wav(_tone(0.18, 880.0, 1100.0, 10.0, 0, 0.25))
+			var s := _sine(0.7, 880.0, 880.0, 7.0, 0.6, 0.003)
+			s = _add(s, _sine(0.5, 1760.0, 1760.0, 11.0, 0.25, 0.003))
+			s = _add(s, _sine(0.3, 2640.0, 2640.0, 18.0, 0.1, 0.003))
+			return _wav(s, 0.5)
 		"wind":
-			return _wav(_loopable_noise(3.0, 0.02), true)
+			var d := 6.0
+			var raw := _white(d + 0.8)
+			var n := raw.size()
+			var out := PackedFloat32Array()
+			out.resize(n)
+			var low := 0.0
+			var band := 0.0
+			for i in range(n):
+				var fc := 260.0 + 380.0 * _lfo(i, n, 3.0) + 160.0 * _lfo(i, n, 7.0, 0.3)
+				var f := 2.0 * sin(PI * fc / SR)
+				low += f * band
+				var high := raw[i] - low - 0.9 * band
+				band += f * high
+				out[i] = band * (0.35 + 0.65 * _lfo(i, n, 2.0, 0.1) * _lfo(i, n, 5.0, 0.6))
+			return _wav(_loopify(_filt(out, 0, 1100.0, 0.7), 0.8), 0.7, true)
 		"fire":
-			var f := _loopable_noise(2.0, 0.25)
-			for i in range(f.size()):
-				if randf() < 0.002:
-					for j in range(mini(300, f.size() - i)):
-						f[i + j] += randf_range(-0.6, 0.6) * (1.0 - float(j) / 300.0)
-			return _wav(f, true)
+			var d := 4.0
+			var s := _env(_nf(_white(d + 0.5), 0, 420.0, 0.7), 0.0, 0.0, 1.2)
+			s = _add(s, _env(_nf(_white(d + 0.5), 1, 1200.0, 0.5), 0.0, 0.0, 0.18))
+			for k in range(int(d * 22)):
+				var fz := randf_range(900.0, 4500.0)
+				var c := _env(_nf(_white(0.03), 1, fz, 1.5), 0.0004, randf_range(90.0, 220.0), randf_range(0.3, 1.4))
+				s = _add(s, c, randf_range(0.0, d + 0.4))
+			s.resize(int(SR * (d + 0.5)))
+			return _wav(_loopify(s, 0.5), 0.7, true)
 		"water":
-			return _wav(_loopable_noise(3.0, 0.08), true)
+			var d := 5.0
+			var s := _nf(_white(d + 0.6), 0, 700.0, 0.7)
+			for i in range(s.size()):
+				s[i] *= 0.4 + 0.6 * _lfo(i, s.size(), 4.0)
+			for k in range(int(d * 5)):
+				s = _add(s, _bubble(randf_range(400.0, 1200.0), 0.1), randf_range(0.0, d + 0.4))
+			s.resize(int(SR * (d + 0.6)))
+			return _wav(_loopify(s, 0.6), 0.6, true)
 	return null
 
 
-static func _loopable_noise(dur: float, k: float) -> PackedFloat32Array:
-	var n := int(RATE * dur)
+## Vogelgesang: ein paar Töne mit Vibrato und Glissando, je Variante ein anderer Vogel.
+static func _bird(v: int) -> PackedFloat32Array:
+	var s := PackedFloat32Array()
+	var base := randf_range(2600.0, 3800.0)
+	var notes: int = [3, 2, 4, 5, 3][v % 5]
+	var gap: float = [0.11, 0.2, 0.08, 0.06, 0.15][v % 5]
+	for k in range(notes):
+		var dur := randf_range(0.05, 0.1)
+		var n := int(SR * dur)
+		var note := PackedFloat32Array()
+		note.resize(n)
+		var f0 := base * randf_range(0.8, 1.3)
+		var f1 := f0 * randf_range(0.7, 1.5)
+		var vib := randf_range(0.0, 0.08) if v != 1 else 0.0
+		var ph := 0.0
+		for i in range(n):
+			var t := float(i) / n
+			var fr := lerpf(f0, f1, t) * (1.0 + vib * sin(TAU * 38.0 * t * dur))
+			ph += TAU * fr / SR
+			note[i] = (sin(ph) + 0.25 * sin(2.0 * ph)) * sin(PI * t) * 0.6
+		s = _add(s, note, k * (dur + gap))
+	return s
+
+
+static func _hoot(dur: float, f0: float, f1: float) -> PackedFloat32Array:
+	var n := int(SR * dur)
 	var out := PackedFloat32Array()
 	out.resize(n)
-	var lp := 0.0
+	var ph := 0.0
 	for i in range(n):
-		lp += (randf_range(-1.0, 1.0) - lp) * k
-		out[i] = lp * 2.2
-	# weich ausblenden, damit die Schleife nicht knackt
-	var fade := 1500
-	for i in range(fade):
-		var w := float(i) / fade
-		out[i] *= w
-		out[n - 1 - i] *= w
+		var t := float(i) / n
+		ph += TAU * lerpf(f0, f1, t) / SR
+		var e := sin(PI * pow(t, 0.6))
+		out[i] = (sin(ph) + 0.35 * sin(2.0 * ph) + 0.1 * sin(3.0 * ph)) * e * 0.6
 	return out
+
+
+static func _croak() -> PackedFloat32Array:
+	var dur := 0.22
+	var n := int(SR * dur)
+	var raw := PackedFloat32Array()
+	raw.resize(n)
+	var ph := 0.0
+	for i in range(n):
+		var t := float(i) / SR
+		ph += TAU * (230.0 - 70.0 * t / dur) / SR
+		var pulse := maxf(0.0, sin(TAU * 52.0 * t))
+		raw[i] = sin(ph) * pulse * sin(PI * t / dur)
+	var s := _filt(raw, 1, 900.0, 1.2)
+	return _add(s, _filt(raw, 1, 1700.0, 1.5), 0.0, 0.4)
+
+
+static func _quack() -> PackedFloat32Array:
+	var dur := 0.2
+	var n := int(SR * dur)
+	var raw := PackedFloat32Array()
+	raw.resize(n)
+	var ph := 0.0
+	for i in range(n):
+		var t := float(i) / SR
+		ph += TAU * (470.0 - 120.0 * t / dur + 18.0 * sin(t * 60.0)) / SR
+		var saw := fposmod(ph / TAU, 1.0) * 2.0 - 1.0
+		raw[i] = saw * minf(t / 0.012, 1.0) * exp(-7.0 * t)
+	var s := _filt(raw, 1, 1100.0, 3.0)
+	s = _add(s, _filt(raw, 1, 2300.0, 3.5), 0.0, 0.6)
+	return _add(s, _filt(raw, 1, 600.0, 2.5), 0.0, 0.5)

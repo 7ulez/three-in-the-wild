@@ -1574,7 +1574,9 @@ func _footsteps(delta: float) -> void:
 			if water_d > 0.15:
 				Sfx.play("splash_small", global_position, -8.0, randf_range(0.9, 1.2))
 			else:
-				Sfx.play("step", global_position, -8.0, randf_range(0.85, 1.15))
+				var gp := global_position
+				var gravel := absf(gp.x) < 13.5 and gp.z > -5.0 and gp.z < 7.0
+				Sfx.play("step_gravel" if gravel else "step", gp, -6.0, randf_range(0.9, 1.1))
 	var wet := water_d > 0.3
 	if wet and not _was_in_water:
 		Sfx.play("splash", global_position, 0.0)
