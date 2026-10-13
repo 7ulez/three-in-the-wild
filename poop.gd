@@ -6,6 +6,10 @@ var _flies: CPUParticles3D = null
 
 
 var stepped: bool = false
+var variant: int = 0   # 0 fest, 1 Brei, 2 flüssig
+
+
+const MODELS: Array = ["kot_fest", "kot_brei", "kot_fluessig"]
 
 
 func _process(_delta: float) -> void:
@@ -16,7 +20,7 @@ func _process(_delta: float) -> void:
 		return
 	if Vector2(pl.global_position.x - global_position.x, pl.global_position.z - global_position.z).length() < 0.4 and pl.global_position.y < global_position.y + 0.6:
 		stepped = true
-		scale = Vector3(1.5, 0.35, 1.5)
+		scale = Vector3(1.5, 0.35, 1.5) if variant == 0 else Vector3(1.25, 0.6, 1.25)
 		Sfx.play("plop", global_position, 2.0, 1.3)
 		pl.step_in_poop()
 
@@ -30,11 +34,11 @@ func build() -> void:
 	cs.shape = bs
 	cs.position.y = 0.15
 	add_child(cs)
-	var brown := Color(0.36, 0.22, 0.1)
-	Util.add_cylinder(self, 0.22, 0.12, brown, Vector3(0, 0.06, 0))
-	Util.add_cylinder(self, 0.16, 0.11, brown.lightened(0.05), Vector3(0, 0.17, 0))
-	Util.add_cylinder(self, 0.1, 0.1, brown.lightened(0.1), Vector3(0, 0.27, 0))
-	Util.add_cone(self, 0.06, 0.12, brown.lightened(0.12), Vector3(0.01, 0.38, 0))
+	var inst := ItemModels._glb(self, MODELS[clampi(variant, 0, 2)])
+	if inst == null:
+		var brown := Color(0.36, 0.22, 0.1)
+		Util.add_cylinder(self, 0.22, 0.12, brown, Vector3(0, 0.06, 0))
+		Util.add_cylinder(self, 0.16, 0.11, brown.lightened(0.05), Vector3(0, 0.17, 0))
 	_flies = CPUParticles3D.new()
 	_flies.amount = 6
 	_flies.lifetime = 1.4
@@ -65,3 +69,14 @@ func interact(player: Node) -> void:
 	player.toast("Vergraben. Die Natur sagt danke.", 2.5)
 	Sfx.play("step_gravel", global_position)
 	queue_free()
+
+
+## Konsistenz je nach Zustand: Alkohol und Hunger machen es weicher
+static func pick_variant(promille: float, hunger: float) -> int:
+	var r := randf()
+	var soft := clampf(promille * 0.35 + hunger * 0.2, 0.0, 0.8)
+	if r < soft * 0.45:
+		return 2
+	if r < soft + 0.2:
+		return 1
+	return 0

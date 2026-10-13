@@ -242,12 +242,13 @@ func _finish_big() -> void:
 	bowel = 0.0
 	_urgent_time = 0.0
 	var pile := Poop.new()
+	pile.variant = Poop.pick_variant(player.promille, hunger)
 	player.get_parent().add_child(pile)
 	pile.build()
 	# Der Haufen liegt hinter dir, nicht unter deinen Füßen
 	pile.global_position = player.global_position + player.global_transform.basis.z * 0.7
 	if Net.instance != null and Net.instance.multiplayer.multiplayer_peer != null:
-		Net.instance.send_poop(pile.global_position)
+		Net.instance.send_poop(pile.global_position, pile.variant)
 	Sfx.play("plop", pile.global_position)
 	player.toast("Puh. Das hat gutgetan. Barometer leer. (Der Haufen bleibt liegen - E: vergraben)", 4.5)
 

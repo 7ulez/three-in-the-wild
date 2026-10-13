@@ -6,7 +6,7 @@ extends RefCounted
 ##   "lid" (Deckel mit Gelenk), "contents", "flames", "bottles".
 
 ## Höhe der Grillfläche über dem Boden (für den Dutch Oven)
-const GRILL_TOP: float = 0.8
+const GRILL_TOP: float = 0.85
 
 
 static func placed_size(kind: String, size: Vector3) -> Vector3:
@@ -14,6 +14,12 @@ static func placed_size(kind: String, size: Vector3) -> Vector3:
 		return Vector3(0.5, 0.95, 0.5)
 	if kind == "Rutenständer":
 		return Vector3(0.6, 0.9, 0.6)
+	if kind == "Gasgrill":
+		return Vector3(0.66, 0.9, 0.55)
+	if kind == "Feuerschale":
+		return Vector3(0.46, 0.62, 0.46)
+	if kind == "Brennholz":
+		return Vector3(0.6, 0.3, 0.32)
 	return size
 
 
@@ -92,6 +98,25 @@ static func _glb(parent: Node3D, name: String) -> Node3D:
 				sm.roughness = maxf(sm.roughness, 0.5)
 	return inst
 
+## Stoff-Materialien eines Modells einfärben (jede Instanz bekommt eigene Kopien)
+static func _tint(inst: Node3D, mat_name: String, color: Color) -> void:
+	for mi in inst.find_children("*", "MeshInstance3D", true, false):
+		var m3 := mi as MeshInstance3D
+		for i in range(m3.mesh.get_surface_count()):
+			var sm := m3.mesh.surface_get_material(i) as BaseMaterial3D
+			if sm != null and sm.resource_name.begins_with(mat_name):
+				var c := sm.duplicate() as BaseMaterial3D
+				c.albedo_color = color
+				m3.set_surface_override_material(i, c)
+
+
+static func _fire_mat(node: Node3D, col: Color) -> void:
+	var fmat := StandardMaterial3D.new()
+	fmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fmat.albedo_color = col
+	for mi in node.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).material_override = fmat
+
 
 static func _tent_bag(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
 	var roll := Util.add_cylinder(parent, size.z * 0.5, size.x, color, Vector3.ZERO)
@@ -152,27 +177,11 @@ static func _cooler(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
 static func _grill(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
 	var gm := _glb(parent, "gasgrill")
 	if gm != null:
-		# Scharnier hinten oben: der Deckel dreht sich um die Rückkante
-		var stray := gm.find_child("lid", true, false)
-		if stray != null:
-			stray.free()
-		var deckel := gm.find_child("Deckelmesh", true, false) as Node3D
-		var lid := Node3D.new()
-		lid.name = "lid"
-		lid.position = Vector3(0, 0.33, 0.24)
-		gm.add_child(lid)
-		if deckel != null:
-			deckel.position.x = 0.0
-			deckel.reparent(lid, true)
 		var fl := gm.find_child("flames", true, false) as Node3D
 		if fl != null:
 			fl.visible = false
-			var fmat := StandardMaterial3D.new()
-			fmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			fmat.albedo_color = Color(1.0, 0.55, 0.15)
-			for mi in fl.find_children("*", "MeshInstance3D", true, false):
-				(mi as MeshInstance3D).material_override = fmat
-		return {"lid": lid, "flames": fl}
+			_fire_mat(fl, Color(1.0, 0.55, 0.15))
+		return {"flames": fl}
 	var bottom := -size.y / 2.0
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
@@ -244,6 +253,10 @@ static func _chair_bag(parent: Node3D, size: Vector3, color: Color) -> Dictionar
 
 
 static func _chair(parent: Node3D, color: Color) -> void:
+	var cm := _glb(parent, "campingstuhl")
+	if cm != null:
+		_tint(cm, "Stoff", color)
+		return
 	var b := -0.475
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
@@ -261,6 +274,8 @@ static func _canister(parent: Node3D, size: Vector3, color: Color) -> Dictionary
 
 
 static func _firewood(parent: Node3D, size: Vector3) -> Dictionary:
+	if _glb(parent, "brennholz") != null:
+		return {}
 	var cols: Array = [Color(0.5, 0.33, 0.18), Color(0.45, 0.3, 0.16), Color(0.55, 0.38, 0.2)]
 	var rows: Array = [[-0.12, 0.0, 0.12], [-0.06, 0.06], [0.0]]
 	var ys: Array = [-0.065, 0.04, 0.135]
@@ -293,6 +308,11 @@ static func _crate(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
 
 
 static func _backpack(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
+	var rm := _glb(parent, "rucksack")
+	if rm != null:
+		_tint(rm, "Stoff", color)
+		_tint(rm, "StoffDunkel", color.darkened(0.3))
+		return {"lid": rm.find_child("lid", true, false)}
 	Util.add_box(parent, Vector3(size.x, size.y - 0.08, size.z), color, Vector3(0, -0.04, 0))
 	Util.add_box(parent, Vector3(size.x * 0.75, 0.2, 0.06), color.darkened(0.15), Vector3(0, -0.1, -size.z / 2.0 - 0.03))
 	var top := -0.04 + (size.y - 0.08) / 2.0
@@ -314,6 +334,17 @@ static func _firesteel(parent: Node3D) -> Dictionary:
 
 ## Feuerschale: Steinring mit Aschebett. "flames" und "embers" werden vom Feuer gesteuert.
 static func _firebowl(parent: Node3D, size: Vector3) -> Dictionary:
+	var fb := _glb(parent, "feuerschale")
+	if fb != null:
+		var pr := {}
+		for k in ["kindling", "logs", "flames"]:
+			var n := fb.find_child(k, true, false) as Node3D
+			if n != null:
+				n.visible = false
+				pr[k] = n
+		if pr.has("flames"):
+			_fire_mat(pr["flames"], Color(1.0, 0.55, 0.12))
+		return pr
 	var bottom := -size.y / 2.0
 	Util.add_cylinder(parent, 0.34, 0.06, Color(0.15, 0.13, 0.12), Vector3(0, bottom + 0.03, 0))
 	for i in range(10):

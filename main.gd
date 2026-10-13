@@ -311,8 +311,8 @@ func _build_cars() -> void:
 			"length": 3.97, "width": 1.68, "model": "res://assets/cars/polo.glb",
 			"loot": [
 				_loot("Bierkasten", 14.0, Vector3(0.5, 0.3, 0.35), Color(0.9, 0.75, 0.2)),
-				_loot("Brennholz", 8.0, Vector3(0.6, 0.25, 0.3), Color(0.5, 0.33, 0.18)),
-				_loot("Feuerschale", 5.0, Vector3(0.8, 0.3, 0.8), Color(0.5, 0.5, 0.52)),
+				_loot("Brennholz", 8.0, Vector3(0.6, 0.3, 0.32), Color(0.5, 0.33, 0.18)),
+				_loot("Feuerschale", 5.0, Vector3(0.46, 0.62, 0.46), Color(0.5, 0.5, 0.52)),
 				_backpack_loot(Color(0.55, 0.3, 0.15), [
 					_loot("Campingstuhl", 3.0, Vector3(0.8, 0.2, 0.2), chair_cols[2]),
 					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[0], "Marian"),

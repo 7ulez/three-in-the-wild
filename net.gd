@@ -326,15 +326,16 @@ func send_placed(p: PlacedItem, state: Dictionary) -> void:
 	rpc("remote_placed", p.item_name, p.weight, p.item_size, p.item_color, p.global_position, p.rotation.y, state)
 
 
-func send_poop(pos: Vector3) -> void:
-	rpc("remote_poop", pos)
+func send_poop(pos: Vector3, variant: int = 0) -> void:
+	rpc("remote_poop", pos, variant)
 
 
 @rpc("any_peer", "reliable")
-func remote_poop(pos: Vector3) -> void:
+func remote_poop(pos: Vector3, variant: int = 0) -> void:
 	if main == null or main.player == null:
 		return
 	var pile := Poop.new()
+	pile.variant = variant
 	main.add_child(pile)
 	pile.build()
 	pile.global_position = pos
