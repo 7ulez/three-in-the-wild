@@ -253,7 +253,7 @@ func _build_cars() -> void:
 	var defs := [
 		{
 			"name": "Schwarzer VW Lupo", "x": -6.5, "color": Color(0.06, 0.06, 0.07),
-			"length": 3.5, "width": 1.65,
+			"length": 3.53, "width": 1.65, "model": "res://assets/cars/lupo.glb",
 			"loot": [
 				_loot("Zeltpaket", 12.0, Vector3(0.9, 0.35, 0.35), Color(0.95, 0.5, 0.15)),
 				_loot("Bierkasten", 14.0, Vector3(0.5, 0.3, 0.35), Color(0.9, 0.75, 0.2)),
@@ -266,7 +266,7 @@ func _build_cars() -> void:
 		},
 		{
 			"name": "Schwarzer VW Passat", "x": 0.0, "color": Color(0.05, 0.05, 0.06),
-			"length": 4.7, "width": 1.8,
+			"length": 4.77, "width": 1.82, "model": "res://assets/cars/passat.glb",
 			"loot": [
 				_loot("Kühlbox", 10.0, Vector3(0.6, 0.4, 0.4), Color(0.2, 0.45, 0.85)),
 				_loot("Gasgrill", 18.0, Vector3(0.7, 0.9, 0.5), Color(0.3, 0.3, 0.33)),
@@ -279,7 +279,7 @@ func _build_cars() -> void:
 		},
 		{
 			"name": "Weißer VW Polo", "x": 6.5, "color": Color(0.93, 0.93, 0.92),
-			"length": 4.0, "width": 1.7,
+			"length": 3.97, "width": 1.68, "model": "res://assets/cars/polo.glb",
 			"loot": [
 				_loot("Campingstühle", 6.0, Vector3(0.8, 0.2, 0.2), Color(0.15, 0.4, 0.2)),
 				_loot("Wasserkanister", 12.0, Vector3(0.3, 0.4, 0.2), Color(0.25, 0.6, 0.9)),
@@ -295,7 +295,7 @@ func _build_cars() -> void:
 		var car := Car.new()
 		add_child(car)
 		car.position = Vector3(d["x"], 0, 0)
-		car.build(d["name"], d["color"], d["length"], d["width"], d["loot"])
+		car.build(d["name"], d["color"], d["length"], d["width"], d["loot"], d["model"])
 
 
 func _add_mountain(pos: Vector3, r: float, h: float, color: Color, rng: RandomNumberGenerator) -> void:

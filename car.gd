@@ -24,13 +24,36 @@ class TrunkButton:
 		car.toggle_trunk()
 
 
-func build(p_name: String, color: Color, length: float, width: float, p_loot: Array) -> void:
+func build(p_name: String, color: Color, length: float, width: float, p_loot: Array, model: String = "") -> void:
 	car_name = p_name
 	car_length = length
 	car_width = width
 	loot = p_loot
 
-	# Karosserie und Kabine
+	var model_scene := load(model) as PackedScene if model != "" else null
+	if model_scene != null:
+		var m := model_scene.instantiate()
+		add_child(m)
+		trunk_pivot = m.find_child("*Heckklappe*", true, false) as Node3D
+		_add_collision(width, length)
+	else:
+		_build_boxes(color, length, width)
+		_add_collision(width, length)
+
+	# Interaktionszone
+	var button := TrunkButton.new()
+	button.car = self
+	var bs := CollisionShape3D.new()
+	var bb := BoxShape3D.new()
+	bb.size = Vector3(width * 0.9, 0.6, 0.5)
+	bs.shape = bb
+	button.add_child(bs)
+	button.position = Vector3(0, 0.65, length / 2.0 + 0.3)
+	add_child(button)
+
+
+
+func _build_boxes(color: Color, length: float, width: float) -> void:
 	Util.add_box(self, Vector3(width, 0.6, length), color, Vector3(0, 0.65, 0))
 	Util.add_box(self, Vector3(width * 0.92, 0.5, length * 0.5), Color(0.12, 0.16, 0.2), Vector3(0, 1.2, -length * 0.05))
 
@@ -47,6 +70,14 @@ func build(p_name: String, color: Color, length: float, width: float, p_loot: Ar
 		Util.add_box(self, Vector3(0.2, 0.1, 0.05), Color(0.8, 0.05, 0.05), Vector3(sx * width * 0.38, 0.8, length / 2.0))
 	Util.add_box(self, Vector3(width, 0.2, 0.12), Color(0.15, 0.15, 0.16), Vector3(0, 0.48, length / 2.0 + 0.04))
 
+	# Heckklappe (oben angelenkt, schwingt nach hinten oben)
+	trunk_pivot = Node3D.new()
+	trunk_pivot.position = Vector3(0, 0.95, length / 2.0)
+	add_child(trunk_pivot)
+	Util.add_box(trunk_pivot, Vector3(width * 0.92, 0.55, 0.05), color.lightened(0.08), Vector3(0, -0.275, 0))
+
+
+func _add_collision(width: float, length: float) -> void:
 	# Kollision des Autos
 	var chassis := StaticBody3D.new()
 	add_child(chassis)
@@ -63,28 +94,11 @@ func build(p_name: String, color: Color, length: float, width: float, p_loot: Ar
 	s2.position = Vector3(0, 1.2, -length * 0.05)
 	chassis.add_child(s2)
 
-	# Heckklappe (oben angelenkt, schwingt nach hinten oben)
-	trunk_pivot = Node3D.new()
-	trunk_pivot.position = Vector3(0, 0.95, length / 2.0)
-	add_child(trunk_pivot)
-	Util.add_box(trunk_pivot, Vector3(width * 0.92, 0.55, 0.05), color.lightened(0.08), Vector3(0, -0.275, 0))
-
-	# Interaktionszone
-	var button := TrunkButton.new()
-	button.car = self
-	var bs := CollisionShape3D.new()
-	var bb := BoxShape3D.new()
-	bb.size = Vector3(width * 0.9, 0.6, 0.5)
-	bs.shape = bb
-	button.add_child(bs)
-	button.position = Vector3(0, 0.65, length / 2.0 + 0.3)
-	add_child(button)
-
 
 func toggle_trunk() -> void:
 	trunk_open = not trunk_open
 	var tw := create_tween()
-	tw.tween_property(trunk_pivot, "rotation_degrees:x", -125.0 if trunk_open else 0.0, 0.5)
+	tw.tween_property(trunk_pivot, "rotation_degrees:x", -115.0 if trunk_open else 0.0, 0.5)
 	if trunk_open and not loot_spawned:
 		loot_spawned = true
 		Game.cars_opened += 1
