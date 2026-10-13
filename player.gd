@@ -55,6 +55,8 @@ var promille: float = 0.0
 var vomit_t: float = 0.0           # >0: gerade am Übergeben
 var sober_t: float = 0.0           # >0: nach dem Kotzen baut sich der Alkohol schneller ab
 var vomit_tilt: float = 0.0
+var vm_hand: Node3D = null         # Hand mit Werkzeug in der Ego-Ansicht
+var _vm_swing: float = 0.0
 var _vomit_fx: CPUParticles3D = null
 var _vomit_cd: float = 0.0
 var beers_drunk: int = 0
@@ -190,6 +192,8 @@ func _build_visual() -> void:
 	for c in body_visual.get_children():
 		c.queue_free()
 	Player.build_body(body_visual, character_name)
+	call_deferred("_apply_view")
+	vm_hand = null
 
 
 ## Baut die Figur (auch für die Avatare der Mitspieler).
@@ -409,14 +413,20 @@ func _fish_anim() -> int:
 	return 0
 
 
+## Erste Person: eigener Körper und Füße sind sichtbar (ohne Kopf), Blick nach unten zeigt Oberkörper und Schuhe.
 func _apply_view() -> void:
+	body_visual.position.z = 0.0 if third_person else 0.16
+	for nm in ["Kopf_Gruppe", "Hals"]:
+		var hn := body_visual.find_child(nm, true, false) as Node3D
+		if hn != null:
+			hn.visible = third_person
 	if third_person:
 		camera.position = Vector3(0.6, 0.4, 3.2)
 		ray.target_position = Vector3(0, 0, -11.2)
 	else:
 		camera.position = Vector3.ZERO
 		ray.target_position = Vector3(0, 0, -8.0)
-	body_visual.visible = third_person
+	body_visual.visible = true
 
 
 func _build_hud() -> void:
@@ -792,6 +802,7 @@ func _process(delta: float) -> void:
 			if stink_fx != null:
 				stink_fx.emitting = false
 			toast("Der Gestank ist weg.", 2.5)
+	_update_vm(delta)
 	var t := Time.get_ticks_msec() / 1000.0
 	var drunk := clampf(promille / 1.5, 0.0, 1.5)
 	head.rotation.x = clampf(pitch + drink_tilt + vomit_tilt + sin(t * 0.7) * 0.06 * drunk, -1.55, 1.55)
@@ -923,6 +934,51 @@ func _carry_factor() -> float:
 		return 1.0
 	# Jedes Teil bremst, schwere Teile mehr (Bierkasten ca. 45 %, Grill ca. 35 %)
 	return clampf(0.8 - held.weight / 40.0, 0.2, 0.8)
+
+
+## Hammer in der Ego-Ansicht: sichtbare Hand mit Ärmel hält den Hammer vor dem Körper.
+func _update_vm(delta: float) -> void:
+	var want := held != null and held.item_name == "Hammer" and not third_person and not sleeping and not placing
+	if want and vm_hand == null:
+		_build_vm()
+	if vm_hand != null:
+		vm_hand.visible = want
+		if want:
+			var sp := Vector2(velocity.x, velocity.z).length()
+			var t := Time.get_ticks_msec() / 1000.0
+			vm_hand.position = Vector3(0.2, -0.22, -0.55) + Vector3(sin(t * 6.0) * 0.008, absf(sin(t * 6.0)) * 0.012, 0.0) * clampf(sp / 3.0, 0.0, 1.5)
+			vm_hand.rotation_degrees.x = -_vm_swing * 70.0
+	if held != null and held.item_name == "Hammer":
+		held.visible = not want
+
+
+func swing_hammer() -> void:
+	var tw := create_tween()
+	tw.tween_property(self, "_vm_swing", 1.0, 0.1)
+	tw.tween_property(self, "_vm_swing", 0.0, 0.18)
+	Sfx.play("thunk", global_position - global_transform.basis.z * 1.5, 0.0, 1.4)
+
+
+func _build_vm() -> void:
+	vm_hand = Node3D.new()
+	camera.add_child(vm_hand)
+	var d: Dictionary = CHARS.get(character_name, CHARS["Julian"])
+	var sleeve: Color = d["shirt"]
+	# Unterarm kommt von rechts unten ins Bild
+	var arm := Util.add_box(vm_hand, Vector3(0.1, 0.1, 0.5), sleeve, Vector3(0.06, -0.12, 0.32))
+	arm.rotation_degrees = Vector3(-18.0, -8.0, 0.0)
+	var cuff := Util.add_box(vm_hand, Vector3(0.11, 0.11, 0.05), sleeve.darkened(0.15), Vector3(0.03, -0.03, 0.06))
+	cuff.rotation_degrees = Vector3(-18.0, -8.0, 0.0)
+	var fist := Util.add_box(vm_hand, Vector3(0.1, 0.09, 0.1), SKIN, Vector3(0.0, 0.0, 0.0))
+	fist.rotation_degrees = Vector3(-18.0, -8.0, 0.0)
+	Util.add_box(vm_hand, Vector3(0.025, 0.03, 0.1), SKIN.darkened(0.08), Vector3(-0.05, 0.03, -0.02))
+	var tool_holder := Node3D.new()
+	tool_holder.position = Vector3(0.0, 0.0, 0.0)
+	tool_holder.rotation_degrees = Vector3(0.0, 0.0, 78.0)
+	vm_hand.add_child(tool_holder)
+	ItemModels.add_visual(tool_holder, "Hammer", Vector3(0.4, 0.12, 0.1), Color(0.45, 0.3, 0.15))
+	for n in vm_hand.find_children("*", "MeshInstance3D", true, false):
+		(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _update_held() -> void:

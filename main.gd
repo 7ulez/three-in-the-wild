@@ -282,7 +282,6 @@ func _build_cars() -> void:
 			"length": 3.53, "width": 1.65, "model": "res://assets/cars/lupo.glb",
 			"loot": [
 				_loot("Zeltpaket", 12.0, Vector3(0.9, 0.35, 0.35), Color(0.95, 0.5, 0.15)),
-				_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
 				_loot("Dutch Oven", 8.0, Vector3(0.4, 0.3, 0.4), Color(0.08, 0.08, 0.08)),
 				_backpack_loot(Color(0.2, 0.32, 0.55), [
 					_loot("Hammer", 2.0, Vector3(0.4, 0.12, 0.1), Color(0.45, 0.3, 0.15)),

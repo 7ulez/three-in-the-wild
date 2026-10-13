@@ -48,6 +48,8 @@ func interact_with_held(player: Node, held: Item) -> bool:
 	if is_driven():
 		return true     # Hammer bleibt in der Hand
 	hits += 1
+	if player.has_method("swing_hammer"):
+		player.swing_hammer()
 	var tw := create_tween()
 	tw.tween_property(visual, "position:y", 0.17 - 0.1 * hits, 0.12)
 	if is_driven() and tent != null:
