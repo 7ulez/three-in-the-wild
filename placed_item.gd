@@ -31,8 +31,10 @@ var _psize: Vector3 = Vector3.ONE
 # Brennholz
 var wood_left: int = 8
 
-# Rucksack
+# Kiste mit Proviant
 var pack: Array = []
+# Rucksack (beliebiger Inhalt)
+var contents: Array = []
 var sel: int = 0
 
 # Rutenständer
@@ -94,7 +96,10 @@ func build(p_name: String, p_weight: float, p_size: Vector3, p_color: Color, sta
 	if state.has("wood"):
 		wood_left = int(state["wood"])
 
-	if p_name == "Rucksack mit Proviant":
+	if p_name == "Rucksack" and state.has("contents"):
+		contents = (state["contents"] as Array).duplicate(true)
+
+	if p_name == "Kiste mit Proviant":
 		pack = (state["pack"] as Array).duplicate() if state.has("pack") else Game.RECIPE.duplicate()
 
 	if p_name == "Gasgrill":
@@ -215,9 +220,15 @@ func get_prompt() -> String:
 			t = "E: Kühlbox %s" % ("schließen" if open else "öffnen")
 		"Dutch Oven":
 			t = _oven_prompt()
-		"Rucksack mit Proviant":
+		"Rucksack":
+			if contents.is_empty():
+				t = "Der Rucksack ist leer   (X: abbauen)"
+			else:
+				var c: Dictionary = contents[sel % contents.size()]
+				t = "E: auspacken: %s   (Z: anderes Teil, %d drin)" % [_pack_label(c), contents.size()]
+		"Kiste mit Proviant":
 			if pack.is_empty():
-				t = "Der Rucksack ist leer"
+				t = "Die Kiste ist leer"
 			else:
 				t = "E: Zutat nehmen: %s   (Z: andere Zutat, %d übrig)" % [pack[sel % pack.size()], pack.size()]
 		"Bierkasten":
@@ -318,7 +329,9 @@ func interact(player: Node) -> void:
 			_toggle_open()
 		"Dutch Oven":
 			_oven_use(player)
-		"Rucksack mit Proviant":
+		"Rucksack":
+			_unpack(player)
+		"Kiste mit Proviant":
 			_take_ingredient(player)
 		"Brennholz":
 			if wood_left > 0:
@@ -336,7 +349,9 @@ func interact(player: Node) -> void:
 
 
 func cycle_selection() -> void:
-	if item_name == "Rucksack mit Proviant" and not pack.is_empty():
+	if item_name == "Rucksack" and not contents.is_empty():
+		sel = (sel + 1) % contents.size()
+	if item_name == "Kiste mit Proviant" and not pack.is_empty():
 		sel = (sel + 1) % pack.size()
 
 
@@ -526,11 +541,47 @@ func rod_bite_while_sleeping() -> bool:
 	return false
 
 
-# ---------- Rucksack ----------
+# ---------- Rucksack (Auspacken) ----------
+
+func _pack_label(c: Dictionary) -> String:
+	var n: String = c["name"]
+	if c.has("owner"):
+		n += " (%s)" % c["owner"]
+	return n
+
+
+func _unpack(player: Node) -> void:
+	if contents.is_empty():
+		player.toast("Der Rucksack ist leer.", 2.0)
+		return
+	var idx := sel % contents.size()
+	var d: Dictionary = contents[idx]
+	contents.remove_at(idx)
+	sel = 0
+	var pivot: Node3D = parts.get("lid", null)
+	if pivot != null and not open:
+		open = true
+		create_tween().tween_property(pivot, "rotation_degrees:x", 100.0, 0.3)
+	var it := Item.new().setup(d["name"], d["weight"], d["size"], d["color"])
+	get_parent().add_child(it)
+	if d.has("owner"):
+		it.set_owner_name(d["owner"])
+	Sfx.play("click", global_position)
+	if player.held == null:
+		it.global_position = global_position + Vector3(0, 1.0, 0)
+		player.pick_up(it)
+	else:
+		# Hände voll: das Teil landet neben dem Rucksack auf dem Boden
+		var a := randf() * TAU
+		it.global_position = global_position + Vector3(cos(a) * 0.8, 0.8, sin(a) * 0.8)
+		player.toast("%s liegt jetzt neben dem Rucksack." % d["name"], 2.0)
+
+
+# ---------- Kiste mit Proviant ----------
 
 func _take_ingredient(player: Node) -> void:
 	if pack.is_empty():
-		player.toast("Der Rucksack ist leer. (Hat ein Nutria etwas geklaut?)", 3.0)
+		player.toast("Die Kiste ist leer. (Hat ein Nutria etwas geklaut?)", 3.0)
 		return
 	if player.held != null:
 		player.toast("Hände voll - erst ablegen.", 2.0)
@@ -694,7 +745,7 @@ func _oven_use(player: Node) -> void:
 					food.visible = false
 		return
 	if added.is_empty():
-		player.toast("Leer. Hol die Zutaten aus dem Rucksack und kipp sie nacheinander hinein: " + ", ".join(PackedStringArray(Game.RECIPE)), 6.0)
+		player.toast("Leer. Hol die Zutaten aus der Kiste und kipp sie nacheinander hinein: " + ", ".join(PackedStringArray(Game.RECIPE)), 6.0)
 		return
 	# Umrühren
 	var bonus := 1.6 if player.character_name == "Steffen" else 1.0
@@ -795,8 +846,10 @@ func get_state() -> Dictionary:
 		st["water"] = water_left
 	if item_name == "Brennholz":
 		st["wood"] = wood_left
-	if item_name == "Rucksack mit Proviant":
+	if item_name == "Kiste mit Proviant":
 		st["pack"] = pack.duplicate()
+	if item_name == "Rucksack":
+		st["contents"] = contents.duplicate(true)
 	return st
 
 
@@ -829,8 +882,15 @@ func dismantle(player: Node) -> void:
 		it.water_left = water_left
 	if item_name == "Brennholz":
 		it.extra["wood"] = wood_left
-	if item_name == "Rucksack mit Proviant":
+	if item_name == "Kiste mit Proviant":
 		it.extra["pack"] = pack.duplicate()
+	if item_name == "Rucksack":
+		it.extra["contents"] = contents.duplicate(true)
+		var w := 1.0
+		for c in contents:
+			w += float((c as Dictionary)["weight"])
+		it.weight = w
+		it.mass = w
 	if on_grill != null:
 		on_grill.oven = null
 	Game.placed.erase(self)

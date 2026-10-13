@@ -115,6 +115,8 @@ func _spawn_loot() -> void:
 		get_parent().add_child(item)
 		if d.has("owner"):
 			item.set_owner_name(d["owner"])
+		if d.has("contents"):
+			item.extra["contents"] = (d["contents"] as Array).duplicate(true)
 		# In Reihen zu je 4 Teilen hinter dem Heck verteilen
 		var row := i / 4
 		var in_row := mini(4, count - row * 4)

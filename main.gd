@@ -243,7 +243,19 @@ func _loot(p_name: String, weight: float, size: Vector3, color: Color, owner: St
 	return d
 
 
+## Rucksack mit Inhalt: spawnt als ein Teil und wird im Lager aufgestellt und ausgepackt.
+func _backpack_loot(color: Color, contents: Array) -> Dictionary:
+	var w := 1.0
+	for c in contents:
+		w += float((c as Dictionary)["weight"])
+	var d := _loot("Rucksack", w, Vector3(0.45, 0.55, 0.28), color)
+	d["contents"] = contents
+	return d
+
+
 func _build_cars() -> void:
+	# Jeder Spieler hat seine Farbe (passend zur Angelrute): Julian blau, Steffen rot, Marian grün
+	var chair_cols := [Color(0.2, 0.4, 0.8), Color(0.8, 0.25, 0.2), Color(0.15, 0.55, 0.3)]
 	var rod_cols := [Color(0.15, 0.55, 0.3), Color(0.8, 0.25, 0.2), Color(0.2, 0.4, 0.8), Color(0.85, 0.65, 0.15)]
 	var defs := [
 		{
@@ -251,12 +263,14 @@ func _build_cars() -> void:
 			"length": 3.53, "width": 1.65, "model": "res://assets/cars/lupo.glb",
 			"loot": [
 				_loot("Zeltpaket", 12.0, Vector3(0.9, 0.35, 0.35), Color(0.95, 0.5, 0.15)),
-				_loot("Bierkasten", 14.0, Vector3(0.5, 0.3, 0.35), Color(0.9, 0.75, 0.2)),
-				_loot("Hammer", 2.0, Vector3(0.4, 0.12, 0.1), Color(0.45, 0.3, 0.15)),
-				_loot("Feuerstahl", 0.3, Vector3(0.16, 0.05, 0.05), Color(0.7, 0.7, 0.74)),
-				_loot("Hängematte", 3.0, Vector3(0.5, 0.3, 0.3), Color(0.8, 0.3, 0.3)),
-				_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[0], "Marian"),
 				_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
+				_loot("Dutch Oven", 8.0, Vector3(0.4, 0.3, 0.4), Color(0.08, 0.08, 0.08)),
+				_backpack_loot(Color(0.2, 0.32, 0.55), [
+					_loot("Hammer", 2.0, Vector3(0.4, 0.12, 0.1), Color(0.45, 0.3, 0.15)),
+					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[2], "Julian"),
+					_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
+					_loot("Campingstuhl", 3.0, Vector3(0.8, 0.2, 0.2), chair_cols[0]),
+				]),
 			],
 		},
 		{
@@ -265,24 +279,29 @@ func _build_cars() -> void:
 			"loot": [
 				_loot("Kühlbox", 10.0, Vector3(0.6, 0.4, 0.4), Color(0.2, 0.45, 0.85)),
 				_loot("Gasgrill", 18.0, Vector3(0.7, 0.9, 0.5), Color(0.3, 0.3, 0.33)),
-				_loot("Dutch Oven", 8.0, Vector3(0.4, 0.3, 0.4), Color(0.08, 0.08, 0.08)),
-				_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[1], "Steffen"),
-				_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[2], "Julian"),
-				_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
-				_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
+				_loot("Kiste mit Proviant", 7.0, Vector3(0.5, 0.35, 0.35), Color(0.75, 0.2, 0.15)),
+				_backpack_loot(Color(0.25, 0.42, 0.22), [
+					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[1], "Steffen"),
+					_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
+					_loot("Wasserkanister", 12.0, Vector3(0.3, 0.4, 0.2), Color(0.25, 0.6, 0.9)),
+					_loot("Campingstuhl", 3.0, Vector3(0.8, 0.2, 0.2), chair_cols[1]),
+				]),
 			],
 		},
 		{
 			"name": "Weißer VW Polo", "x": 6.5, "color": Color(0.93, 0.93, 0.92),
 			"length": 3.97, "width": 1.68, "model": "res://assets/cars/polo.glb",
 			"loot": [
-				_loot("Campingstühle", 6.0, Vector3(0.8, 0.2, 0.2), Color(0.15, 0.4, 0.2)),
-				_loot("Wasserkanister", 12.0, Vector3(0.3, 0.4, 0.2), Color(0.25, 0.6, 0.9)),
+				_loot("Bierkasten", 14.0, Vector3(0.5, 0.3, 0.35), Color(0.9, 0.75, 0.2)),
 				_loot("Brennholz", 8.0, Vector3(0.6, 0.25, 0.3), Color(0.5, 0.33, 0.18)),
 				_loot("Feuerschale", 5.0, Vector3(0.8, 0.3, 0.8), Color(0.5, 0.5, 0.52)),
-				_loot("Rucksack mit Proviant", 7.0, Vector3(0.4, 0.5, 0.25), Color(0.75, 0.2, 0.15)),
-				_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[3], "Gast"),
-				_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
+				_backpack_loot(Color(0.55, 0.3, 0.15), [
+					_loot("Campingstuhl", 3.0, Vector3(0.8, 0.2, 0.2), chair_cols[2]),
+					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[0], "Marian"),
+					_loot("Hängematte", 3.0, Vector3(0.5, 0.3, 0.3), Color(0.8, 0.3, 0.3)),
+					_loot("Feuerstahl", 0.3, Vector3(0.16, 0.05, 0.05), Color(0.7, 0.7, 0.74)),
+					_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
+				]),
 			],
 		},
 	]

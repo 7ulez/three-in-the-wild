@@ -79,7 +79,7 @@ func _choose_target() -> void:
 	for o in Game.placed:
 		if not is_instance_valid(o):
 			continue
-		if o.item_name == "Rucksack mit Proviant" and not o.pack.is_empty():
+		if o.item_name == "Kiste mit Proviant" and not o.pack.is_empty():
 			cands.append(o)
 		elif o.item_name == "Kühlbox":
 			cands.append(o)
@@ -175,10 +175,10 @@ func _toast_near(ppos: Vector3, msg: String) -> void:
 func _do_steal(ppos: Vector3) -> void:
 	steal_pos = global_position
 	if target != null and is_instance_valid(target):
-		if target.item_name == "Rucksack mit Proviant":
+		if target.item_name == "Kiste mit Proviant":
 			carried = target.steal_one()
 			if carried != "":
-				_toast_near(ppos, "Das Nutria hat %s aus dem Rucksack geklaut! Verjag es!" % carried)
+				_toast_near(ppos, "Das Nutria hat %s aus der Kiste geklaut! Verjag es!" % carried)
 		else:
 			_toast_near(ppos, "Das Nutria knabbert an den Würstchen in der Kühlbox. Frechheit!")
 	_start_flee(ppos)

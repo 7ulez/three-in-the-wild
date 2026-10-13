@@ -1290,6 +1290,8 @@ func _confirm_item_placement() -> void:
 		state["wood"] = it.extra["wood"]
 	if it.extra.has("pack"):
 		state["pack"] = it.extra["pack"]
+	if it.extra.has("contents"):
+		state["contents"] = it.extra["contents"]
 	if it.item_name == "Campingstühle":
 		var right := Vector3(cos(yaw), 0, -sin(yaw))
 		for sgn in [-1.0, 0.0, 1.0]:

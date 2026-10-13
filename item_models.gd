@@ -40,7 +40,9 @@ static func add_visual(parent: Node3D, kind: String, size: Vector3, color: Color
 			return _canister(parent, size, color)
 		"Brennholz":
 			return _firewood(parent, size)
-		"Rucksack mit Proviant":
+		"Kiste mit Proviant":
+			return _crate(parent, size, color)
+		"Rucksack":
 			return _backpack(parent, size, color)
 		"Rutenständer":
 			return _rodpod(parent)
@@ -271,6 +273,23 @@ static func _firewood(parent: Node3D, size: Vector3) -> Dictionary:
 	for x in [-0.2, 0.2]:
 		Util.add_box(parent, Vector3(0.03, 0.3, 0.34), Color(0.2, 0.2, 0.2), Vector3(x, 0.03, 0))
 	return {}
+
+
+## Holzkiste mit Klappdeckel (Proviant)
+static func _crate(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
+	var wood := Color(0.55, 0.38, 0.2)
+	Util.add_box(parent, Vector3(size.x, size.y - 0.06, size.z), wood, Vector3(0, -0.03, 0))
+	for sy in [-0.1, 0.0, 0.1]:
+		Util.add_box(parent, Vector3(size.x + 0.01, 0.015, size.z + 0.01), wood.darkened(0.3), Vector3(0, sy, 0))
+	for cx in [-1.0, 1.0]:
+		Util.add_box(parent, Vector3(0.04, size.y - 0.04, size.z + 0.015), wood.darkened(0.15), Vector3(cx * (size.x / 2.0 - 0.02), -0.03, 0))
+	Util.add_box(parent, Vector3(size.x * 0.5, 0.08, 0.02), color, Vector3(0, 0.0, size.z / 2.0 + 0.012))
+	var top := -0.03 + (size.y - 0.06) / 2.0
+	var pivot := Node3D.new()
+	pivot.position = Vector3(0, top, size.z / 2.0)
+	parent.add_child(pivot)
+	Util.add_box(pivot, Vector3(size.x + 0.02, 0.035, size.z + 0.02), wood.lightened(0.1), Vector3(0, 0.018, -size.z / 2.0))
+	return {"lid": pivot}
 
 
 static func _backpack(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
