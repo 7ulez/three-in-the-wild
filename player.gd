@@ -196,10 +196,16 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 		var ap := _find_anim(inst)
 		if ap != null:
 			for n in ap.get_animation_list():
-				ap.get_animation(n).loop_mode = Animation.LOOP_NONE if (n == "Jump" or n == "FishCast") else Animation.LOOP_LINEAR
+				ap.get_animation(n).loop_mode = Animation.LOOP_NONE if (n == "Jump" or n == "FishCast" or n == "Squat") else Animation.LOOP_LINEAR
 			if ap.has_animation("Idle"):
 				ap.play("Idle")
 			parent.set_meta("ap", ap)
+			var hd := inst.find_child("HoseDown", true, false) as Node3D
+			var hs := inst.find_child("Hose", true, false) as Node3D
+			if hd != null and hs != null:
+				hd.visible = false
+				parent.set_meta("hose", hs)
+				parent.set_meta("hose_down", hd)
 		return
 	var d: Dictionary = CHARS[char_name]
 	var shirt: Color = d["shirt"]
@@ -234,12 +240,31 @@ static func _find_anim(n: Node) -> AnimationPlayer:
 
 
 ## Wählt die passende Animation für das Lauftempo (Stehen / Gehen / Rennen).
-static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0) -> void:
+static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0, squat: bool = false) -> void:
 	var ap: AnimationPlayer = parent.get_meta("ap", null) as AnimationPlayer
 	if ap == null:
 		return
 	var want := "Idle"
 	var sc := 1.0
+	var hose: Node3D = parent.get_meta("hose", null) as Node3D
+	var hose_down: Node3D = parent.get_meta("hose_down", null) as Node3D
+	if squat and ap.has_animation("Squat"):
+		if not parent.get_meta("squatting", false):
+			parent.set_meta("squatting", true)
+			ap.play("Squat", 0.1)
+			if hose != null and hose_down != null:
+				var tw := parent.create_tween()
+				tw.tween_interval(0.25)
+				tw.tween_callback(func() -> void:
+					hose.visible = false
+					hose_down.visible = true)
+		ap.speed_scale = 1.0
+		return
+	if parent.get_meta("squatting", false):
+		parent.set_meta("squatting", false)
+		if hose != null and hose_down != null:
+			hose.visible = true
+			hose_down.visible = false
 	if air and ap.has_animation("Jump"):
 		if not parent.get_meta("jumping", false):
 			parent.set_meta("jumping", true)
@@ -607,7 +632,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
-	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim())
+	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim(), needs != null and needs.squatting)
 	if is_on_floor():
 		var drop := _peak_y - global_position.y
 		if _airborne and drop > 5.0:
