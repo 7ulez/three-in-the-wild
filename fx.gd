@@ -247,3 +247,35 @@ static func _vomit_dry(mi: MeshInstance3D) -> Tween:
 	tw.tween_property(mi, "scale", Vector3(0.02, 1.0, 0.02), 6.0)
 	tw.tween_callback(mi.queue_free)
 	return tw
+
+
+## Wasserfontäne an einer Stelle (Fisch springt / fällt zurück).
+static func splash(parent: Node, pos: Vector3, power: float = 1.0, col: Color = Color(0.85, 0.95, 1.0, 0.8), rings: bool = true) -> void:
+	var p := CPUParticles3D.new()
+	p.emitting = true
+	p.one_shot = true
+	p.explosiveness = 0.95
+	p.amount = (14 if Game.low else 30)
+	p.lifetime = 0.9
+	p.direction = Vector3(0, 1, 0)
+	p.spread = 35.0
+	p.initial_velocity_min = 1.8 * power
+	p.initial_velocity_max = 4.2 * power
+	p.gravity = Vector3(0, -9.0, 0)
+	var m := SphereMesh.new()
+	m.radius = 0.03
+	m.height = 0.06
+	m.radial_segments = 4
+	m.rings = 2
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = col
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.material = mat
+	p.mesh = m
+	parent.add_child(p)
+	p.global_position = pos
+	if rings:
+		ripple(parent, pos, 1.4 * power)
+		ripple(parent, pos, 2.2 * power, 0.15)
+	p.get_tree().create_timer(1.6).timeout.connect(p.queue_free)

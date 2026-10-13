@@ -84,6 +84,7 @@ var stones: int = 0
 var crouching: bool = false
 var _air_t: float = 0.0
 var fish_cast_t: float = 0.0
+var shake: float = 0.0              # Kamerawackeln (Angelkampf, Funken ...)
 
 var crouch_f: float = 0.0
 var col_shape: CapsuleShape3D = null
@@ -819,6 +820,14 @@ func _process(delta: float) -> void:
 	var drunk := clampf(promille / 1.5, 0.0, 1.5)
 	head.rotation.x = clampf(pitch + drink_tilt + vomit_tilt + sin(t * 0.7) * 0.06 * drunk, -1.55, 1.55)
 	camera.rotation.z = sin(t * 0.9) * 0.12 * drunk + sin(t * 2.3) * 0.04 * drunk
+	if shake > 0.001:
+		camera.rotation.z += sin(t * 61.0) * shake * 0.03
+		camera.h_offset = sin(t * 47.0) * shake * 0.012
+		camera.v_offset = cos(t * 53.0) * shake * 0.012
+		shake = lerpf(shake, 0.0, minf(delta * 6.0, 1.0))
+	elif camera.h_offset != 0.0:
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
 	camera.fov = 75.0 + sin(t * 0.5) * 8.0 * drunk
 	blur_rect.visible = drunk > 0.05
 	if blur_rect.visible:
@@ -1073,6 +1082,9 @@ func _interact() -> void:
 	if fire_bowl != null:
 		strike()
 		return
+	if stir_oven != null:
+		stir_oven.stir_press(self)
+		return
 	if seat != null:
 		stand_up()
 		return
@@ -1130,6 +1142,15 @@ func _throw() -> void:
 		return
 	var forward := -head.global_transform.basis.z
 	_drop(forward * clampf(10.0 - held.weight * 0.4, 2.0, 8.0))
+
+
+## Der gehaltene Gegenstand wandert in einen Behälter (wird danach freigegeben).
+func release_held_for_storage() -> void:
+	if held == null:
+		return
+	ray.remove_exception(held)
+	held = null
+	_update_help()
 
 
 func _drop(impulse: Vector3 = Vector3.ZERO) -> void:
@@ -1366,6 +1387,8 @@ func _confirm_item_placement() -> void:
 		state["pack"] = it.extra["pack"]
 	if it.extra.has("contents"):
 		state["contents"] = it.extra["contents"]
+	if it.extra.has("fish"):
+		state["fish"] = it.extra["fish"]
 	if it.item_name == "Campingstühle":
 		var right := Vector3(cos(yaw), 0, -sin(yaw))
 		for sgn in [-1.0, 0.0, 1.0]:
@@ -1499,13 +1522,24 @@ const STRIKE_NEEDED: int = 4
 var strike_pos: float = 0.0
 var strike_dir: float = 1.0
 var strike_hits: int = 0
+var strike_combo: int = 0
 var strike_zone_w: float = 0.13
 var strike_zone_x: float = 0.5
-var strike_ui: Control = null
-var strike_cursor: ColorRect = null
-var strike_zone: ColorRect = null
-var strike_label: Label = null
+var strike_zone_dir: float = 1.0
+var strike_flash: float = 0.0
+var strike_flash_good: bool = true
 var _strike_speed: float = 1.0
+var _ember_t: float = 0.0
+var _ember_light: OmniLight3D = null
+var minihud: MiniHud = null
+var stir_oven: PlacedItem = null
+
+
+func get_minihud() -> MiniHud:
+	if minihud == null:
+		minihud = MiniHud.new()
+		help_label.get_parent().add_child(minihud)
+	return minihud
 
 
 func start_firemaking(bowl: PlacedItem) -> void:
@@ -1514,50 +1548,34 @@ func start_firemaking(bowl: PlacedItem) -> void:
 	fire_bowl = bowl
 	fire_t = 0.0
 	strike_hits = 0
+	strike_combo = 0
 	strike_pos = 0.0
 	strike_dir = 1.0
+	strike_flash = 0.0
+	_ember_t = 0.0
 	_curses_done = 0
-	strike_zone_w = 0.13 * (0.8 if character_name == "Marian" else 1.0)   # Marian: 20 % schwieriger
-	_strike_speed = 0.95
+	strike_zone_w = 0.15 * (0.8 if character_name == "Marian" else 1.0)   # Marian: 20 % schwieriger
+	_strike_speed = 0.9
 	_new_strike_zone()
-	toast("Feuerstahl: E drücken, wenn der Strich im grünen Feld ist! %d Treffer nötig." % STRIKE_NEEDED, 4.0)
-	if strike_ui == null:
-		strike_ui = Control.new()
-		strike_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var bg := ColorRect.new()
-		bg.color = Color(0, 0, 0, 0.6)
-		bg.size = Vector2(420, 30)
-		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		strike_ui.add_child(bg)
-		strike_zone = ColorRect.new()
-		strike_zone.color = Color(0.3, 0.9, 0.3, 0.9)
-		strike_zone.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		strike_ui.add_child(strike_zone)
-		strike_cursor = ColorRect.new()
-		strike_cursor.color = Color(1.0, 0.9, 0.3)
-		strike_cursor.size = Vector2(6, 30)
-		strike_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		strike_ui.add_child(strike_cursor)
-		strike_label = Label.new()
-		strike_label.position = Vector2(0, -34)
-		strike_label.add_theme_font_size_override("font_size", 20)
-		strike_label.add_theme_constant_override("outline_size", 6)
-		strike_label.add_theme_color_override("font_outline_color", Color.BLACK)
-		strike_ui.add_child(strike_label)
-		strike_ui.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-		strike_ui.position = Vector2(-210, 120)
-		help_label.get_parent().add_child(strike_ui)
-	strike_ui.visible = true
+	get_minihud().card("FEUERSTAHL!", "E drücken, wenn der Strich im grünen Feld ist", UI.FIRE, 2.2)
+	if _ember_light == null:
+		_ember_light = OmniLight3D.new()
+		_ember_light.light_color = Color(1.0, 0.5, 0.15)
+		_ember_light.omni_range = 3.5
+		_ember_light.light_energy = 0.0
+		get_parent().add_child(_ember_light)
+	_ember_light.global_position = bowl.global_position + Vector3(0, 0.5, 0)
+	_ember_light.light_energy = 0.0
 	_update_strike_ui()
 	if sparks == null:
 		sparks = CPUParticles3D.new()
-		sparks.amount = 30
-		sparks.lifetime = 0.5
+		sparks.amount = 40
+		sparks.lifetime = 0.6
 		sparks.one_shot = false
 		sparks.direction = Vector3(0, 1, 0)
-		sparks.spread = 60.0
+		sparks.spread = 70.0
 		sparks.initial_velocity_min = 1.0
-		sparks.initial_velocity_max = 2.5
+		sparks.initial_velocity_max = 3.2
 		sparks.gravity = Vector3(0, -6, 0)
 		var m := SphereMesh.new()
 		m.radius = 0.015
@@ -1576,43 +1594,64 @@ func start_firemaking(bowl: PlacedItem) -> void:
 
 func _new_strike_zone() -> void:
 	strike_zone_x = randf_range(0.1, 0.9 - strike_zone_w)
+	strike_zone_dir = 1.0 if randf() < 0.5 else -1.0
 
 
 func _update_strike_ui() -> void:
-	if strike_ui == null:
-		return
-	strike_zone.position = Vector2(420.0 * strike_zone_x, 0)
-	strike_zone.size = Vector2(420.0 * strike_zone_w, 30)
-	strike_cursor.position = Vector2(420.0 * strike_pos - 3.0, 0)
-	strike_label.text = "Funken schlagen: %d / %d    (E im grünen Feld)" % [strike_hits, STRIKE_NEEDED]
+	var h := get_minihud()
+	h.kind = "fire"
+	h.d = {"pos": strike_pos, "dir": strike_dir, "zone_x": strike_zone_x, "zone_w": strike_zone_w, "hits": strike_hits,
+		"needed": STRIKE_NEEDED, "combo": strike_combo, "flash": strike_flash, "flash_good": strike_flash_good}
 
 
 ## E während des Funkenschlagens: trifft der Strich das grüne Feld?
 func strike() -> void:
 	if fire_bowl == null:
 		return
+	var h := get_minihud()
 	var in_zone := strike_pos >= strike_zone_x and strike_pos <= strike_zone_x + strike_zone_w
+	_ember_t = 0.0
+	strike_flash = 1.0
 	if in_zone:
+		strike_flash_good = true
+		var centre := absf(strike_pos - (strike_zone_x + strike_zone_w * 0.5)) < strike_zone_w * 0.18
 		Sfx.play("spark", global_position, -2.0)
 		strike_hits += 1
+		strike_combo += 1
+		shake = 1.6
+		sparks.amount = 40 + strike_hits * 10
 		sparks.emitting = true
-		get_tree().create_timer(0.35).timeout.connect(func() -> void:
+		get_tree().create_timer(0.4).timeout.connect(func() -> void:
 			if sparks != null:
 				sparks.emitting = false)
-		_strike_speed += 0.2
+		h.burst(Vector2(h.size.x / 2.0 + (strike_pos - 0.5) * 520.0, h.size.y * 0.72), Color(1.0, 0.8, 0.3), 16 + strike_combo * 4, 300.0)
+		h.flash(Color(1.0, 0.6, 0.15, 0.45))
+		if centre:
+			h.card("VOLLTREFFER!", "", Color(1.0, 0.9, 0.3), 0.7)
+			Sfx.play("ding", Vector3.INF, -8.0)
+		_strike_speed += 0.22
+		strike_zone_w = maxf(strike_zone_w * 0.9, 0.07)
 		_new_strike_zone()
+		if _ember_light != null:
+			_ember_light.light_energy = float(strike_hits) * 0.9
 		if strike_hits >= STRIKE_NEEDED:
 			var bowl := fire_bowl
 			_stop_firemaking()
 			bowl.ignite(self)
-			toast("Das Feuer brennt! Nachlegen: Holzscheit vom Brennholz-Bündel nehmen (E) und ins Feuer (E).", 5.0)
+			shake = 2.5
+			h.card("DAS FEUER BRENNT!", "Holzscheit vom Bündel (E) holen und ins Feuer legen (E)", Color(1.0, 0.7, 0.2), 4.0)
+			h.burst(h.size / 2.0, Color(1.0, 0.6, 0.15), 50, 450.0)
+			h.flash(Color(1.0, 0.5, 0.1, 0.8))
 			return
-		toast("Funke! (%d/%d)" % [strike_hits, STRIKE_NEEDED], 1.2)
 	else:
+		strike_flash_good = false
+		strike_combo = 0
 		Sfx.play("click", global_position, -2.0)
 		strike_hits = maxi(strike_hits - 1, 0)
-		_strike_speed = maxf(_strike_speed - 0.1, 0.95)
-		toast("Daneben - der Stahl rutscht ab. Treffer: %d/%d" % [strike_hits, STRIKE_NEEDED], 1.5)
+		_strike_speed = maxf(_strike_speed - 0.12, 0.9)
+		h.flash(Color(1.0, 0.2, 0.15, 0.4))
+		if _ember_light != null:
+			_ember_light.light_energy = float(strike_hits) * 0.9
 		if character_name == "Marian":
 			var curses := ["Verdammte Axt!", "Scheiße, warum zündet das nicht?!", "Komm schon, du blödes Ding!", "Himmel, Arsch und Zwirn!"]
 			toast("Marian: " + curses.pick_random(), 2.0)
@@ -1623,8 +1662,12 @@ func _stop_firemaking() -> void:
 	fire_bowl = null
 	if sparks != null:
 		sparks.emitting = false
-	if strike_ui != null:
-		strike_ui.visible = false
+	if _ember_light != null:
+		var l := _ember_light
+		var tw := create_tween()
+		tw.tween_property(l, "light_energy", 0.0, 0.8)
+	if minihud != null and minihud.kind == "fire":
+		minihud.clear()
 
 
 func _update_firemaking(delta: float) -> void:
@@ -1636,6 +1679,7 @@ func _update_firemaking(delta: float) -> void:
 		_stop_firemaking()
 		return
 	fire_t += delta
+	strike_flash = maxf(strike_flash - delta * 3.0, 0.0)
 	strike_pos += strike_dir * _strike_speed * delta
 	if strike_pos >= 1.0:
 		strike_pos = 1.0
@@ -1643,6 +1687,26 @@ func _update_firemaking(delta: float) -> void:
 	elif strike_pos <= 0.0:
 		strike_pos = 0.0
 		strike_dir = 1.0
+	# Das Zielfeld wandert ab dem zweiten Treffer hin und her
+	if strike_hits >= 1:
+		strike_zone_x += strike_zone_dir * (0.12 + 0.06 * strike_hits) * delta
+		if strike_zone_x <= 0.05:
+			strike_zone_x = 0.05
+			strike_zone_dir = 1.0
+		elif strike_zone_x + strike_zone_w >= 0.95:
+			strike_zone_x = 0.95 - strike_zone_w
+			strike_zone_dir = -1.0
+	# Die Glut erlischt, wenn man zu lange trödelt
+	if strike_hits > 0:
+		_ember_t += delta
+		if _ember_t > 6.0:
+			_ember_t = 0.0
+			strike_hits -= 1
+			strike_combo = 0
+			if _ember_light != null:
+				_ember_light.light_energy = float(strike_hits) * 0.9
+			get_minihud().flash(Color(0.6, 0.6, 0.7, 0.4))
+			toast("Die Glut wird kalt ...", 1.5)
 	_update_strike_ui()
 
 

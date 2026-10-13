@@ -58,6 +58,19 @@ var burn: float = 0.0
 var done: bool = false
 var burnt: bool = false
 var portions: int = 0
+var flavor: float = 0.0           # Geschmacksbonus durch Rühren (max. 15)
+var stirrer: Node = null          # Spieler, der gerade rührt
+var stir_bubbles: Array = []
+var stir_spawned: int = 0
+var stir_resolved: int = 0
+var stir_score: int = 0
+var stir_max: int = 0
+var stir_combo: int = 0
+var stir_cd: float = 0.0
+var stir_spin: float = 0.0
+const STIR_COUNT: int = 10
+var fish_in: Array = []          # Kühlbox: gelagerte Fänge {name, weight, size, color}
+var _fish_vis: Node3D = null
 var quality: float = 100.0
 var cook_char: String = ""
 var food: MeshInstance3D = null
@@ -98,6 +111,10 @@ func build(p_name: String, p_weight: float, p_size: Vector3, p_color: Color, sta
 
 	if p_name == "Rucksack" and state.has("contents"):
 		contents = (state["contents"] as Array).duplicate(true)
+
+	if p_name == "Kühlbox" and state.has("fish"):
+		fish_in = (state["fish"] as Array).duplicate(true)
+		_refresh_fish()
 
 	if p_name == "Kiste mit Proviant":
 		pack = (state["pack"] as Array).duplicate() if state.has("pack") else Game.RECIPE.duplicate()
@@ -212,7 +229,7 @@ func get_prompt() -> String:
 		"Gasgrill":
 			t = "E: Grill %s" % ("ausmachen" if open else "anzünden")
 		"Kühlbox":
-			t = "E: Kühlbox %s" % ("schließen" if open else "öffnen")
+			t = _cooler_prompt()
 		"Dutch Oven":
 			t = _oven_prompt()
 		"Rucksack":
@@ -268,12 +285,28 @@ func _oven_prompt() -> String:
 	if added.is_empty():
 		s = "Dutch Oven leer. Rezept: " + " > ".join(PackedStringArray(Game.RECIPE))
 	else:
-		s = "Chili %d/9 · als Nächstes: %s\nAnbrennen: %s   E: umrühren" % [added.size(), _next_ingredient() if _next_ingredient() != "" else "köcheln lassen", _bar(burn)]
+		s = "Chili %d/9 · als Nächstes: %s\nAnbrennen: %s   E: rühren (Minispiel)" % [added.size(), _next_ingredient() if _next_ingredient() != "" else "köcheln lassen", _bar(burn)]
 		if on_grill == null:
 			s += "\n(auf den angezündeten Grill stellen!)"
 		elif not on_grill.open:
 			s += "\n(der Grill ist aus)"
 	return s
+
+
+func _cooler_prompt() -> String:
+	if not open:
+		return "E: Kühlbox öffnen" + ("   (%d Fische drin)" % fish_in.size() if not fish_in.is_empty() else "")
+	if fish_in.is_empty():
+		return "E: Kühlbox schließen   (Fang in die Hand nehmen und E: hineinlegen)"
+	var i := sel % (fish_in.size() + 1)
+	if i == fish_in.size():
+		return "E: Kühlbox schließen   (Z: Fisch wählen, %d drin)" % fish_in.size()
+	return "E: nehmen: %s   (Z: anderer Fisch / schließen, %d drin)" % [fish_in[i]["name"], fish_in.size()]
+
+
+func is_fish_item(held: Node) -> bool:
+	var nm: String = held.item_name
+	return nm.ends_with("kg") and Fisher.FISH.has(nm.split(" ")[0])
 
 
 func _bar(v: float) -> String:
@@ -282,6 +315,10 @@ func _bar(v: float) -> String:
 
 
 func get_held_prompt(held: Node) -> String:
+	if item_name == "Kühlbox" and is_fish_item(held):
+		if fish_in.size() >= 6:
+			return "Die Kühlbox ist voll mit Fisch"
+		return "E: %s in die Kühlbox legen (%d/6)" % [held.item_name, fish_in.size()]
 	if item_name == "Rutenständer" and held.item_name == "Angelrute":
 		if rod_in:
 			return "Im Ständer hängt schon eine Rute"
@@ -299,6 +336,9 @@ func get_held_prompt(held: Node) -> String:
 
 
 func interact_with_held(player: Node, held: Node) -> bool:
+	if item_name == "Kühlbox" and is_fish_item(held):
+		_store_fish(player, held)
+		return true
 	if item_name == "Rutenständer" and held.item_name == "Angelrute":
 		_park_rod(player, held)
 		return true
@@ -320,8 +360,10 @@ func interact(player: Node) -> void:
 	match item_name:
 		"Campingstuhl":
 			player.sit(self)
-		"Gasgrill", "Kühlbox":
+		"Gasgrill":
 			_toggle_open()
+		"Kühlbox":
+			_cooler_use(player)
 		"Dutch Oven":
 			_oven_use(player)
 		"Rucksack":
@@ -348,6 +390,8 @@ func cycle_selection() -> void:
 		sel = (sel + 1) % contents.size()
 	if item_name == "Kiste mit Proviant" and not pack.is_empty():
 		sel = (sel + 1) % pack.size()
+	if item_name == "Kühlbox" and open and not fish_in.is_empty():
+		sel = (sel + 1) % (fish_in.size() + 1)
 
 
 func _toggle_open() -> void:
@@ -366,6 +410,68 @@ func _toggle_open() -> void:
 			flames.visible = open
 		if light != null:
 			light.visible = open
+
+
+# ---------- Kühlbox mit Fang ----------
+
+func _cooler_use(player: Node) -> void:
+	if not open:
+		_toggle_open()
+		return
+	if fish_in.is_empty() or sel % (fish_in.size() + 1) == fish_in.size():
+		sel = 0
+		_toggle_open()
+		return
+	var idx := sel % (fish_in.size() + 1)
+	var d: Dictionary = fish_in[idx]
+	fish_in.remove_at(idx)
+	sel = 0
+	_refresh_fish()
+	var it := Item.new().setup(d["name"], d["weight"], d["size"], d["color"])
+	get_parent().add_child(it)
+	it.global_position = global_position + Vector3(0, 1.0, 0)
+	Sfx.play("pop", global_position)
+	player.pick_up(it)
+	player.toast("%s aus der Kühlbox genommen." % d["name"], 2.0)
+
+
+func _store_fish(player: Node, held: Node) -> void:
+	if fish_in.size() >= 6:
+		player.toast("Die Kühlbox ist voll.", 2.0)
+		return
+	if not open:
+		_toggle_open()
+	fish_in.append({"name": held.item_name, "weight": held.weight, "size": held.item_size, "color": held.item_color})
+	player.release_held_for_storage()
+	Sfx.play("splash", global_position, -8.0)
+	_refresh_fish()
+	player.toast("%s liegt jetzt auf Eis. (%d/6)" % [held.item_name, fish_in.size()], 2.5)
+	held.queue_free()
+
+
+func _refresh_fish() -> void:
+	var cont: Node3D = parts.get("contents", null)
+	if cont == null:
+		return
+	if _fish_vis != null:
+		_fish_vis.queue_free()
+	_fish_vis = Node3D.new()
+	_fish_vis.position = Vector3(0, -0.035, 0)
+	cont.add_child(_fish_vis)
+	var n := 0
+	for d in fish_in:
+		var sz: Vector3 = d["size"]
+		var k := minf(1.0, 0.36 / maxf(sz.x, 0.1))
+		var f := Node3D.new()
+		f.position = Vector3(0.0, n * 0.012, -0.15 + n * 0.07)
+		f.rotation.y = (n % 2) * 0.35 - 0.17
+		f.position.x = (n % 3 - 1) * 0.04
+		_fish_vis.add_child(f)
+		var sc := Vector3(sz.x * k, sz.y * k, sz.z * k)
+		ItemModels.add_visual(f, d["name"], sc, d["color"])
+		n += 1
+	# Fisch liegt flach auf Eis: etwas anheben
+	_fish_vis.visible = true
 
 
 # ---------- Rutenständer ----------
@@ -727,6 +833,7 @@ func _oven_use(player: Node) -> void:
 		cook_t = 0.0
 		burnt = false
 		done = false
+		flavor = 0.0
 		quality = 100.0
 		if food != null:
 			food.visible = false
@@ -742,6 +849,7 @@ func _oven_use(player: Node) -> void:
 				n.ate_chili()
 			player.toast("Mmmh, Chili con Carne! %s (%d Portionen übrig)" % [_rating(), portions], 4.0)
 			if portions == 0:
+				flavor = 0.0
 				added.clear()
 				done = false
 				if food != null:
@@ -750,17 +858,166 @@ func _oven_use(player: Node) -> void:
 	if added.is_empty():
 		player.toast("Leer. Hol die Zutaten aus der Kiste und kipp sie nacheinander hinein: " + ", ".join(PackedStringArray(Game.RECIPE)), 6.0)
 		return
-	# Umrühren
-	var bonus := 1.6 if player.character_name == "Steffen" else 1.0
-	burn = maxf(burn - 0.3 * bonus, 0.0)
+	_stir_start(player)
+
+
+# ---------- Rühr-Minispiel ----------
+
+func _stir_start(player: Node) -> void:
+	if stirrer != null:
+		return
+	if on_grill == null or not on_grill.open:
+		player.toast("Ohne Hitze nichts zu rühren - Topf auf den angezündeten Grill!", 3.0)
+		return
+	stirrer = player
+	player.stir_oven = self
+	stir_bubbles.clear()
+	stir_spawned = 0
+	stir_resolved = 0
+	stir_score = 0
+	stir_max = 0
+	stir_combo = 0
+	stir_cd = 0.6
 	cook_char = player.character_name
 	var pivot: Node3D = parts.get("lid", null)
 	if pivot != null:
+		create_tween().tween_property(pivot, "rotation_degrees:x", 100.0, 0.25)
+	var h: MiniHud = player.get_minihud()
+	h.card("RÜHREN!", "E, wenn der Ring die Blase trifft", UI.FIRE, 1.6)
+	Sfx.play("sizzle", global_position, -4.0)
+
+
+func _stir_update(delta: float) -> void:
+	var pl := stirrer
+	if not is_instance_valid(pl) or global_position.distance_to((pl as Node3D).global_position) > 4.5 or done or burnt:
+		_stir_end(false)
+		return
+	stir_spin += delta * 3.2
+	if stir_spawned < STIR_COUNT:
+		stir_cd -= delta
+		if stir_cd <= 0.0:
+			stir_cd = maxf(0.95 - float(stir_spawned) * 0.045, 0.5)
+			stir_spawned += 1
+			stir_bubbles.append({"a": randf() * TAU, "rad": randf_range(0.35, 0.78), "t": 0.0, "p": 1.0, "res": "", "fade": 0.0})
+	for b in stir_bubbles.duplicate():
+		if b["res"] != "":
+			b["fade"] = float(b["fade"]) + delta
+			if float(b["fade"]) > 0.6:
+				stir_bubbles.erase(b)
+			continue
+		b["t"] = float(b["t"]) + delta
+		b["p"] = 1.0 - float(b["t"]) / 1.0
+		if float(b["t"]) > 1.0 + 0.3:
+			_stir_result(b, "ZU SPÄT")
+	var h: MiniHud = pl.get_minihud()
+	var left := 1.0 - float(stir_resolved) / float(STIR_COUNT)
+	h.kind = "stir"
+	h.d = {"bubbles": stir_bubbles, "score": stir_score, "combo": stir_combo, "time_left": left, "burn": burn, "spin": stir_spin}
+	if stir_resolved >= STIR_COUNT:
+		_stir_end(true)
+
+
+func stir_press(player: Node) -> void:
+	if stirrer == null:
+		return
+	var win := 1.3 if player.character_name == "Steffen" else 1.0
+	var best: Dictionary = {}
+	var best_d := 9.0
+	for b in stir_bubbles:
+		if b["res"] != "":
+			continue
+		var dd := absf(float(b["p"]))
+		if dd < best_d:
+			best_d = dd
+			best = b
+	if best.is_empty() or best_d > 0.5:
+		_stir_result({}, "DANEBEN")
+		return
+	if best_d <= 0.09 * win:
+		_stir_result(best, "PERFEKT")
+	elif best_d <= 0.22 * win:
+		_stir_result(best, "GUT")
+	else:
+		_stir_result(best, "DANEBEN" if float(best["p"]) > 0.0 else "ZU SPÄT")
+
+
+func _stir_result(b: Dictionary, res: String) -> void:
+	var pl := stirrer
+	if pl == null:
+		return
+	var h: MiniHud = pl.get_minihud()
+	if not b.is_empty():
+		b["res"] = res
+		stir_resolved += 1
+		stir_max += 100
+	match res:
+		"PERFEKT":
+			stir_combo += 1
+			stir_score += int(100 * (1.0 + 0.1 * stir_combo))
+			burn = maxf(burn - 0.07, 0.0)
+			flavor = minf(flavor + 1.5, 15.0)
+			if added.size() >= Game.RECIPE.size():
+				cook_t += 1.5
+			Sfx.play("ding", global_position, -6.0, 1.0 + minf(stir_combo, 8) * 0.05)
+			Sfx.play("plop", global_position, -2.0)
+			_stir_fx(1.0)
+			pl.shake = 0.8
+		"GUT":
+			stir_combo += 1
+			stir_score += 50
+			burn = maxf(burn - 0.03, 0.0)
+			flavor = minf(flavor + 0.6, 15.0)
+			Sfx.play("plop", global_position, -3.0)
+			_stir_fx(0.6)
+		_:
+			stir_combo = 0
+			burn = minf(burn + 0.03, 0.95)
+			Sfx.play("click", global_position, -4.0)
+			h.flash(Color(1.0, 0.25, 0.15, 0.35))
+	_update_food_color()
+	if not b.is_empty():
+		var bc := Vector2(h.size.x / 2.0, h.size.y * 0.52) + Vector2(cos(float(b["a"])), sin(float(b["a"]))) * 120.0 * float(b["rad"])
+		h.burst(bc, Color(1.0, 0.5, 0.25) if res != "DANEBEN" and res != "ZU SPÄT" else Color(0.6, 0.6, 0.6), 10 if res == "PERFEKT" else 5, 200.0)
+
+
+func _stir_fx(power: float) -> void:
+	if food != null:
 		var tw := create_tween()
-		tw.tween_property(pivot, "rotation_degrees:x", 100.0, 0.2)
-		tw.tween_interval(0.8)
-		tw.tween_property(pivot, "rotation_degrees:x", 0.0, 0.3)
-	player.toast("Umgerührt.%s" % (" (Steffen rührt wie ein Profi)" if bonus > 1.0 else ""), 1.5)
+		tw.tween_property(food, "scale", Vector3(1.0, 1.0 + 0.5 * power, 1.0), 0.07)
+		tw.tween_property(food, "scale", Vector3.ONE, 0.18)
+	Fx.splash(get_tree().current_scene, global_position + Vector3(0, _psize.y + 0.05, 0), 0.35 * power, Color(0.85, 0.28, 0.14, 0.95), false)
+
+
+func _stir_end(finished: bool) -> void:
+	var pl := stirrer
+	stirrer = null
+	stir_bubbles.clear()
+	var pivot: Node3D = parts.get("lid", null)
+	if pivot != null:
+		create_tween().tween_property(pivot, "rotation_degrees:x", 0.0, 0.3)
+	if pl == null or not is_instance_valid(pl):
+		return
+	pl.stir_oven = null
+	var h: MiniHud = pl.get_minihud()
+	h.clear()
+	if finished:
+		var ratio := float(stir_score) / maxf(float(stir_max) * 1.5, 1.0)
+		var grade := "C"
+		var col := Color(0.8, 0.8, 0.8)
+		if ratio >= 0.55:
+			grade = "S"
+			col = Color(1.0, 0.85, 0.3)
+		elif ratio >= 0.4:
+			grade = "A"
+			col = Color(0.5, 1.0, 0.55)
+		elif ratio >= 0.25:
+			grade = "B"
+			col = Color(0.6, 0.85, 1.0)
+		h.card("NOTE %s" % grade, "%d Punkte  ·  Geschmack %d%%" % [stir_score, int(flavor / 15.0 * 100.0)], col, 3.0)
+		h.burst(h.size / 2.0, col, 30, 400.0)
+		Sfx.play("fanfare" if grade != "C" else "fail", Vector3.INF, -6.0)
+	else:
+		pl.toast("Rühren abgebrochen.", 1.5)
 
 
 func _rating() -> String:
@@ -803,6 +1060,8 @@ func _process(delta: float) -> void:
 			if pl != null:
 				pl.toast("Das Feuer ist heruntergebrannt. Neues Holz nötig (und neuer Zunder!).", 4.0)
 	if item_name == "Dutch Oven":
+		if stirrer != null:
+			_stir_update(delta)
 		_cook(delta)
 
 
@@ -835,7 +1094,7 @@ func _cook(delta: float) -> void:
 	if added.size() >= Game.RECIPE.size() and cook_t >= 30.0:
 		done = true
 		portions = 4
-		quality = clampf(quality - burn * 40.0 + (10.0 if steffen else 0.0), 5.0, 100.0)
+		quality = clampf(quality - burn * 40.0 + flavor + (10.0 if steffen else 0.0), 5.0, 100.0)
 		var pl2 := get_tree().get_first_node_in_group("local_player")
 		if pl2 != null:
 			pl2.toast("Das Chili con Carne ist FERTIG! Riecht fantastisch. E zum Essen.", 5.0)
@@ -853,6 +1112,8 @@ func get_state() -> Dictionary:
 		st["pack"] = pack.duplicate()
 	if item_name == "Rucksack":
 		st["contents"] = contents.duplicate(true)
+	if item_name == "Kühlbox":
+		st["fish"] = fish_in.duplicate(true)
 	return st
 
 
@@ -887,6 +1148,13 @@ func dismantle(player: Node) -> void:
 		it.extra["wood"] = wood_left
 	if item_name == "Kiste mit Proviant":
 		it.extra["pack"] = pack.duplicate()
+	if item_name == "Kühlbox":
+		it.extra["fish"] = fish_in.duplicate(true)
+		var fw := weight
+		for fd in fish_in:
+			fw += float((fd as Dictionary)["weight"])
+		it.weight = fw
+		it.mass = fw
 	if item_name == "Rucksack":
 		it.extra["contents"] = contents.duplicate(true)
 		var w := 1.0

@@ -4,7 +4,7 @@ extends Node
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
-const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2}
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2}
 const LOWRATE: Array = ["wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit"]
 var _warm: Array = []
 var _warm_t: float = 2.0
@@ -429,6 +429,33 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			s = _add(s, _sine(0.3, 150.0, 60.0, 16.0, 0.4, 0.001), 0.003)
 			s = _add(s, _sine(0.5, 640.0, 560.0, 11.0, 0.12, 0.001), 0.02)
 			return _wav(s, 0.9)
+		"reel":
+			# Angelrolle: schnelles Ratschen
+			var s := PackedFloat32Array()
+			for k in range(4):
+				s = _add(s, _env(_nf(_white(0.02), 1, 3200.0 + k * 150.0, 2.5), 0.0003, 160.0, 0.9), k * 0.035)
+			return _wav(s, 0.5)
+		"fanfare":
+			var s := PackedFloat32Array()
+			var k := 0
+			for f in [523.0, 659.0, 784.0, 1047.0]:
+				s = _add(s, _sine(0.4, f, f, 5.0, 0.5, 0.004, 0.25), k * 0.11)
+				k += 1
+			s = _add(s, _sine(0.9, 1047.0, 1047.0, 3.0, 0.4, 0.004, 0.3), 0.44)
+			return _wav(s, 0.7)
+		"fail":
+			var s := _sine(0.5, 330.0, 140.0, 4.0, 0.7, 0.004, 0.3)
+			s = _add(s, _sine(0.5, 247.0, 100.0, 4.0, 0.5, 0.004, 0.2), 0.12)
+			return _wav(s, 0.7)
+		"ding":
+			var s := _sine(0.6, 1568.0, 1568.0, 6.0, 0.5, 0.001, 0.2)
+			s = _add(s, _sine(0.5, 2349.0, 2349.0, 9.0, 0.25, 0.001))
+			return _wav(s, 0.6)
+		"sizzle":
+			var s := _env(_nf(_white(0.7), 2, 5200.0, 0.7), 0.02, 3.0, 0.8)
+			for k in range(14):
+				s = _add(s, _env(_nf(_white(0.01), 1, randf_range(3000.0, 8000.0), 2.0), 0.0003, 250.0, randf_range(0.3, 1.0)), randf_range(0.0, 0.6))
+			return _wav(s, 0.55)
 		"click":
 			var s := _env(_nf(_white(0.05), 1, randf_range(2600.0, 3600.0), 2.5), 0.0003, 110.0, 1.0)
 			s = _add(s, _sine(0.04, 1700.0, 1500.0, 140.0, 0.4, 0.0003))

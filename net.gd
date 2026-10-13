@@ -143,6 +143,26 @@ func submit_catch(e: Dictionary) -> void:
 	server_add(e)
 
 
+## Nach einem Server-Reset: Spieler melden ihre gemerkten Bestfänge erneut (Duplikate werden ignoriert).
+@rpc("any_peer", "reliable")
+func submit_history(list: Array) -> void:
+	if not is_host() or not avatars.has(multiplayer.get_remote_sender_id()):
+		return
+	var changed := false
+	for e in list.slice(0, Leaderboard.MY_MAX):
+		if not (e is Dictionary):
+			continue
+		var c := Leaderboard.sanitize(e)
+		if c.is_empty() or Leaderboard.has_entry(c):
+			continue
+		if Leaderboard.rank_for(float(c["kg"])) < 0:
+			continue
+		Leaderboard.add(c)
+		changed = true
+	if changed:
+		rpc("lb_sync", Leaderboard.entries)
+
+
 func server_add(e: Dictionary) -> void:
 	var c := Leaderboard.sanitize(e)
 	if c.is_empty():
@@ -164,6 +184,10 @@ func _on_connected() -> void:
 	connected = true
 	status = "verbunden"
 	rpc_id(1, "login", Game.password)
+	get_tree().create_timer(2.5).timeout.connect(func() -> void:
+		var mine := Leaderboard.my_load()
+		if connected and not mine.is_empty() and multiplayer.multiplayer_peer != null:
+			rpc_id(1, "submit_history", mine))
 
 
 @rpc("authority", "reliable")
