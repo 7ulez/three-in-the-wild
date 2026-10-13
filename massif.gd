@@ -8,6 +8,31 @@ const BASE: Vector3 = Vector3(105, 7.5, -72)    # Mitte des Felsblocks
 const SIZE: Vector3 = Vector3(50, 15, 50)
 const TOP_Y: float = 15.0
 
+const ROCK_SHADER: String = """
+shader_type spatial;
+varying vec3 wp;
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) {
+	vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	vec2 q = vec2(wp.x + wp.z, wp.y);
+	float n = vn(q * vec2(0.5, 1.6)) * 0.6 + vn(q * vec2(1.7, 4.0)) * 0.4;
+	float band = fract(floor(wp.y * 0.9 + n * 1.6) * 0.618);
+	vec3 col = mix(vec3(0.50, 0.45, 0.40), vec3(0.38, 0.34, 0.32), step(0.5, band));
+	col = mix(col, vec3(0.60, 0.53, 0.44), step(0.8, band));
+	col *= 0.85 + 0.3 * n;
+	float moss = smoothstep(2.5, 0.0, wp.y + n * 1.5);
+	col = mix(col, vec3(0.28, 0.40, 0.20), moss * 0.65);
+	float crack = smoothstep(0.04, 0.0, abs(vn(vec2(q.x * 1.3, q.y * 0.12) + 7.0) - 0.5));
+	col *= 1.0 - crack * 0.28;
+	ALBEDO = col;
+	ROUGHNESS = 0.95;
+}
+"""
+
 var main: Node
 var summit_reached: bool = false
 var pit_area: Area3D
@@ -33,7 +58,9 @@ class Chest:
 
 func build(p_main: Node) -> void:
 	main = p_main
-	var rock := Util.mat(Color(0.46, 0.41, 0.37), 0.95)
+	var rock := ShaderMaterial.new()
+	rock.shader = Shader.new()
+	rock.shader.code = ROCK_SHADER
 	var dark := Util.mat(Color(0.3, 0.27, 0.25), 0.95)
 
 	# Felsblock mit Höhlen (CSG: Block minus Tunnel)
@@ -68,6 +95,7 @@ func build(p_main: Node) -> void:
 	Util.add_box(self, Vector3(49.6, 0.04, 49.6), Color(0.33, 0.5, 0.24), Vector3(BASE.x, TOP_Y + 0.02, BASE.z))
 
 	_build_climb()
+	_build_peaks()
 
 	# Boulder am Fuß und Aussichtsplattform-Dekoration
 	var rng := RandomNumberGenerator.new()
@@ -91,6 +119,8 @@ func build(p_main: Node) -> void:
 		var tx := rng.randf_range(84.0, 126.0)
 		var tz := rng.randf_range(-93.0, -52.0)
 		var h := rng.randf_range(2.5, 4.5)
+		if tz < -61.0 and tx > 90.0:
+			continue    # dort steht jetzt der Gipfel
 		Util.add_cylinder(self, 0.18, h * 0.4, Color(0.35, 0.22, 0.12), Vector3(tx, TOP_Y + h * 0.2, tz))
 		Util.add_cone(self, 1.0, h, Color(0.12, 0.42, 0.25), Vector3(tx, TOP_Y + h * 0.5 + 0.3, tz))
 	# Aussichtsbank und Fahne
@@ -183,6 +213,101 @@ func build(p_main: Node) -> void:
 	add_child(sp3)
 	sp3.position = Vector3(125, TOP_Y, -49)
 	sp3.build([{"text": "Aussichtspunkt - nicht zu nah an die Kante!", "yaw": 180.0, "y": 2.0}])
+
+
+## Zackiger Gipfel auf dem Plateau und Geröllhalden am Fuß, damit der Block wie ein Berg wirkt.
+## Die Kletterroute und alle Höhleneingänge bleiben frei.
+func _build_peaks() -> void:
+	# [Mittelpunkt, Radien, Seed, Rauheit]
+	var peaks: Array = [
+		[Vector3(110, TOP_Y - 1.5, -78), Vector3(17, 22, 14), 11, 0.5],
+		[Vector3(100, TOP_Y - 1.5, -88), Vector3(8, 15, 7), 12, 0.5],
+		[Vector3(96, TOP_Y - 1.5, -72), Vector3(7, 11, 7), 13, 0.5],
+		[Vector3(123, TOP_Y - 1.5, -72), Vector3(8, 14, 8), 14, 0.5],
+		[Vector3(122, TOP_Y - 1.5, -90), Vector3(6, 11, 5.5), 15, 0.5],
+		[Vector3(108, TOP_Y - 1.5, -65), Vector3(6, 7, 5), 16, 0.45],
+	]
+	for pk in peaks:
+		_rock(pk[0], pk[1], int(pk[2]), float(pk[3]), true)
+	# Geröll am Fuß (nicht an der Südwand, nicht vor den Höhlen)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 321
+	var skirts: Array = []
+	for z in [-95.0, -89.0, -83.0, -78.0, -60.0, -54.0, -49.5]:
+		skirts.append(Vector3(78.2, 0, z))
+	for x in [83.0, 89.0, 111.0, 117.0, 123.0, 128.5]:
+		skirts.append(Vector3(x, 0, -98.8))
+	for z in [-93.0, -86.0, -79.0, -72.0, -65.0, -58.0]:
+		skirts.append(Vector3(131.8, 0, z))
+	for sp in skirts:
+		var r := rng.randf_range(2.8, 4.6)
+		_rock(sp + Vector3(rng.randf_range(-0.6, 0.6), 0.0, rng.randf_range(-0.6, 0.6)), Vector3(r, r * rng.randf_range(0.6, 0.95), r), rng.randi(), 0.38, false)
+
+
+## Ein kantiger Felsbrocken (zerbeulte Halbkugel, flach schattiert, Farbe nach Höhe).
+func _rock(center: Vector3, radii: Vector3, seed_v: int, rough: float, peak: bool) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	var segs := 12 if peak else 9
+	var rings := 6 if peak else 5
+	var grid: Array = []
+	for r in range(rings + 1):
+		var row: Array = []
+		var phi := PI * 0.5 * float(r) / float(rings)     # 0 = Spitze, PI/2 = Rand
+		for sg in range(segs):
+			var th := TAU * float(sg) / float(segs)
+			var d := 1.0 + rough * (rng.randf() - 0.5)
+			if r == 0:
+				d = 1.0 + rough * 0.4
+			var v := Vector3(sin(phi) * cos(th), cos(phi), sin(phi) * sin(th)) * d
+			if peak and r <= 1:
+				v.y *= 1.15
+			row.append(center + Vector3(v.x * radii.x, v.y * radii.y, v.z * radii.z))
+		grid.append(row)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for r in range(rings):
+		for sg in range(segs):
+			var s2 := (sg + 1) % segs
+			var a: Vector3 = grid[r][sg]
+			var b: Vector3 = grid[r][s2]
+			var c: Vector3 = grid[r + 1][sg]
+			var e: Vector3 = grid[r + 1][s2]
+			if r == 0:
+				_tri(st, a, c, e, rng)
+			else:
+				_tri(st, a, c, b, rng)
+				_tri(st, b, c, e, rng)
+	st.generate_normals()
+	var mesh := st.commit()
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.roughness = 0.95
+	mi.material_override = m
+	add_child(mi)
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	cs.shape = mesh.create_trimesh_shape()
+	body.add_child(cs)
+	add_child(body)
+
+
+func _tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, rng: RandomNumberGenerator) -> void:
+	var n := (b - a).cross(c - a).normalized()
+	var cy := (a.y + b.y + c.y) / 3.0
+	var col := Color(0.5, 0.45, 0.4).lerp(Color(0.36, 0.33, 0.31), rng.randf())
+	if cy > TOP_Y + 9.5:
+		col = col.lerp(Color(0.95, 0.96, 0.98), clampf((cy - TOP_Y - 9.5) / 2.5, 0.0, 1.0) * (0.4 + 0.6 * maxf(n.y, 0.0)))
+	elif n.y > 0.55 and cy < TOP_Y + 3.0:
+		col = col.lerp(Color(0.3, 0.45, 0.22), 0.7)
+	elif cy < TOP_Y + 2.0 and n.y < 0.55:
+		col = col.lerp(Color(0.28, 0.4, 0.2), clampf((3.0 - cy) / 3.0, 0.0, 0.5))
+	col = col.darkened(clampf(0.25 - n.y * 0.25, 0.0, 0.25))
+	for v in [a, b, c]:
+		st.set_color(col)
+		st.add_vertex(v)
 
 
 var route: Array = []     # [{pos: Vector3 (Mitte der Oberseite), size: Vector3 (Länge x Breite in x/z), kind}]
