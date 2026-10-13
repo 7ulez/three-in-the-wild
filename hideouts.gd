@@ -4,11 +4,11 @@ extends Node3D
 ## Die Plätze (x, z, Radius) sind für Bäume gesperrt.
 
 const SPOTS: Array = [
-	{"id": "fuchsbau", "x": -44.0, "z": -36.0, "r": 9.0},
-	{"id": "huette", "x": -30.0, "z": -64.0, "r": 10.0},
-	{"id": "tropf", "x": 0.0, "z": -76.0, "r": 13.0},
-	{"id": "baum", "x": 27.0, "z": -66.0, "r": 7.0},
-	{"id": "lager", "x": 43.0, "z": -38.0, "r": 8.0},
+	{"id": "fuchsbau", "x": -105.0, "z": 50.0, "r": 9.0},     # Südwesten, hinter dem Parkplatz
+	{"id": "huette", "x": -115.0, "z": -75.0, "r": 10.0},     # Nordwesten
+	{"id": "tropf", "x": 95.0, "z": 55.0, "r": 13.0},         # Südosten
+	{"id": "baum", "x": 10.0, "z": 72.0, "r": 7.0},           # Süden, direkt hinter dem Parkplatz
+	{"id": "lager", "x": 20.0, "z": -112.0, "r": 8.0},        # Norden, hinter dem See
 ]
 
 var main: Node
@@ -63,7 +63,6 @@ func build(p_main: Node) -> void:
 				_mush(root, "gut", Vector3(-4.5, 0, 3))
 				_mush(root, "beere", Vector3(0, 0, 4.5))
 	_scatter_forest_traps()
-	_signs()
 	_pebbles()
 
 
