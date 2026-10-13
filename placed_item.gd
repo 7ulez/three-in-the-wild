@@ -43,6 +43,8 @@ var rod_color: Color = Color(0.15, 0.55, 0.3)
 var _rbob: MeshInstance3D = null
 var _rline: MeshInstance3D = null
 var _rbeep: AudioStreamPlayer3D = null
+var _rled: MeshInstance3D = null
+var _rled_light: OmniLight3D = null
 var _beep_cd: float = 0.0
 var _rt: float = 0.0
 
@@ -412,6 +414,8 @@ func _take_rod(player: Node) -> void:
 	if _rbob != null:
 		_rbob.visible = false
 		(_rline.mesh as ImmediateMesh).clear_surfaces()
+		_rled.visible = false
+		_rled_light.visible = false
 	(player.fisher as Fisher).import_state(st)
 
 
@@ -436,6 +440,30 @@ func _ensure_rod_visuals() -> void:
 	_rline.material_override = lm
 	_rline.top_level = true
 	add_child(_rline)
+	# Biss-Leuchte: blinkt rot auf dem Ständer, damit man sofort sieht, welche Rute beißt
+	_rled = MeshInstance3D.new()
+	var lsm := SphereMesh.new()
+	lsm.radius = 0.055
+	lsm.height = 0.11
+	lsm.radial_segments = 10
+	lsm.rings = 6
+	_rled.mesh = lsm
+	var lmat := StandardMaterial3D.new()
+	lmat.albedo_color = Color(1.0, 0.1, 0.08)
+	lmat.emission_enabled = true
+	lmat.emission = Color(1.0, 0.1, 0.05)
+	lmat.emission_energy_multiplier = 4.0
+	_rled.material_override = lmat
+	_rled.position = Vector3(0.12, 1.0, -0.2)
+	_rled.visible = false
+	add_child(_rled)
+	_rled_light = OmniLight3D.new()
+	_rled_light.light_color = Color(1.0, 0.15, 0.1)
+	_rled_light.light_energy = 2.5
+	_rled_light.omni_range = 5.0
+	_rled_light.position = _rled.position
+	_rled_light.visible = false
+	add_child(_rled_light)
 	_rbeep = AudioStreamPlayer3D.new()
 	_rbeep.stream = Fisher.make_beep()
 	_rbeep.unit_size = 12.0
@@ -448,6 +476,10 @@ func _rod_process(delta: float) -> void:
 	var st: int = int(rod_st.get("st", Fisher.S.IDLE))
 	if st == Fisher.S.IDLE:
 		return
+	if _rled != null:
+		var on := st == Fisher.S.BITE and fmod(_rt, 0.6) < 0.3
+		_rled.visible = on
+		_rled_light.visible = on
 	var tgt: Vector3 = rod_st["target"]
 	var mode: int = int(rod_st["mode"])
 	var bpos := tgt
@@ -477,7 +509,7 @@ func _rod_process(delta: float) -> void:
 			rod_st["wait_left"] = randf_range(15.0, 40.0)
 	if _rbob != null:
 		_rbob.global_position = bpos
-		var tip := global_position + global_transform.basis * Vector3(0, 0.95, 0.8)
+		var tip := global_position + global_transform.basis * Vector3(0, 1.45, -1.19)
 		var m := _rline.mesh as ImmediateMesh
 		m.clear_surfaces()
 		m.surface_begin(Mesh.PRIMITIVE_LINES)
