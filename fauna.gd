@@ -158,6 +158,8 @@ class Animal extends Node3D:
 	var orbit_a: float = 0.0
 	var hop: float = 0.0
 	var _snd_cd: float = 0.0
+	var ap: AnimationPlayer = null
+	var _cur: String = ""
 
 	func setup(f: Fauna, k: String) -> void:
 		fauna = f
@@ -190,6 +192,17 @@ class Animal extends Node3D:
 						Util.add_box(body, Vector3(0.09, 0.7, 0.09), c.darkened(0.15), Vector3(lx, 0.35, lz))
 				speed = 1.2
 			"hare":
+				if ResourceLoader.exists("res://assets/fauna/hase.glb"):
+					var inst := (load("res://assets/fauna/hase.glb") as PackedScene).instantiate() as Node3D
+					inst.scale = Vector3.ONE * 1.25
+					body.add_child(inst)
+					ap = _find_ap(inst)
+					if ap != null:
+						for an in ap.get_animation_list():
+							ap.get_animation(an).loop_mode = Animation.LOOP_LINEAR
+					speed = 1.5
+					target = global_position
+					return
 				var hc := Color(0.62, 0.52, 0.42)
 				Util.add_sphere(body, 0.17, hc, Vector3(0, 0.17, 0)).scale = Vector3(0.8, 0.8, 1.3)
 				Util.add_sphere(body, 0.1, hc, Vector3(0, 0.27, -0.2))
@@ -209,6 +222,23 @@ class Animal extends Node3D:
 				orbit_r = randf_range(8.0, 22.0)
 				orbit_a = randf() * TAU
 		target = global_position
+
+	func _find_ap(n: Node) -> AnimationPlayer:
+		if n is AnimationPlayer:
+			return n as AnimationPlayer
+		for c in n.get_children():
+			var r := _find_ap(c)
+			if r != null:
+				return r
+		return null
+
+	func _play(a: String, sc: float = 1.0) -> void:
+		if ap == null or not ap.has_animation(a):
+			return
+		if a != _cur:
+			_cur = a
+			ap.play(a, 0.2)
+		ap.speed_scale = sc
 
 	func _pdist() -> float:
 		if fauna.player == null or not is_instance_valid(fauna.player):
@@ -325,7 +355,15 @@ class Animal extends Node3D:
 							break
 				if kind == "hare":
 					var moving := fleeing or wait <= 0.0
-					body.position.y = absf(sin(_t * (9.0 if fleeing else 5.0))) * 0.25 if moving else 0.0
+					if ap != null:
+						if fleeing:
+							_play("Run", 1.0)
+						elif moving:
+							_play("Hop", 1.0)
+						else:
+							_play("Eat" if int(_t / 7.0) % 2 == 0 else "Idle")
+					else:
+						body.position.y = absf(sin(_t * (9.0 if fleeing else 5.0))) * 0.25 if moving else 0.0
 					if moving and not fleeing:
 						_step_to(delta, speed)
 				else:
