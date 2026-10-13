@@ -72,6 +72,7 @@ var seat: PlacedItem = null
 var hammock: Hammock = null
 var stones: int = 0
 var crouching: bool = false
+var _air_t: float = 0.0
 var crouch_f: float = 0.0
 var col_shape: CapsuleShape3D = null
 var col_node: CollisionShape3D = null
@@ -193,7 +194,7 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 		var ap := _find_anim(inst)
 		if ap != null:
 			for n in ap.get_animation_list():
-				ap.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+				ap.get_animation(n).loop_mode = Animation.LOOP_NONE if n == "Jump" else Animation.LOOP_LINEAR
 			if ap.has_animation("Idle"):
 				ap.play("Idle")
 			parent.set_meta("ap", ap)
@@ -231,12 +232,19 @@ static func _find_anim(n: Node) -> AnimationPlayer:
 
 
 ## Wählt die passende Animation für das Lauftempo (Stehen / Gehen / Rennen).
-static func animate_body(parent: Node3D, speed: float, crouch: bool = false) -> void:
+static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false) -> void:
 	var ap: AnimationPlayer = parent.get_meta("ap", null) as AnimationPlayer
 	if ap == null:
 		return
 	var want := "Idle"
 	var sc := 1.0
+	if air and ap.has_animation("Jump"):
+		if not parent.get_meta("jumping", false):
+			parent.set_meta("jumping", true)
+			ap.play("Jump", 0.08)
+		ap.speed_scale = 1.0
+		return
+	parent.set_meta("jumping", false)
 	if crouch:
 		want = "CrouchWalk" if speed > 0.3 else "Crouch"
 		sc = clampf(speed / 0.9, 0.6, 1.6) if speed > 0.3 else 1.0
@@ -574,7 +582,8 @@ func _physics_process(delta: float) -> void:
 		velocity.x = target.x
 		velocity.z = target.z
 	move_and_slide()
-	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching)
+	_air_t = 0.0 if is_on_floor() else _air_t + delta
+	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18)
 	if is_on_floor():
 		var drop := _peak_y - global_position.y
 		if _airborne and drop > 5.0:
