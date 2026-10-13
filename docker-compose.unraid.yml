@@ -3,6 +3,8 @@ services:
   game:
     image: ghcr.io/7ulez/three-in-the-wild:latest
     restart: unless-stopped
+    volumes:
+      - /mnt/user/appdata/three-in-the-wild:/data      # hier liegt die Bestenliste (bleibt nach Neustart/Update erhalten)
     environment:
       GAME_PASSWORD: "PASSWORT"
       WS_URL: "wss://ws.DEINE-DOMAIN"

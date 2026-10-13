@@ -44,6 +44,10 @@ func _ready() -> void:
 	_build_piers()
 	_build_cars()
 	_build_signs()
+	var lb := LeaderboardBoard.new()
+	add_child(lb)
+	lb.position = Vector3(0, 0, -4.4)
+	lb.build()
 
 	var fauna := Fauna.new()
 	fauna.name = "Fauna"
@@ -61,6 +65,8 @@ func _ready() -> void:
 	amb.name = "Ambient"
 	add_child(amb)
 	amb.start(self, player)
+	if Game.net_mode == "solo":
+		Leaderboard.load_file()
 	if Game.net_mode != "solo":
 		var net := Net.new()
 		add_child(net)

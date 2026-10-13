@@ -4,6 +4,8 @@ services:
   game:
     build: .
     restart: unless-stopped
+    volumes:
+      - ./data:/data      # hier liegt die Bestenliste (bleibt nach Neustart/Update erhalten)
     environment:
       GAME_PASSWORD: "PASSWORT"                    # leer lassen = kein Passwort
       WS_URL: "wss://ws.DEINE-DOMAIN"              # Adresse, über die der Browser das Spiel erreicht

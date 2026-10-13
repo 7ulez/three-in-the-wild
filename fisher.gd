@@ -12,6 +12,7 @@ const FISH: Dictionary = {
 	"Rotauge": {"kg": [0.1, 0.5], "strength": 0.3, "color": Color(0.75, 0.75, 0.8)},
 	"Barsch": {"kg": [0.2, 1.2], "strength": 0.5, "color": Color(0.5, 0.55, 0.25)},
 	"Brasse": {"kg": [0.5, 2.5], "strength": 0.6, "color": Color(0.7, 0.62, 0.45)},
+	"Riesenwels": {"kg": [30.0, 130.0], "strength": 1.5, "color": Color(0.24, 0.24, 0.2)},
 }
 
 var player: Player
@@ -272,6 +273,9 @@ func reel_in(msg: String) -> void:
 func _pick_species() -> String:
 	var r := randf()
 	var night := Game.is_night()
+	# Ganz selten: der Riesenwels (nachts am Grund etwas wahrscheinlicher, nicht beim Spinnfischen)
+	if mode != 2 and randf() < (0.012 if (night and mode == 0) else 0.004):
+		return "Riesenwels"
 	match mode:
 		0:
 			if night:
@@ -413,7 +417,7 @@ func _fight(delta: float) -> void:
 
 func _catch() -> void:
 	Sfx.play("splash", player.global_position + (-player.global_transform.basis.z) * 2.0)
-	var cm := int(clampf(24.0 * pow(fish_kg, 0.36) * 2.0, 12.0, 130.0))
+	var cm := int(clampf(24.0 * pow(fish_kg, 0.36) * 2.0, 12.0, 300.0 if fish_name == "Riesenwels" else 130.0))
 	Game.catches.append({"name": fish_name, "kg": fish_kg, "cm": cm})
 	var d: Dictionary = FISH[fish_name]
 	var len_m := cm / 100.0
@@ -421,12 +425,18 @@ func _catch() -> void:
 	player.get_parent().add_child(item)
 	item.global_position = player.global_position + (-player.global_transform.basis.z) * 1.0 + Vector3(0, 1.0, 0)
 	reel_in("")
+	var rank := Leaderboard.rank_for(fish_kg)
+	Leaderboard.report(fish_name, fish_kg, cm)
 	var extra := ""
 	if fish_name == "Karpfen" and fish_kg >= 10.0:
 		extra = "  Ein Prachtkarpfen!"
 	if fish_name == "Hecht" and fish_kg >= 6.0:
 		extra = "  Ein Monsterhecht!"
-	player.toast("GEFANGEN! %s, %.1f kg, %d cm.%s" % [fish_name, fish_kg, cm, extra], 6.0)
+	if fish_name == "Riesenwels":
+		extra = "  EIN RIESENWELS!!!"
+	if rank >= 0:
+		extra += "  Platz %d auf der Bestenliste am Parkplatz!" % (rank + 1)
+	player.toast("GEFANGEN! %s, %.1f kg, %d cm.%s" % [fish_name, fish_kg, cm, extra], 7.0)
 
 
 ## Beim Schlafen: Hat in der Nacht etwas an der Grundrute gebissen?

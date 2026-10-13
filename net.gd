@@ -76,6 +76,8 @@ func start(p_main: Node) -> void:
 		status = "Netzwerkfehler %d" % err
 		return
 	multiplayer.multiplayer_peer = peer
+	if Game.net_mode == "host":
+		Leaderboard.load_file()
 	if Game.net_mode == "host" and not OS.has_feature("web"):
 		var wh := WebHost.new()
 		add_child(wh)
@@ -88,6 +90,28 @@ func start(p_main: Node) -> void:
 	multiplayer.server_disconnected.connect(func() -> void:
 		if not (status.begins_with("Falsches") or status.begins_with("Das Spiel ist voll") or status.begins_with("Der Server ist noch nicht")):
 			status = "Host hat das Spiel verlassen")
+
+
+@rpc("any_peer", "reliable")
+func submit_catch(e: Dictionary) -> void:
+	if not is_host():
+		return
+	if not avatars.has(multiplayer.get_remote_sender_id()):
+		return    # nur eingeloggte Spieler
+	server_add(e)
+
+
+func server_add(e: Dictionary) -> void:
+	var c := Leaderboard.sanitize(e)
+	if c.is_empty():
+		return
+	Leaderboard.add(c)
+	rpc("lb_sync", Leaderboard.entries)
+
+
+@rpc("authority", "reliable")
+func lb_sync(list: Array) -> void:
+	Leaderboard.set_entries(list)
 
 
 func is_host() -> bool:
@@ -150,6 +174,7 @@ func _admit(id: int) -> void:
 	var av := _get_avatar(id)
 	av.set_meta("slot", s)
 	rpc_id(id, "assign_slot", s, _snapshot())
+	rpc_id(id, "lb_sync", Leaderboard.entries)
 	if main.player != null:
 		main.player.toast("Mitspieler %d ist beigetreten." % s, 3.0)
 

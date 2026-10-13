@@ -8,5 +8,7 @@ RUN wget -q https://github.com/godotengine/godot/releases/download/4.3-stable/Go
 COPY . /game
 WORKDIR /game
 RUN godot --headless --path /game --import || true
+ENV DATA_DIR=/data
+VOLUME /data
 EXPOSE 24680 24681
 CMD ["godot", "--headless", "--path", "/game", "--", "--server"]
