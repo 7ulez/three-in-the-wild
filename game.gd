@@ -42,6 +42,7 @@ static var net_mode: String = "solo"    # "solo", "host", "join"
 static var host_ip: String = "127.0.0.1"
 static var port: int = 24680
 static var password: String = ""
+static var login_error: String = ""    # Meldung fürs Menü nach abgelehntem Login
 static var dedicated: bool = false     # Server ohne Fenster/Spieler (Docker)
 static var ws_url: String = ""         # vom Server vorgegebene WebSocket-Adresse (Browser)
 

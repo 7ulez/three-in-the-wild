@@ -1,5 +1,7 @@
 # Server auf Unraid (24/7) mit Cloudflare Tunnel
 
+**Wichtig:** `GAME_PASSWORD` muss gesetzt sein. Ohne Passwort lässt der Server niemanden herein.
+
 Ergebnis: Deine Freunde öffnen `https://spiel.DEINE-DOMAIN` im Browser, geben das Passwort ein und spielen - ohne Installation, ohne Tailscale.
 
 ## 1. Cloudflare Tunnel anlegen

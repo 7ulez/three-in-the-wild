@@ -51,6 +51,7 @@ func start(p_main: Node) -> void:
 	instance = self
 	name = "Net"
 	var peer := WebSocketMultiplayerPeer.new()
+	peer.handshake_timeout = 30.0   # langsame Geräte brauchen beim Start länger
 	var err := OK
 	if Game.net_mode == "host":
 		err = peer.create_server(Game.port)
@@ -78,7 +79,7 @@ func start(p_main: Node) -> void:
 	multiplayer.connected_to_server.connect(_on_connected)
 	multiplayer.connection_failed.connect(func() -> void: status = "Verbindung fehlgeschlagen")
 	multiplayer.server_disconnected.connect(func() -> void:
-		if not (status.begins_with("Falsches") or status.begins_with("Das Spiel ist voll")):
+		if not (status.begins_with("Falsches") or status.begins_with("Das Spiel ist voll") or status.begins_with("Der Server ist noch nicht")):
 			status = "Host hat das Spiel verlassen")
 
 
@@ -95,8 +96,14 @@ func _on_connected() -> void:
 @rpc("authority", "reliable")
 func denied(msg: String) -> void:
 	status = msg
+	Game.login_error = msg
 	if main.player != null:
 		main.player.toast(msg, 6.0)
+	# Zurück zum Anmeldebildschirm, dort steht der Grund.
+	get_tree().create_timer(1.5).timeout.connect(func() -> void:
+		if is_inside_tree():
+			multiplayer.multiplayer_peer = null
+			get_tree().change_scene_to_file("res://menu.tscn"))
 
 
 ## Der Server prüft das Passwort und vergibt erst dann einen Platz.
@@ -105,8 +112,8 @@ func login(pw: String) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
-	if Game.password != "" and pw != Game.password:
-		rpc_id(id, "denied", "Falsches Passwort.")
+	if Game.password == "" or pw != Game.password:
+		rpc_id(id, "denied", "Falsches Passwort." if Game.password != "" else "Der Server ist noch nicht eingerichtet (kein Passwort gesetzt).")
 		get_tree().create_timer(0.5).timeout.connect(func() -> void:
 			if multiplayer.multiplayer_peer != null:
 				multiplayer.multiplayer_peer.disconnect_peer(id))

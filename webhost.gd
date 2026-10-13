@@ -75,6 +75,21 @@ func _respond(p: StreamPeerTCP, req: String) -> void:
 	if path == "/wsurl":
 		_send(p, 200, "text/plain", ws_url.to_utf8_buffer(), false)
 		return
+	if path == "/check":
+		# Passwortprüfung fürs Anmeldemenü (Passwort steht im Header, nicht in der Adresse).
+		var pw: String = ""
+		for hl in req.split("\r\n"):
+			if hl.to_lower().begins_with("x-game-pw:"):
+				pw = hl.substr(10).strip_edges().uri_decode()
+		var answer := "ok"
+		if Game.password == "":
+			answer = "nopw"
+		elif pw != Game.password:
+			answer = "no"
+		if answer != "ok":
+			await get_tree().create_timer(1.0).timeout    # bremst Raten
+		_send(p, 200, "text/plain", answer.to_utf8_buffer(), false)
+		return
 	if path.contains(".."):
 		_send(p, 403, "text/plain", "no".to_utf8_buffer(), false)
 		return
