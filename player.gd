@@ -419,7 +419,14 @@ func _apply_view() -> void:
 	for nm in ["Kopf_Gruppe", "Hals"]:
 		var hn := body_visual.find_child(nm, true, false) as Node3D
 		if hn != null:
-			hn.visible = third_person
+			# Kopf bleibt für den Schatten da, ist aber in der Ego-Ansicht unsichtbar
+			hn.visible = true
+			var mode := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if third_person else GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			var meshes: Array = hn.find_children("*", "MeshInstance3D", true, false)
+			if hn is MeshInstance3D:
+				meshes.append(hn)
+			for m in meshes:
+				(m as MeshInstance3D).cast_shadow = mode
 	if third_person:
 		camera.position = Vector3(0.6, 0.4, 3.2)
 		ray.target_position = Vector3(0, 0, -11.2)
