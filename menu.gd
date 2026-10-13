@@ -2,13 +2,13 @@ extends Control
 ## Startmenü / Login: Name, Figur, Passwort - dann geht es auf den Server.
 ## Alles wird per Code gebaut (kein Editor nötig).
 
-const ACCENT := Color(0.98, 0.62, 0.22)
+const ACCENT := Color("e29a4d")
 const ACCENT_DARK := Color(0.82, 0.44, 0.1)
 const PANEL_BG := Color(0.04, 0.055, 0.07, 0.84)
 const FIELD_BG := Color(0.0, 0.0, 0.0, 0.38)
-const TEXT_DIM := Color(0.72, 0.76, 0.8)
-const ERR := Color(1.0, 0.42, 0.38)
-const OKC := Color(0.55, 0.9, 0.6)
+const TEXT_DIM := Color("5d6159")
+const ERR := Color("d9533f")
+const OKC := Color("4aa35a")
 
 const ROLES := {"Marian": "Feuer", "Steffen": "Koch", "Julian": "Vape"}
 const ORDER := ["Marian", "Steffen", "Julian"]
@@ -148,24 +148,19 @@ class CharCard:
 		var accent := Color(0.98, 0.62, 0.22)
 		var r := Rect2(Vector2.ZERO, size)
 		var lift := -4.0 if (selected or hover) else 0.0
-		var sb := StyleBoxFlat.new()
-		sb.set_corner_radius_all(14)
-		sb.bg_color = Color(0.1, 0.12, 0.15, 0.95) if selected else Color(0.06, 0.08, 0.1, 0.8)
-		sb.border_color = accent if selected else (Color(1, 1, 1, 0.3) if hover else Color(1, 1, 1, 0.09))
-		sb.set_border_width_all(3 if selected else 1)
-		if selected:
-			sb.shadow_color = Color(accent.r, accent.g, accent.b, 0.35)
-			sb.shadow_size = 14
+		var sb := UI.sticker(Color("d9ecd6") if selected else UI.PAPER, 12, 4.0 if (selected or hover) else 2.0, Vector4(0, 0, 0, 0))
+		sb.set_border_width_all(3 if selected else 2)
 		draw_style_box(sb, Rect2(0, lift, r.size.x, r.size.y))
 		# Porträtfläche
 		var pr := Rect2(8, 8 + lift, r.size.x - 16, r.size.y - 74)
 		var d: Dictionary = Player.CHARS[char_name]
 		draw_portrait(pr, d, selected, t)
 		# Name
-		var font := ThemeDB.fallback_font
-		var nc := Color(1, 1, 1) if selected else Color(0.85, 0.88, 0.9)
+		UI.fonts()
+		var font: Font = UI.f_head
+		var nc := UI.INK
 		draw_string(font, Vector2(0, r.size.y - 38 + lift), char_name.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 22, nc)
-		draw_string(font, Vector2(0, r.size.y - 16 + lift), role, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 15, accent if selected else Color(0.6, 0.65, 0.7))
+		draw_string(font, Vector2(0, r.size.y - 16 + lift), role, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 15, UI.TEXT_LOW)
 
 	func draw_portrait(pr: Rect2, d: Dictionary, active: bool, time: float) -> void:
 		# Hintergrund des Porträts (Abendhimmel + Hügel), pro Figur leicht getönt
@@ -298,13 +293,15 @@ func _ready() -> void:
 	var t1 := Label.new()
 	t1.text = "THREE"
 	t1.add_theme_font_size_override("font_size", 104)
-	t1.add_theme_color_override("font_color", Color(1, 0.96, 0.9))
+	t1.add_theme_color_override("font_color", UI.PAPER)
+	t1.add_theme_font_override("font", UI.f_head)
 	_outline(t1)
 	left.add_child(t1)
 	var t2 := Label.new()
 	t2.text = "IN THE WILD"
 	t2.add_theme_font_size_override("font_size", 56)
 	t2.add_theme_color_override("font_color", ACCENT)
+	t2.add_theme_font_override("font", UI.f_head)
 	_outline(t2)
 	left.add_child(t2)
 	var bar := ColorRect.new()
@@ -322,17 +319,7 @@ func _ready() -> void:
 	row.add_child(right)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(620, 0)
-	var ps := StyleBoxFlat.new()
-	ps.bg_color = PANEL_BG
-	ps.set_corner_radius_all(20)
-	ps.border_color = Color(1, 1, 1, 0.12)
-	ps.set_border_width_all(1)
-	ps.shadow_color = Color(0, 0, 0, 0.5)
-	ps.shadow_size = 24
-	ps.content_margin_left = 30
-	ps.content_margin_right = 30
-	ps.content_margin_top = 26
-	ps.content_margin_bottom = 22
+	var ps := UI.sticker(UI.PAPER, 20, 6.0, Vector4(30, 26, 30, 22))
 	panel.add_theme_stylebox_override("panel", ps)
 	right.add_child(panel)
 	var box := VBoxContainer.new()
@@ -344,6 +331,7 @@ func _ready() -> void:
 	var login_l := Label.new()
 	login_l.text = "ANMELDEN"
 	login_l.add_theme_font_size_override("font_size", 26)
+	login_l.add_theme_font_override("font", UI.f_head)
 	login_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(login_l)
 	server_dot = Label.new()
@@ -400,15 +388,7 @@ func _ready() -> void:
 	join_btn.text = "SPIEL BETRETEN"
 	join_btn.custom_minimum_size = Vector2(0, 58)
 	join_btn.add_theme_font_size_override("font_size", 22)
-	join_btn.add_theme_stylebox_override("normal", _btn_style(ACCENT, ACCENT.lightened(0.25)))
-	join_btn.add_theme_stylebox_override("hover", _btn_style(ACCENT.lightened(0.12), Color(1, 1, 1, 0.6)))
-	join_btn.add_theme_stylebox_override("pressed", _btn_style(ACCENT_DARK, ACCENT))
-	join_btn.add_theme_stylebox_override("disabled", _btn_style(Color(0.35, 0.3, 0.25), Color(1, 1, 1, 0.1)))
-	join_btn.add_theme_stylebox_override("focus", _btn_style(ACCENT, Color(1, 1, 1, 0.9)))
-	join_btn.add_theme_color_override("font_color", Color(0.1, 0.06, 0.02))
-	join_btn.add_theme_color_override("font_hover_color", Color(0.1, 0.06, 0.02))
-	join_btn.add_theme_color_override("font_pressed_color", Color(0.1, 0.06, 0.02))
-	join_btn.add_theme_color_override("font_disabled_color", Color(0.75, 0.7, 0.65))
+	UI.primary_button(join_btn)
 	join_btn.pressed.connect(_on_join)
 	box.add_child(join_btn)
 
@@ -426,13 +406,13 @@ func _ready() -> void:
 	solo_btn.text = "Allein spielen (ohne Server)"
 	solo_btn.flat = true
 	solo_btn.add_theme_color_override("font_color", TEXT_DIM)
-	solo_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1))
+	solo_btn.add_theme_color_override("font_hover_color", UI.INK)
 	solo_btn.pressed.connect(_on_solo)
 	bottom.add_child(solo_btn)
 	var q_btn := Button.new()
 	q_btn.flat = true
 	q_btn.add_theme_color_override("font_color", TEXT_DIM)
-	q_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1))
+	q_btn.add_theme_color_override("font_hover_color", UI.INK)
 	q_btn.text = "Grafik: Niedrig" if Game.low else "Grafik: Hoch"
 	q_btn.pressed.connect(func() -> void:
 		Game.low = not Game.low
@@ -473,26 +453,7 @@ func _ready() -> void:
 
 
 func _make_theme() -> Theme:
-	var th := Theme.new()
-	th.set_font_size("font_size", "Label", 17)
-	th.set_font_size("font_size", "LineEdit", 18)
-	th.set_font_size("font_size", "Button", 17)
-	th.set_color("font_color", "Label", Color(0.93, 0.95, 0.97))
-	th.set_color("font_color", "LineEdit", Color(1, 1, 1))
-	th.set_color("font_placeholder_color", "LineEdit", Color(1, 1, 1, 0.35))
-	th.set_color("caret_color", "LineEdit", ACCENT)
-	th.set_color("selection_color", "LineEdit", Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.4))
-	th.set_stylebox("normal", "LineEdit", _field_style(Color(1, 1, 1, 0.14)))
-	th.set_stylebox("focus", "LineEdit", _field_style(ACCENT))
-	th.set_stylebox("read_only", "LineEdit", _field_style(Color(1, 1, 1, 0.08)))
-	th.set_stylebox("normal", "Button", _btn_style(Color(1, 1, 1, 0.1), Color(1, 1, 1, 0.16)))
-	th.set_stylebox("hover", "Button", _btn_style(Color(1, 1, 1, 0.18), Color(1, 1, 1, 0.3)))
-	th.set_stylebox("pressed", "Button", _btn_style(Color(1, 1, 1, 0.26), ACCENT))
-	th.set_stylebox("focus", "Button", _btn_style(Color(1, 1, 1, 0.1), ACCENT))
-	th.set_stylebox("disabled", "Button", _btn_style(Color(1, 1, 1, 0.05), Color(1, 1, 1, 0.08)))
-	var flat := StyleBoxEmpty.new()
-	th.set_stylebox("normal", "FlatButton", flat)
-	return th
+	return UI.theme()
 
 
 func _field_style(border: Color) -> StyleBoxFlat:

@@ -82,11 +82,13 @@ func setup(p: Player, layer: CanvasLayer) -> void:
 	panel.position = Vector2(-170, -230)
 	panel.custom_minimum_size = Vector2(340, 0)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.theme = UI.theme()
 	layer.add_child(panel)
 	status = Label.new()
 	status.add_theme_font_size_override("font_size", 22)
-	status.add_theme_constant_override("outline_size", 6)
-	status.add_theme_color_override("font_outline_color", Color.BLACK)
+	status.add_theme_color_override("font_color", UI.PAPER)
+	status.add_theme_constant_override("outline_size", 7)
+	status.add_theme_color_override("font_outline_color", UI.SHADOW)
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	panel.add_child(status)
 	tension_bar = ProgressBar.new()

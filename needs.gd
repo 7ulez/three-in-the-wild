@@ -32,6 +32,7 @@ func setup(p: Player, layer: CanvasLayer) -> void:
 	panel.offset_top = -120.0
 	panel.offset_left = 14.0
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.theme = UI.theme()
 	layer.add_child(panel)
 	for key in ["Gesundheit", "Hunger", "Blase", "Darm"]:
 		var row := HBoxContainer.new()
@@ -40,8 +41,9 @@ func setup(p: Player, layer: CanvasLayer) -> void:
 		l.text = key
 		l.custom_minimum_size = Vector2(90, 0)
 		l.add_theme_font_size_override("font_size", 14)
-		l.add_theme_constant_override("outline_size", 5)
-		l.add_theme_color_override("font_outline_color", Color.BLACK)
+		l.add_theme_color_override("font_color", UI.PAPER)
+		l.add_theme_constant_override("outline_size", 6)
+		l.add_theme_color_override("font_outline_color", UI.SHADOW)
 		row.add_child(l)
 		var bar := ProgressBar.new()
 		bar.custom_minimum_size = Vector2(140, 14)
