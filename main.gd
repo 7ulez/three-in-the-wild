@@ -100,7 +100,7 @@ func _update_sky() -> void:
 	var day := clampf(elev * 2.5 + 0.35, 0.0, 1.0)
 	var night := 1.0 - day
 	sun.rotation = Vector3(-asin(clampf(elev, -1.0, 1.0)) - 0.12, deg_to_rad(40.0) + cos(a) * 0.9, 0)
-	sun.light_energy = lerpf(0.0, 1.05, day)
+	sun.light_energy = lerpf(0.0, 0.82, day)
 	sun.shadow_enabled = elev > 0.02 and not Game.low
 	var warm := clampf(1.0 - absf(elev) * 2.5, 0.0, 1.0)   # Abend-/Morgenrot
 	sun.light_color = Color(1.0, 0.95, 0.85).lerp(Color(1.0, 0.55, 0.3), warm)
@@ -109,7 +109,7 @@ func _update_sky() -> void:
 	var hor := Color(0.95, 0.8, 0.62).lerp(Color(1.0, 0.45, 0.25), warm * day).lerp(Color(0.06, 0.07, 0.16), night)
 	Scenery.update_sky(top, hor, Color(0.3, 0.45, 0.3).lerp(Color(0.02, 0.03, 0.05), night), sun.global_transform.basis.z,
 		sun.light_color, moon.global_transform.basis.z, night, day)
-	env.ambient_light_energy = lerpf(0.25, 0.85, day)
+	env.ambient_light_energy = lerpf(0.25, 0.6, day)
 	if _in_cave:
 		env.ambient_light_energy = 0.04
 	env.fog_light_color = Color(0.95, 0.82, 0.65).lerp(Color(0.05, 0.06, 0.12), night)
@@ -140,8 +140,9 @@ func _setup_environment() -> void:
 	env.fog_density = 0.002
 	env.fog_sky_affect = 0.15
 	env.glow_enabled = not Game.low
-	env.glow_intensity = 0.5
-	env.glow_bloom = 0.1
+	env.glow_intensity = 0.3
+	env.glow_bloom = 0.05
+	env.tonemap_exposure = 0.82
 
 	var we := WorldEnvironment.new()
 	we.environment = env
@@ -181,7 +182,25 @@ func _build_ground() -> void:
 	gm.material_override = Scenery.ground_material()
 	gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Kiesfläche als Parkplatz
-	Util.add_box(self, Vector3(26, 0.04, 12), Color(0.72, 0.64, 0.5), Vector3(0, 0.02, 1))
+	var lot := MeshInstance3D.new()
+	var lot_mesh := PlaneMesh.new()
+	lot_mesh.size = Vector2(36, 22)
+	lot.mesh = lot_mesh
+	var lot_mat := ShaderMaterial.new()
+	lot_mat.shader = load("res://shaders/gravel.gdshader")
+	lot.material_override = lot_mat
+	lot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	lot.position = Vector3(0, 0.03, 1)
+	add_child(lot)
+	# lose Steine am Rand des Kiesplatzes
+	var lrng := RandomNumberGenerator.new()
+	lrng.seed = 77
+	for i in range(46):
+		var la := lrng.randf() * TAU
+		var lr := lrng.randf_range(0.93, 1.12)
+		var pos := Vector3(cos(la) * 14.0 * lr, 0.0, 1.0 + sin(la) * 7.5 * lr)
+		var st := Util.add_sphere(self, lrng.randf_range(0.08, 0.2), Color(0.5, 0.48, 0.44).lerp(Color(0.62, 0.58, 0.5), lrng.randf()), pos + Vector3(0, 0.04, 0))
+		st.scale = Vector3(1.0, 0.55, lrng.randf_range(0.7, 1.1))
 
 
 func _add_wall(size: Vector3, pos: Vector3, parent: Node = null) -> void:

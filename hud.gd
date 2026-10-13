@@ -21,6 +21,7 @@ var _drunk: PanelContainer
 var _drunk_l: Label
 var _help: PanelContainer
 var _help_t: float = 28.0
+var _info: Control
 var _touch: bool = false
 var _goals_sig: String = ""
 
@@ -56,6 +57,7 @@ func _ready() -> void:
 	_build_toast()
 	_build_drunk()
 	_build_help()
+	_build_info()
 
 
 func _process(delta: float) -> void:
@@ -351,7 +353,7 @@ func _build_help() -> void:
 	var t := _lbl("Steuerung", 16, UI.INK, UI.f_head)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hd.add_child(t)
-	hd.add_child(_lbl("F1 halten", 12, UI.TEXT_LOW, UI.f_mono))
+	hd.add_child(_lbl("I = alle Tasten", 12, UI.TEXT_LOW, UI.f_mono))
 	v.add_child(hd)
 	var g := GridContainer.new()
 	g.columns = 4
@@ -365,6 +367,61 @@ func _build_help() -> void:
 		var kc := key_chip(r[0])
 		g.add_child(kc)
 		g.add_child(_lbl(r[1], 13, UI.INK, UI.f_label))
+
+
+func toggle_info() -> void:
+	if _info != null:
+		_info.visible = not _info.visible
+
+
+func _build_info() -> void:
+	_info = Control.new()
+	_info.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info.visible = false
+	add_child(_info)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.45)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info.add_child(dim)
+	var cc := CenterContainer.new()
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info.add_child(cc)
+	var panel := _panel(Color(UI.PAPER, 0.98), 16, 4.0, Vector4(22, 16, 22, 16))
+	cc.add_child(panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	panel.add_child(v)
+	var hd := HBoxContainer.new()
+	var t := _lbl("Tastenbelegung", 22, UI.INK, UI.f_head)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hd.add_child(t)
+	hd.add_child(_lbl("I oder F1 schließt", 13, UI.TEXT_LOW, UI.f_mono))
+	v.add_child(hd)
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 34)
+	v.add_child(cols)
+	var sections := [
+		["Bewegen", [["WASD", "laufen"], ["⇧", "rennen"], ["␣", "springen"], ["C", "ducken"], ["V", "Ansicht wechseln"], ["1 2 3", "Charakter"], ["Esc", "Maus frei"]]],
+		["Handeln", [["E", "benutzen / auspacken"], ["F", "trinken"], ["G", "werfen"], ["R", "aufstellen"], ["X", "abbauen"], ["Z", "Auswahl wechseln"], ["L", "Kopflampe"]]],
+		["Körper & Angeln", [["P", "pinkeln (halten)"], ["H", "großes Geschäft"], ["Q", "Vape (Julian)"], ["T", "Angelart"], ["Klick", "auswerfen / anschlagen"]]],
+	]
+	for sec in sections:
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 5)
+		cols.add_child(col)
+		col.add_child(_lbl(sec[0], 15, UI.TEXT_LOW, UI.f_head))
+		for r in sec[1]:
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			var kc := key_chip(r[0])
+			kc.custom_minimum_size = Vector2(46, 26)
+			row.add_child(kc)
+			row.add_child(_lbl(r[1], 14, UI.INK, UI.f_label))
+			col.add_child(row)
+	v.add_child(_lbl("Tipps: Rucksack mit R aufstellen und mit E auspacken · Rute in den Rutenständer: E, rotes Blinken = Fisch am Haken · Wasser hilft gegen Rausch", 13, UI.TEXT_LOW, UI.f_label))
 
 
 # ---------------------------------------------------------------- Daten

@@ -629,6 +629,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_V:
 				third_person = not third_person
 				_apply_view()
+			KEY_I, KEY_F1:
+				hud.toggle_info()
 			KEY_E:
 				_interact()
 			KEY_G:
@@ -1648,7 +1650,7 @@ func _footsteps(delta: float) -> void:
 				Sfx.play("splash_small", global_position, -8.0, randf_range(0.9, 1.2))
 			else:
 				var gp := global_position
-				var gravel := absf(gp.x) < 13.5 and gp.z > -5.0 and gp.z < 7.0
+				var gravel := pow(gp.x / 13.0, 2.0) + pow((gp.z - 1.0) / 7.0, 2.0) < 1.0
 				Sfx.play("step_gravel" if gravel else "step", gp, -6.0, randf_range(0.9, 1.1))
 	var wet := water_d > 0.3
 	if wet and not _was_in_water:
