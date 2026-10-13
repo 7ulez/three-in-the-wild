@@ -231,13 +231,16 @@ static func _find_anim(n: Node) -> AnimationPlayer:
 
 
 ## Wählt die passende Animation für das Lauftempo (Stehen / Gehen / Rennen).
-static func animate_body(parent: Node3D, speed: float) -> void:
+static func animate_body(parent: Node3D, speed: float, crouch: bool = false) -> void:
 	var ap: AnimationPlayer = parent.get_meta("ap", null) as AnimationPlayer
 	if ap == null:
 		return
 	var want := "Idle"
 	var sc := 1.0
-	if speed > 2.8:
+	if crouch:
+		want = "CrouchWalk" if speed > 0.3 else "Crouch"
+		sc = clampf(speed / 0.9, 0.6, 1.6) if speed > 0.3 else 1.0
+	elif speed > 2.8:
 		want = "Run"
 		sc = clampf(speed / 3.4, 0.7, 2.2)
 	elif speed > 0.3:
@@ -571,7 +574,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = target.x
 		velocity.z = target.z
 	move_and_slide()
-	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length())
+	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching)
 	if is_on_floor():
 		var drop := _peak_y - global_position.y
 		if _airborne and drop > 5.0:
@@ -614,7 +617,7 @@ func _process(delta: float) -> void:
 	if seat == null and hammock == null and trapped_t <= 0.0 and not sleeping and not needs.squatting:
 		head.position.y = lerpf(head.position.y, 1.6 - 0.85 * water_d - 0.6 * crouch_f, minf(delta * 8.0, 1.0))
 	body_visual.position.y = -0.95 * water_d
-	body_visual.scale.y = 1.0 - 0.35 * crouch_f
+	body_visual.scale.y = 1.0 if body_visual.has_meta("ap") else 1.0 - 0.35 * crouch_f
 	_help_timer -= delta
 	if _help_timer <= 0.0:
 		_help_timer = 0.25
