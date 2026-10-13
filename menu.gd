@@ -128,6 +128,51 @@ class CharCard:
 	var selected: bool = false
 	var hover: bool = false
 	var t: float = 0.0
+	var has3d: bool = false
+	var _vpc: SubViewportContainer = null
+	var _model_root: Node3D = null
+
+	func _ready() -> void:
+		# Porträt = das echte Blender-Modell (Leerlauf-Animation) in einem kleinen 3D-Fenster
+		if not ResourceLoader.exists("res://assets/chars/%s.glb" % char_name.to_lower()):
+			return
+		has3d = true
+		_vpc = SubViewportContainer.new()
+		_vpc.stretch = true
+		_vpc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_vpc)
+		var vp := SubViewport.new()
+		vp.own_world_3d = true
+		vp.transparent_bg = true
+		vp.msaa_3d = Viewport.MSAA_4X
+		vp.size = Vector2i(320, 280)
+		_vpc.add_child(vp)
+		var env := Environment.new()
+		env.background_mode = Environment.BG_CLEAR_COLOR
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		env.ambient_light_color = Color(0.85, 0.82, 0.9)
+		env.ambient_light_energy = 0.75
+		var we := WorldEnvironment.new()
+		we.environment = env
+		vp.add_child(we)
+		var sun := DirectionalLight3D.new()
+		sun.rotation_degrees = Vector3(-35, 200, 0)
+		sun.light_color = Color(1.0, 0.92, 0.82)
+		sun.light_energy = 1.1
+		vp.add_child(sun)
+		var rim := DirectionalLight3D.new()
+		rim.rotation_degrees = Vector3(-15, 30, 0)
+		rim.light_color = Color(1.0, 0.6, 0.35)
+		rim.light_energy = 0.5
+		vp.add_child(rim)
+		_model_root = Node3D.new()
+		_model_root.rotation.y = 0.35
+		vp.add_child(_model_root)
+		Player.build_body(_model_root, char_name)
+		var cam := Camera3D.new()
+		cam.fov = 26.0
+		vp.add_child(cam)
+		cam.look_at_from_position(Vector3(0.0, 1.42, -3.1), Vector3(0.0, 1.27, 0.0))
 
 	func _init() -> void:
 		custom_minimum_size = Vector2(176, 216)
@@ -154,6 +199,11 @@ class CharCard:
 		# Porträtfläche
 		var pr := Rect2(8, 8 + lift, r.size.x - 16, r.size.y - 74)
 		var d: Dictionary = Player.CHARS[char_name]
+		if _vpc != null:
+			_vpc.position = pr.position
+			_vpc.size = pr.size
+			if _model_root != null:
+				_model_root.rotation.y = lerp_angle(_model_root.rotation.y, (0.35 + sin(t * 0.8) * 0.25) if selected else 0.35, 0.1)
 		draw_portrait(pr, d, selected, t)
 		# Name
 		UI.fonts()
@@ -171,6 +221,8 @@ class CharCard:
 			draw_rect(Rect2(pr.position.x, pr.position.y + pr.size.y * f * 0.9, pr.size.x, pr.size.y * 0.1 + 1.0),
 				bgc.lerp(Color(0.95, 0.55, 0.3), f * f * 0.8))
 		draw_circle(Vector2(pr.get_center().x, pr.position.y + pr.size.y * 0.5), pr.size.x * 0.42, Color(1, 0.8, 0.5, 0.12 if active else 0.06))
+		if has3d:
+			return
 		# Figur
 		var u := minf(pr.size.x / 176.0, pr.size.y / 152.0)
 		var cx := pr.get_center().x
