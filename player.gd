@@ -70,6 +70,8 @@ var item_snap: PlacedItem = null      # Grill, auf den der Dutch Oven gesetzt wi
 # Sitzen
 var seat: PlacedItem = null
 var vape_t: float = 0.0          # Dauer der Vape-Animation
+var drink_t: float = 0.0         # Dauer der Trink-Animation
+var drink_kind: int = 0          # 1 Bier, 2 Wasser
 var hammock: Hammock = null
 var stones: int = 0
 var crouching: bool = false
@@ -203,6 +205,24 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 			if ap.has_animation("Idle"):
 				ap.play("Idle")
 			parent.set_meta("ap", ap)
+			var sk := inst.find_child("Skeleton3D", true, false) as Skeleton3D
+			if sk != null and sk.find_bone("Hand.R") >= 0:
+				var att := BoneAttachment3D.new()
+				att.bone_name = "Hand.R"
+				sk.add_child(att)
+				var bt := Node3D.new()
+				bt.visible = false
+				bt.rotation_degrees.z = -90.0
+				bt.position = Vector3(-0.12, 0.05, 0.04)
+				att.add_child(bt)
+				# Flasche liegt in der Faust: Hals zeigt zum Mund (Bone-Achse Y)
+				var gl := Util.add_cylinder(bt, 0.03, 0.16, Color(0.3, 0.16, 0.05), Vector3(0, 0.07, 0.0))
+				gl.name = "glass"
+				var ne := Util.add_cylinder(bt, 0.0125, 0.08, Color(0.3, 0.16, 0.05), Vector3(0, 0.19, 0.0))
+				ne.name = "glass"
+				Util.add_cylinder(bt, 0.0135, 0.012, Color(0.85, 0.7, 0.2), Vector3(0, 0.236, 0.0))
+				Util.add_cylinder(bt, 0.031, 0.05, Color(0.93, 0.88, 0.7), Vector3(0, 0.06, 0.0))
+				parent.set_meta("bottle", bt)
 			var hd := inst.find_child("HoseDown", true, false) as Node3D
 			var hs := inst.find_child("Hose", true, false) as Node3D
 			if hd != null and hs != null:
@@ -243,12 +263,36 @@ static func _find_anim(n: Node) -> AnimationPlayer:
 
 
 ## Wählt die passende Animation für das Lauftempo (Stehen / Gehen / Rennen).
-static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0, squat: bool = false, sit: bool = false, vape: bool = false) -> void:
+static func _paint_bottle(b: Node3D, kind: int) -> void:
+	var glass: Color = Color(0.3, 0.16, 0.05) if kind == 1 else Color(0.55, 0.78, 0.92)
+	for mi in b.find_children("*", "MeshInstance3D", true, false):
+		if mi.name == "glass":
+			(mi as MeshInstance3D).material_override = Util.mat(glass, 0.2)
+
+
+static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0, squat: bool = false, sit: bool = false, vape: bool = false, drink: int = 0) -> void:
 	var ap: AnimationPlayer = parent.get_meta("ap", null) as AnimationPlayer
 	if ap == null:
 		return
 	var want := "Idle"
 	var sc := 1.0
+	var bottle: Node3D = parent.get_meta("bottle", null) as Node3D
+	if drink > 0 and speed < 0.5 and not sit and ap.has_animation("Drink"):
+		if not parent.get_meta("drinking", false):
+			parent.set_meta("drinking", true)
+			if bottle != null:
+				bottle.set_meta("kind", drink)
+				_paint_bottle(bottle, drink)
+			ap.play("Drink", 0.12)
+		if ap.current_animation == "Drink" and ap.is_playing():
+			if bottle != null:
+				bottle.visible = true
+			ap.speed_scale = 1.0
+			return
+	else:
+		parent.set_meta("drinking", false)
+	if bottle != null:
+		bottle.visible = false
 	if vape and speed < 0.5 and ap.has_animation("Vape"):
 		if not parent.get_meta("vaping", false):
 			parent.set_meta("vaping", true)
@@ -327,6 +371,8 @@ func anim_flags() -> int:
 		f |= 64
 	if needs != null and needs.peeing:
 		f |= 128
+	if drink_t > 0.0:
+		f |= 256 if drink_kind == 1 else 512
 	return f
 
 
@@ -596,12 +642,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	vape_t = maxf(vape_t - delta, 0.0)
+	drink_t = maxf(drink_t - delta, 0.0)
 	if sleeping:
 		velocity = Vector3.ZERO
 		return
 	if seat != null:
 		velocity = Vector3.ZERO
-		Player.animate_body(body_visual, 0.0, false, false, 0, false, true, vape_t > 0.0)
+		Player.animate_body(body_visual, 0.0, false, false, 0, false, true, vape_t > 0.0, drink_kind if drink_t > 0.0 else 0)
 		_drink_cd = maxf(_drink_cd - delta, 0.0)
 		promille = maxf(promille - delta * 0.005, 0.0)
 		if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_A) \
@@ -682,7 +729,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
-	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim(), needs != null and needs.squatting, false, vape_t > 0.0)
+	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim(), needs != null and needs.squatting, false, vape_t > 0.0, drink_kind if drink_t > 0.0 else 0)
 	if is_on_floor():
 		var drop := _peak_y - global_position.y
 		if _airborne and drop > 5.0:
@@ -750,6 +797,8 @@ func _drink() -> void:
 		toast("Leer!", 2.5)
 		return
 	_drink_cd = 1.4
+	drink_t = 1.25
+	drink_kind = 1 if kind == "beer" else 2
 	var msg := ""
 	if kind == "beer":
 		beers_drunk += 1

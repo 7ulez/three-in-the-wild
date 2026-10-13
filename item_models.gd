@@ -73,6 +73,24 @@ static func add_placed_visual(parent: Node3D, kind: String, size: Vector3, color
 	return add_visual(parent, kind, size, color)
 
 
+## Lädt ein Blender-Modell (assets/items/NAME.glb). null, wenn es fehlt.
+static func _glb(parent: Node3D, name: String) -> Node3D:
+	var path := "res://assets/items/%s.glb" % name
+	if not ResourceLoader.exists(path):
+		return null
+	var inst := (load(path) as PackedScene).instantiate() as Node3D
+	parent.add_child(inst)
+	# Metall ohne Spiegelungen wirkt im Spiel schwarz: Glanz etwas zurücknehmen
+	for mi in inst.find_children("*", "MeshInstance3D", true, false):
+		var m3 := mi as MeshInstance3D
+		for i in range(m3.mesh.get_surface_count()):
+			var sm := m3.mesh.surface_get_material(i) as BaseMaterial3D
+			if sm != null and sm.metallic > 0.2:
+				sm.metallic = 0.2
+				sm.roughness = maxf(sm.roughness, 0.5)
+	return inst
+
+
 static func _tent_bag(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
 	var roll := Util.add_cylinder(parent, size.z * 0.5, size.x, color, Vector3.ZERO)
 	roll.rotation_degrees.z = 90.0
@@ -83,6 +101,13 @@ static func _tent_bag(parent: Node3D, size: Vector3, color: Color) -> Dictionary
 
 
 static func _beer_crate(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
+	var bm := _glb(parent, "bierkasten")
+	if bm != null:
+		var bl: Array = []
+		var holder := bm.find_child("Bottles", true, false)
+		if holder != null:
+			bl = holder.get_children()
+		return {"bottles": bl}
 	Util.add_box(parent, size, color)
 	var bottles: Array = []
 	for ix in range(5):
@@ -94,6 +119,8 @@ static func _beer_crate(parent: Node3D, size: Vector3, color: Color) -> Dictiona
 
 
 static func _hammer(parent: Node3D) -> Dictionary:
+	if _glb(parent, "hammer") != null:
+		return {}
 	Util.add_box(parent, Vector3(0.3, 0.035, 0.035), Color(0.5, 0.33, 0.17), Vector3(-0.05, 0, 0))
 	Util.add_box(parent, Vector3(0.1, 0.09, 0.07), Color(0.4, 0.4, 0.43), Vector3(0.13, 0, 0))
 	return {}
@@ -121,6 +148,29 @@ static func _cooler(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
 
 
 static func _grill(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
+	var gm := _glb(parent, "gasgrill")
+	if gm != null:
+		# Scharnier hinten oben: der Deckel dreht sich um die Rückkante
+		var stray := gm.find_child("lid", true, false)
+		if stray != null:
+			stray.free()
+		var deckel := gm.find_child("Deckelmesh", true, false) as Node3D
+		var lid := Node3D.new()
+		lid.name = "lid"
+		lid.position = Vector3(0, 0.33, 0.24)
+		gm.add_child(lid)
+		if deckel != null:
+			deckel.position.x = 0.0
+			deckel.reparent(lid, true)
+		var fl := gm.find_child("flames", true, false) as Node3D
+		if fl != null:
+			fl.visible = false
+			var fmat := StandardMaterial3D.new()
+			fmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			fmat.albedo_color = Color(1.0, 0.55, 0.15)
+			for mi in fl.find_children("*", "MeshInstance3D", true, false):
+				(mi as MeshInstance3D).material_override = fmat
+		return {"lid": lid, "flames": fl}
 	var bottom := -size.y / 2.0
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
@@ -149,6 +199,16 @@ static func _grill(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
 
 
 static func _rod(parent: Node3D, size: Vector3, color: Color = Color(0.15, 0.55, 0.3)) -> Dictionary:
+	var rm := _glb(parent, "angelrute")
+	if rm != null:
+		var bk := rm.find_child("Blank", true, false) as MeshInstance3D
+		if bk != null:
+			var bmat := StandardMaterial3D.new()
+			bmat.albedo_color = color
+			bmat.roughness = 0.35
+			bmat.metallic = 0.1
+			bk.material_override = bmat
+		return {}
 	var rod := Util.add_cylinder(parent, 0.012, size.x, color, Vector3.ZERO)
 	rod.rotation_degrees.z = 90.0
 	var handle := Util.add_cylinder(parent, 0.025, 0.3, Color(0.4, 0.27, 0.15), Vector3(-0.55, 0, 0))
@@ -159,6 +219,9 @@ static func _rod(parent: Node3D, size: Vector3, color: Color = Color(0.15, 0.55,
 
 
 static func _oven(parent: Node3D, size: Vector3) -> Dictionary:
+	var om := _glb(parent, "dutchoven")
+	if om != null:
+		return {"lid": om.find_child("lid", true, false)}
 	Util.add_cylinder(parent, 0.2, 0.2, Color(0.1, 0.1, 0.11), Vector3(0, -0.04, 0))
 	for a in range(3):
 		var ang := TAU * float(a) / 3.0
@@ -222,6 +285,8 @@ static func _backpack(parent: Node3D, size: Vector3, color: Color) -> Dictionary
 
 
 static func _firesteel(parent: Node3D) -> Dictionary:
+	if _glb(parent, "feuerstahl") != null:
+		return {}
 	var rod := Util.add_cylinder(parent, 0.012, 0.14, Color(0.7, 0.7, 0.74), Vector3.ZERO)
 	rod.rotation_degrees.z = 90.0
 	Util.add_box(parent, Vector3(0.05, 0.03, 0.03), Color(0.75, 0.15, 0.1), Vector3(-0.08, 0, 0))
@@ -301,6 +366,12 @@ static func _fish(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
 
 ## Rutenständer: zwei Gabeln, die Rute liegt schräg darauf. "rod" ist die (versteckte) Rute.
 static func _rodpod(parent: Node3D) -> Dictionary:
+	var pm := _glb(parent, "rutenstaender")
+	if pm != null:
+		var rn := pm.find_child("rod", true, false) as Node3D
+		if rn != null:
+			rn.visible = false
+		return {"rod": rn}
 	var wood := Color(0.45, 0.3, 0.16)
 	Util.add_box(parent, Vector3(0.05, 0.9, 0.05), wood, Vector3(0, 0.0, -0.22))
 	Util.add_box(parent, Vector3(0.05, 0.5, 0.05), wood, Vector3(0, -0.2, 0.22))
