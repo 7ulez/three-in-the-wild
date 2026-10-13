@@ -4,7 +4,8 @@ extends Node3D
 
 const PAPER: Color = Color(0.957, 0.937, 0.894)
 const INK: Color = Color(0.114, 0.122, 0.102)
-const FIRE: Color = Color(0.886, 0.604, 0.302)
+const PANEL: Color = Color(0.09, 0.13, 0.10)
+const FIRE: Color = Color(0.6, 0.36, 0.12)
 const WOOD: Color = Color(0.36, 0.24, 0.13)
 
 var _labels: Array[Label3D] = []
@@ -16,7 +17,7 @@ func build() -> void:
 	for sx in [-2.25, 2.25]:
 		Util.add_box(self, Vector3(0.16, 3.0, 0.16), WOOD, Vector3(sx, 1.5, 0))
 	Util.add_box(self, Vector3(4.2, 2.45, 0.1), WOOD, Vector3(0, 2.0, 0))
-	Util.add_box(self, Vector3(3.95, 2.2, 0.12), PAPER, Vector3(0, 2.0, 0))
+	Util.add_box(self, Vector3(3.95, 2.2, 0.12), PANEL, Vector3(0, 2.0, 0))
 	Util.add_box(self, Vector3(3.95, 0.42, 0.14), FIRE, Vector3(0, 2.9, 0))
 	Util.add_box(self, Vector3(4.5, 0.12, 0.45), WOOD, Vector3(0, 3.22, 0))
 	for side in [1.0, -1.0]:
@@ -33,10 +34,10 @@ func build() -> void:
 		body.font = UI.f_mono
 		body.font_size = 34
 		body.pixel_size = 0.0029
-		body.modulate = INK
+		body.modulate = PAPER
 		body.outline_size = 0
 		body.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		body.position = Vector3(-1.78, 2.62, z * 1.1)
+		body.position = Vector3(-1.78, 2.66, z * 1.1)
 		body.offset = Vector2(0, 0)
 		body.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 		if side < 0.0:
@@ -69,3 +70,9 @@ func _refresh() -> void:
 	var txt := "\n".join(lines)
 	for l in _labels:
 		l.text = txt
+		l.pixel_size = 0.0029
+		var wd := 0.0
+		for ln in lines:
+			wd = maxf(wd, UI.f_mono.get_string_size(ln, HORIZONTAL_ALIGNMENT_LEFT, -1, l.font_size).x * l.pixel_size)
+		if wd > 3.6:
+			l.pixel_size *= 3.6 / wd

@@ -5,7 +5,7 @@ extends Node3D
 ## 0 = Osten (+X), 270 = Süden (+Z). Die Schrift ist von beiden Seiten lesbar.
 
 const WOOD: Color = Color(0.45, 0.3, 0.16)
-const BOARD: Color = Color(0.88, 0.78, 0.55)
+const BOARD: Color = Color(0.66, 0.53, 0.32)
 
 
 ## boards: Array aus {"text": String, "yaw": float, "y": float}
@@ -35,9 +35,13 @@ func build(boards: Array) -> void:
 			label.text = b["text"]
 			label.font_size = 36
 			label.pixel_size = 0.0048
-			label.modulate = Color(0.15, 0.09, 0.04)
+			label.modulate = Color(0.1, 0.06, 0.02)
 			label.outline_size = 0
 			label.position = Vector3(-0.05, 0, side * 0.035)
+			# Schrift auf die Schildbreite (1,7 m, Spitze bleibt frei) einpassen
+			var wd := ThemeDB.fallback_font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, label.font_size).x * label.pixel_size
+			if wd > 1.7:
+				label.pixel_size *= 1.7 / wd
 			if side < 0.0:
 				label.rotation_degrees.y = 180.0
 			node.add_child(label)
