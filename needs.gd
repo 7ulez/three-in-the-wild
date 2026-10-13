@@ -26,31 +26,42 @@ var dead_until: float = 0.0
 
 func setup(p: Player, layer: CanvasLayer) -> void:
 	player = p
+	var frame := PanelContainer.new()
+	frame.theme = UI.theme()
+	frame.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	frame.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	frame.offset_left = 14.0
+	frame.offset_bottom = -14.0
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_theme_stylebox_override("panel", UI.sticker(UI.PAPER, 14, 4.0, Vector4(12, 8, 12, 8)))
+	layer.add_child(frame)
 	panel = VBoxContainer.new()
-	panel.anchor_top = 1.0
-	panel.anchor_bottom = 1.0
-	panel.offset_top = -120.0
-	panel.offset_left = 14.0
+	panel.add_theme_constant_override("separation", 4)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.theme = UI.theme()
-	layer.add_child(panel)
+	frame.add_child(panel)
+	UI.fonts()
+	var cols := {"Gesundheit": Color("4aa35a"), "Hunger": UI.FIRE, "Blase": Color("e8c547"), "Darm": Color("8a6a43")}
 	for key in ["Gesundheit", "Hunger", "Blase", "Darm"]:
 		var row := HBoxContainer.new()
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var l := Label.new()
 		l.text = key
-		l.custom_minimum_size = Vector2(90, 0)
+		l.custom_minimum_size = Vector2(88, 0)
 		l.add_theme_font_size_override("font_size", 14)
-		l.add_theme_color_override("font_color", UI.PAPER)
-		l.add_theme_constant_override("outline_size", 6)
-		l.add_theme_color_override("font_outline_color", UI.SHADOW)
+		l.add_theme_color_override("font_color", UI.INK)
 		row.add_child(l)
 		var bar := ProgressBar.new()
-		bar.custom_minimum_size = Vector2(140, 14)
+		bar.custom_minimum_size = Vector2(140, 12)
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		bar.show_percentage = false
 		bar.max_value = 1.0
 		bar.step = 0.001
 		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bg := UI.sticker(Color("fffdf7"), 6, 0.0, Vector4(0, 0, 0, 0))
+		var fl := UI.sticker(cols[key], 4, 0.0, Vector4(0, 0, 0, 0))
+		fl.set_border_width_all(0)
+		bar.add_theme_stylebox_override("background", bg)
+		bar.add_theme_stylebox_override("fill", fl)
 		row.add_child(bar)
 		panel.add_child(row)
 		bars[key] = bar

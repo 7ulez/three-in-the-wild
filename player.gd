@@ -100,6 +100,7 @@ var sparks: CPUParticles3D = null
 var fade_rect: ColorRect
 var needs: Needs
 var goals_label: Label
+var hud: Hud
 var _dark_hint: bool = false
 var water_d: float = 0.0              # 0 = an Land, 1 = tief im See (schwimmen)
 var wake: CPUParticles3D = null
@@ -352,6 +353,9 @@ func _build_hud() -> void:
 	layer.layer = 2
 	add_child(layer)
 
+	hud = Hud.new()
+	layer.add_child(hud)
+
 	help_label = _make_label(layer, 16)
 	help_label.position = Vector2(14, 10)
 
@@ -402,6 +406,9 @@ func _build_hud() -> void:
 	goals_label.offset_top = 150.0
 	goals_label.offset_right = -10.0
 
+	for old in [help_label, clock_label, prompt_label, toast_label, goals_label]:
+		old.visible = false
+
 	var cross := _make_label(layer, 28)
 	cross.text = "+"
 	cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -422,11 +429,8 @@ func _make_label(parent: Node, font_size: int) -> Label:
 func toast(text: String, seconds: float = 4.0) -> void:
 	if toast_tween != null and toast_tween.is_valid():
 		toast_tween.kill()
-	toast_label.text = text
-	toast_label.modulate.a = 1.0
-	toast_tween = create_tween()
-	toast_tween.tween_interval(seconds)
-	toast_tween.tween_property(toast_label, "modulate:a", 0.0, 0.8)
+	if hud != null:
+		hud.toast(text, seconds)
 
 
 func _update_goals() -> void:
@@ -437,6 +441,8 @@ func _update_goals() -> void:
 		if not g[1]:
 			all = false
 	goals_label.text = "\n".join(lines)
+	if hud != null:
+		hud.set_goals(Game.goals())
 	if all and not Game.all_done_shown:
 		Game.all_done_shown = true
 		toast("ALLE ZIELE GESCHAFFT! Ein perfekter Angelausflug. Du darfst weitercampen (und noch ein Bier trinken).", 10.0)
@@ -496,6 +502,15 @@ func _update_help() -> void:
 	if Net.instance != null:
 		net_txt = "  |  Netz: %s, %d Mitspieler" % [Net.instance.status, Net.instance.avatars.size()]
 	help_label.text = "%s  |  trägt: %s  |  Lager: %s  |  %s Tag %d  |  Promille: %.2f%s\nZunder %d · Äste %d · Holz %d · Steine %d  |  Bier %d · Wasser %d  |  Fänge: %d  |  Chili: %d\nWASD laufen · Shift rennen · Space springen · E benutzen · F trinken · R aufstellen · X abbauen · G werfen/Stein flitschen · C ducken · L Kopflampe\nP pinkeln (halten) · H großes Geschäft · Q Vape (Julian) · T Angelmethode · Z Zutat wechseln · V Ansicht · 1/2/3 Charakter · Esc Maus frei" % [character_name, carrying, camp, Game.clock_text(), Game.day_count, promille, net_txt, tinder, sticks, logs, stones, beers_drunk, water_drunk, Game.catches.size(), Game.chili_served]
+	if hud != null:
+		var others: Array = []
+		if Net.instance != null:
+			for k in Net.instance.avatars.keys():
+				var av: Node = Net.instance.avatars[k]
+				var lb = av.get("label")
+				others.append([lb.text if lb != null else "?", str(av.get("char_name"))])
+		hud.update_info(Game.player_name, character_name, carrying, camp, Game.hour, Game.day_count, Game.clock_text(), _day_phase(), promille,
+			[tinder, sticks, logs, stones, beers_drunk, water_drunk, Game.catches.size(), Game.chili_served], others)
 	if Game.touch:
 		var hl: PackedStringArray = help_label.text.split("\n")
 		help_label.text = hl[0] + "\n" + hl[1] + "\nLinks: Joystick laufen (ganz raus = rennen) · Rechts wischen: umschauen · Mehr: alle weiteren Aktionen"
@@ -824,6 +839,8 @@ func _update_prompt() -> void:
 		elif c != null and c.has_method("get_prompt"):
 			text = c.get_prompt()
 	prompt_label.text = text
+	if hud != null:
+		hud.set_prompt(text)
 
 
 func _interact() -> void:
