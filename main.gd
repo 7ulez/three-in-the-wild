@@ -7,7 +7,6 @@ const PIER_X: Array = [-12.0, 0.0, 12.0]
 var lake_root: Node3D
 var sun: DirectionalLight3D
 var moon: DirectionalLight3D
-var sky_mat: ProceduralSkyMaterial
 var env: Environment
 var player: Player
 var time_scale: float = 1.0
@@ -98,10 +97,8 @@ func _update_sky() -> void:
 	moon.light_energy = lerpf(0.0, 0.35, night)
 	var top := Color(0.25, 0.55, 0.85).lerp(Color(0.02, 0.03, 0.1), night)
 	var hor := Color(0.95, 0.8, 0.62).lerp(Color(1.0, 0.45, 0.25), warm * day).lerp(Color(0.06, 0.07, 0.16), night)
-	sky_mat.sky_top_color = top
-	sky_mat.sky_horizon_color = hor
-	sky_mat.ground_horizon_color = hor
-	sky_mat.ground_bottom_color = Color(0.3, 0.45, 0.3).lerp(Color(0.02, 0.03, 0.05), night)
+	Scenery.update_sky(top, hor, Color(0.3, 0.45, 0.3).lerp(Color(0.02, 0.03, 0.05), night), sun.global_transform.basis.z,
+		sun.light_color, moon.global_transform.basis.z, night, day)
 	env.ambient_light_energy = lerpf(0.25, 0.85, day)
 	if _in_cave:
 		env.ambient_light_energy = 0.04
@@ -121,13 +118,7 @@ func is_in_cave(p: Vector3) -> bool:
 
 
 func _setup_environment() -> void:
-	sky_mat = ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.25, 0.55, 0.85)
-	sky_mat.sky_horizon_color = Color(1.0, 0.8, 0.6)
-	sky_mat.ground_horizon_color = Color(1.0, 0.8, 0.6)
-	sky_mat.ground_bottom_color = Color(0.3, 0.45, 0.3)
-	var sky := Sky.new()
-	sky.sky_material = sky_mat
+	var sky := Scenery.make_sky()
 
 	env = Environment.new()
 	env.background_mode = Environment.BG_SKY
@@ -137,7 +128,10 @@ func _setup_environment() -> void:
 	env.fog_enabled = true
 	env.fog_light_color = Color(1.0, 0.85, 0.65)
 	env.fog_density = 0.002
+	env.fog_sky_affect = 0.15
 	env.glow_enabled = not Game.low
+	env.glow_intensity = 0.5
+	env.glow_bloom = 0.1
 
 	var we := WorldEnvironment.new()
 	we.environment = env
@@ -148,6 +142,9 @@ func _setup_environment() -> void:
 	sun.light_color = Color(1.0, 0.9, 0.75)
 	sun.light_energy = 1.2
 	sun.shadow_enabled = not Game.low
+	sun.directional_shadow_max_distance = 70.0
+	sun.shadow_blur = 1.6
+	sun.light_angular_distance = 0.5
 	add_child(sun)
 	moon = DirectionalLight3D.new()
 	moon.light_color = Color(0.55, 0.65, 1.0)
@@ -156,7 +153,7 @@ func _setup_environment() -> void:
 	add_child(moon)
 	env.ssao_enabled = true
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 0.92
+	env.adjustment_saturation = 0.98
 	_update_sky()
 
 
@@ -170,7 +167,9 @@ func _build_ground() -> void:
 	cs.shape = bs
 	cs.position = Vector3(0, -0.5, 0)
 	ground.add_child(cs)
-	Util.add_box(ground, Vector3(1400, 1, 1400), Color(0.36, 0.55, 0.22), Vector3(0, -0.5, 0))
+	var gm := Util.add_box(ground, Vector3(1400, 1, 1400), Color(0.36, 0.55, 0.22), Vector3(0, -0.5, 0))
+	gm.material_override = Scenery.ground_material()
+	gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Kiesfläche als Parkplatz
 	Util.add_box(self, Vector3(26, 0.04, 12), Color(0.72, 0.64, 0.5), Vector3(0, 0.02, 1))
 
@@ -193,15 +192,7 @@ func _build_lake() -> void:
 	# Sandufer, Wasser, tieferes Wasser in der Mitte
 	var sand := Util.mat(Color(0.55, 0.47, 0.3))
 	lake_root.add_child(LakeShape.poly_mesh(LakeShape.scaled(1.14), 0.015, sand))
-	var wm := Util.mat(Color(0.08, 0.3, 0.42, 0.88), 0.2)
-	wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	wm.metallic = 0.1
-	var water := LakeShape.poly_mesh(LakeShape.points, 0.03, wm)
-	water.name = "Water"
-	lake_root.add_child(water)
-	var dm := Util.mat(Color(0.03, 0.15, 0.25, 0.55), 0.2)
-	dm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	lake_root.add_child(LakeShape.poly_mesh(LakeShape.scaled(0.62), 0.035, dm))
+	Scenery.make_water(lake_root, LakeShape.points)
 
 	var pts := LakeShape.points
 
@@ -218,12 +209,6 @@ func _build_lake() -> void:
 		if near_spot:
 			continue
 		var out := (p - LakeShape.CENTER).normalized()
-		if rng.randf() < 0.65:
-			for k in range(rng.randi_range(3, 6)):
-				var q := p + out * rng.randf_range(-0.3, 0.9) + Vector2(rng.randf_range(-0.6, 0.6), rng.randf_range(-0.6, 0.6))
-				var h := rng.randf_range(1.0, 1.9)
-				var r := Util.add_cone(lake_root, 0.07, h, reed_col.darkened(rng.randf() * 0.2), Vector3(q.x, h / 2.0, q.y))
-				r.rotation_degrees = Vector3(rng.randf_range(-8, 8), 0, rng.randf_range(-8, 8))
 		if rng.randf() < 0.45:
 			var q2 := p + out * rng.randf_range(0.8, 2.0)
 			var rs := rng.randf_range(0.25, 0.7)
@@ -419,7 +404,7 @@ func _build_trees() -> void:
 	add_child(forest)
 
 	var parts := {}
-	for key in ["bush", "s_trunk", "s_c1", "s_c2", "s_c3", "b_trunk", "b_c1", "b_c2", "l_trunk", "l_c1", "l_c2"]:
+	for key in ["bush", "s_trunk", "s_c1", "s_c2", "s_c3", "b_trunk", "b_c1", "b_c2", "l_trunk", "l_c1", "l_c2", "p_trunk", "p_c1", "p_c2", "p_c3", "p_c4", "d_trunk", "d_b1", "d_b2", "sap"]:
 		parts[key] = {"x": [], "c": []}
 
 	var shape := CylinderShape3D.new()
@@ -433,16 +418,35 @@ func _build_trees() -> void:
 		if rng.randf() < 0.12:
 			sc = rng.randf_range(2.0, 2.8)   # Riesenbaum
 		var yaw := rng.randf_range(0.0, TAU)
-		var base := Transform3D(Basis.from_euler(Vector3(0, yaw, 0)).scaled(Vector3(sc, sc, sc)), pos)
+		var stretch := rng.randf_range(0.85, 1.3)
+		var tilt := Vector3(rng.randf_range(-0.04, 0.04), yaw, rng.randf_range(-0.04, 0.04))
+		var base := Transform3D(Basis.from_euler(tilt).scaled(Vector3(sc, sc * stretch, sc)), pos)
 		var kind := rng.randf()
-		if kind < 0.55:
+		if kind < 0.18:
+			# Hohe schlanke Kiefer
+			var g2 := rng.randf_range(0.0, 0.06)
+			_part(parts, "p_trunk", base, 1.5, Color(0.42, 0.26, 0.15))
+			_part(parts, "p_c1", base, 2.6, Color(0.1 + g2, 0.34, 0.2))
+			_part(parts, "p_c2", base, 3.6, Color(0.12 + g2, 0.38, 0.22))
+			_part(parts, "p_c3", base, 4.6, Color(0.14 + g2, 0.42, 0.24))
+			_part(parts, "p_c4", base, 5.5, Color(0.16 + g2, 0.46, 0.27))
+		elif kind < 0.24:
+			# Toter Baum
+			_part(parts, "d_trunk", base, 2.0, Color(0.4, 0.34, 0.28))
+			_part(parts, "d_b1", base * Transform3D(Basis.from_euler(Vector3(0, 0, 0.9)), Vector3.ZERO), 2.9, Color(0.38, 0.32, 0.26), Vector3(0.35, 0, 0))
+			_part(parts, "d_b2", base * Transform3D(Basis.from_euler(Vector3(0.8, 0, -0.5)), Vector3.ZERO), 2.4, Color(0.38, 0.32, 0.26), Vector3(-0.2, 0, 0.3))
+		elif kind < 0.34:
+			# Junger Baum
+			var sb := Transform3D(Basis.from_euler(tilt).scaled(Vector3(0.6, 0.6, 0.6)), pos)
+			_part(parts, "sap", sb, 1.2, Color(0.4 + rng.randf() * 0.2, 0.62, 0.2))
+		elif kind < 0.6:
 			# Fichte
 			var g := rng.randf_range(0.0, 0.08)
 			_part(parts, "s_trunk", base, 1.0, Color(0.35, 0.22, 0.12))
 			_part(parts, "s_c1", base, 2.2, Color(0.12 + g, 0.42, 0.25))
 			_part(parts, "s_c2", base, 3.2, Color(0.14 + g, 0.46, 0.27))
 			_part(parts, "s_c3", base, 4.1, Color(0.16 + g, 0.5, 0.3))
-		elif kind < 0.8:
+		elif kind < 0.82:
 			# Birke mit goldener Krone
 			_part(parts, "b_trunk", base, 2.0, Color(0.92, 0.92, 0.88))
 			_part(parts, "b_c1", base, 4.3, Color(0.75, 0.8, 0.25))
@@ -469,17 +473,31 @@ func _build_trees() -> void:
 		body.add_child(cs)
 		forest.add_child(body)
 
-	_add_multimesh(_sphere_mesh(0.7), parts["bush"])
+	var fol := Scenery.foliage_material(0.06)
+	_add_multimesh(_sphere_mesh(0.7), parts["bush"], fol)
 	_add_multimesh(_cyl_mesh(0.25, 2.0), parts["s_trunk"])
-	_add_multimesh(_cone_mesh(1.5, 1.8), parts["s_c1"])
-	_add_multimesh(_cone_mesh(1.1, 1.8), parts["s_c2"])
-	_add_multimesh(_cone_mesh(0.7, 1.6), parts["s_c3"])
+	_add_multimesh(_cone_mesh(1.5, 1.8), parts["s_c1"], fol)
+	_add_multimesh(_cone_mesh(1.1, 1.8), parts["s_c2"], fol)
+	_add_multimesh(_cone_mesh(0.7, 1.6), parts["s_c3"], fol)
 	_add_multimesh(_cyl_mesh(0.2, 4.0), parts["b_trunk"])
-	_add_multimesh(_sphere_mesh(1.4), parts["b_c1"])
-	_add_multimesh(_sphere_mesh(1.0), parts["b_c2"])
+	_add_multimesh(_sphere_mesh(1.4), parts["b_c1"], fol)
+	_add_multimesh(_sphere_mesh(1.0), parts["b_c2"], fol)
 	_add_multimesh(_cyl_mesh(0.3, 3.0), parts["l_trunk"])
-	_add_multimesh(_sphere_mesh(1.8), parts["l_c1"])
-	_add_multimesh(_sphere_mesh(1.2), parts["l_c2"])
+	_add_multimesh(_sphere_mesh(1.8), parts["l_c1"], fol)
+	_add_multimesh(_sphere_mesh(1.2), parts["l_c2"], fol)
+	_add_multimesh(_cyl_mesh(0.18, 3.0), parts["p_trunk"])
+	_add_multimesh(_cone_mesh(1.25, 1.7), parts["p_c1"], fol)
+	_add_multimesh(_cone_mesh(1.0, 1.6), parts["p_c2"], fol)
+	_add_multimesh(_cone_mesh(0.75, 1.5), parts["p_c3"], fol)
+	_add_multimesh(_cone_mesh(0.45, 1.3), parts["p_c4"], fol)
+	_add_multimesh(_cyl_mesh(0.22, 4.0), parts["d_trunk"])
+	_add_multimesh(_cyl_mesh(0.07, 1.4), parts["d_b1"])
+	_add_multimesh(_cyl_mesh(0.06, 1.2), parts["d_b2"])
+	_add_multimesh(_sphere_mesh(0.55), parts["sap"], fol)
+
+	var cover_rng := RandomNumberGenerator.new()
+	cover_rng.seed = 4242
+	Scenery.build_ground_cover(self, lake_root, _tree_blocked, cover_rng)
 
 
 func _part(parts: Dictionary, key: String, base: Transform3D, y: float, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
@@ -488,7 +506,7 @@ func _part(parts: Dictionary, key: String, base: Transform3D, y: float, color: C
 	d["c"].append(color)
 
 
-func _add_multimesh(mesh: Mesh, d: Dictionary) -> void:
+func _add_multimesh(mesh: Mesh, d: Dictionary, mat: Material = null) -> void:
 	var xforms: Array = d["x"]
 	var colors: Array = d["c"]
 	if xforms.is_empty():
@@ -503,10 +521,13 @@ func _add_multimesh(mesh: Mesh, d: Dictionary) -> void:
 		mm.set_instance_color(i, colors[i])
 	var mi := MultiMeshInstance3D.new()
 	mi.multimesh = mm
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.roughness = 0.9
-	mi.material_override = m
+	if mat != null:
+		mi.material_override = mat
+	else:
+		var m := StandardMaterial3D.new()
+		m.vertex_color_use_as_albedo = true
+		m.roughness = 0.9
+		mi.material_override = m
 	add_child(mi)
 
 
