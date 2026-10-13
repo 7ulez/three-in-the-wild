@@ -404,7 +404,7 @@ func _build_trees() -> void:
 	add_child(forest)
 
 	var parts := {}
-	for key in ["bush", "s_trunk", "s_c1", "s_c2", "s_c3", "b_trunk", "b_c1", "b_c2", "l_trunk", "l_c1", "l_c2", "p_trunk", "p_c1", "p_c2", "p_c3", "p_c4", "d_trunk", "d_b1", "d_b2", "sap"]:
+	for key in ["bush", "s_trunk", "s_c1", "s_c2", "s_c3", "b_trunk", "b_c1", "b_c2", "l_trunk", "l_c1", "l_c2", "p_trunk", "p_c1", "p_c2", "p_c3", "p_c4", "d_trunk", "d_b1", "d_b2", "sap", "sap_t"]:
 		parts[key] = {"x": [], "c": []}
 
 	var shape := CylinderShape3D.new()
@@ -433,12 +433,13 @@ func _build_trees() -> void:
 		elif kind < 0.24:
 			# Toter Baum
 			_part(parts, "d_trunk", base, 2.0, Color(0.4, 0.34, 0.28))
-			_part(parts, "d_b1", base * Transform3D(Basis.from_euler(Vector3(0, 0, 0.9)), Vector3.ZERO), 2.9, Color(0.38, 0.32, 0.26), Vector3(0.35, 0, 0))
-			_part(parts, "d_b2", base * Transform3D(Basis.from_euler(Vector3(0.8, 0, -0.5)), Vector3.ZERO), 2.4, Color(0.38, 0.32, 0.26), Vector3(-0.2, 0, 0.3))
+			_branch(parts["d_b1"], base, 2.5, 0.9, 0.0, 0.7, Color(0.38, 0.32, 0.26))
+			_branch(parts["d_b2"], base, 3.1, -0.8, 2.4, 0.6, Color(0.38, 0.32, 0.26))
 		elif kind < 0.34:
 			# Junger Baum
 			var sb := Transform3D(Basis.from_euler(tilt).scaled(Vector3(0.6, 0.6, 0.6)), pos)
-			_part(parts, "sap", sb, 1.2, Color(0.4 + rng.randf() * 0.2, 0.62, 0.2))
+			_part(parts, "sap_t", sb, 0.5, Color(0.4, 0.28, 0.16))
+			_part(parts, "sap", sb, 1.1, Color(0.4 + rng.randf() * 0.2, 0.62, 0.2))
 		elif kind < 0.6:
 			# Fichte
 			var g := rng.randf_range(0.0, 0.08)
@@ -494,10 +495,19 @@ func _build_trees() -> void:
 	_add_multimesh(_cyl_mesh(0.07, 1.4), parts["d_b1"])
 	_add_multimesh(_cyl_mesh(0.06, 1.2), parts["d_b2"])
 	_add_multimesh(_sphere_mesh(0.55), parts["sap"], fol)
+	_add_multimesh(_cyl_mesh(0.06, 1.0), parts["sap_t"])
 
 	var cover_rng := RandomNumberGenerator.new()
 	cover_rng.seed = 4242
 	Scenery.build_ground_cover(self, lake_root, _tree_blocked, cover_rng)
+
+
+## Ast, der unten am Stamm (Höhe y0) ansetzt und schräg nach außen wächst. half = halbe Astlänge.
+func _branch(d: Dictionary, base: Transform3D, y0: float, tilt: float, yaw: float, half: float, color: Color) -> void:
+	var rot := Basis.from_euler(Vector3(0, yaw, 0)) * Basis(Vector3.BACK, tilt)
+	var centre := Vector3(0, y0, 0) + rot * Vector3.UP * half
+	d["x"].append(base * Transform3D(rot, centre))
+	d["c"].append(color)
 
 
 func _part(parts: Dictionary, key: String, base: Transform3D, y: float, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
