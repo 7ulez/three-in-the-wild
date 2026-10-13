@@ -292,7 +292,7 @@ static func vomit_pose(parent: Node3D, on: bool, delta: float) -> void:
 	inst.rotation.x = lerp_angle(inst.rotation.x, target, minf(delta * 9.0, 1.0))
 
 
-static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0, squat: bool = false, sit: bool = false, vape: bool = false, drink: int = 0) -> void:
+static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air: bool = false, fish: int = 0, squat: bool = false, sit: bool = false, vape: bool = false, drink: int = 0, pee: bool = false) -> void:
 	var ap: AnimationPlayer = parent.get_meta("ap", null) as AnimationPlayer
 	if ap == null:
 		return
@@ -322,6 +322,11 @@ static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air
 		ap.speed_scale = 1.0
 		return
 	parent.set_meta("vaping", false)
+	if pee and speed < 0.5 and not sit and ap.has_animation("Pee"):
+		if ap.current_animation != "Pee":
+			ap.play("Pee", 0.2)
+		ap.speed_scale = 1.0
+		return
 	if sit and ap.has_animation("Sit"):
 		if ap.current_animation != "Sit":
 			ap.play("Sit", 0.2)
@@ -696,7 +701,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if seat != null:
 		velocity = Vector3.ZERO
-		Player.animate_body(body_visual, 0.0, false, false, 0, false, true, vape_t > 0.0, drink_kind if drink_t > 0.0 else 0)
+		Player.animate_body(body_visual, 0.0, false, false, 0, false, true, vape_t > 0.0, drink_kind if drink_t > 0.0 else 0, needs != null and needs.peeing)
 		_drink_cd = maxf(_drink_cd - delta, 0.0)
 		promille = maxf(promille - delta * 0.005, 0.0)
 		if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_A) \
@@ -781,7 +786,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
-	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim(), needs != null and needs.squatting, false, vape_t > 0.0, drink_kind if drink_t > 0.0 else 0)
+	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim(), needs != null and needs.squatting, false, vape_t > 0.0, drink_kind if drink_t > 0.0 else 0, needs != null and needs.peeing)
 	if is_on_floor():
 		var drop := _peak_y - global_position.y
 		if _airborne and drop > 5.0:
@@ -843,7 +848,7 @@ func _drink() -> void:
 		if c != null and c.has_method("drink_kind") and c.drink_kind() != "":
 			src = c
 	if src == null:
-		toast("Zum Trinken: Bierkasten oder Wasserkanister anschauen oder tragen, dann F.", 2.5)
+		toast("Zum Trinken: Bierkasten oder Wasserflasche anschauen oder tragen, dann F.", 2.5)
 		return
 	var kind: String = src.drink_kind()
 	if not src.take_drink():
@@ -1353,7 +1358,7 @@ func _confirm_item_placement() -> void:
 	var state := {}
 	if it.item_name == "Bierkasten":
 		state["beers"] = it.beers_left()
-	if it.item_name == "Wasserkanister":
+	if it.item_name == "Wasserflasche":
 		state["water"] = it.water_left
 	if it.extra.has("wood"):
 		state["wood"] = it.extra["wood"]

@@ -301,7 +301,7 @@ func _build_cars() -> void:
 				_backpack_loot(Color(0.25, 0.42, 0.22), [
 					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[1], "Steffen"),
 					_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
-					_loot("Wasserkanister", 12.0, Vector3(0.3, 0.4, 0.2), Color(0.25, 0.6, 0.9)),
+					_loot("Wasserflasche", 2.0, Vector3(0.084, 0.3, 0.084), Color(0.25, 0.6, 0.9)),
 					_loot("Campingstuhl", 3.0, Vector3(0.8, 0.2, 0.2), chair_cols[1]),
 				]),
 			],
@@ -316,7 +316,7 @@ func _build_cars() -> void:
 				_backpack_loot(Color(0.55, 0.3, 0.15), [
 					_loot("Campingstuhl", 3.0, Vector3(0.8, 0.2, 0.2), chair_cols[2]),
 					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[0], "Marian"),
-					_loot("Hängematte", 3.0, Vector3(0.5, 0.3, 0.3), Color(0.8, 0.3, 0.3)),
+					_loot("Hängematte", 3.0, Vector3(0.5, 0.3, 0.3), Color(0.05, 0.05, 0.06)),
 					_loot("Feuerstahl", 0.3, Vector3(0.16, 0.05, 0.05), Color(0.7, 0.7, 0.74)),
 					_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
 				]),

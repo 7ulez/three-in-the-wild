@@ -8,7 +8,7 @@ var hold_extra: float = 0.0
 var item_size: Vector3 = Vector3.ONE
 var item_color: Color = Color.WHITE
 var bottle_nodes: Array = []   # nur beim Bierkasten: die sichtbaren Flaschen
-var water_left: int = 10       # nur beim Wasserkanister: Schlucke
+var water_left: int = 10       # nur beim Wasserflasche: Schlucke
 var label: Label3D
 var extra: Dictionary = {}     # Zusatzzustand (Rucksack-Inhalt, Holzvorrat)
 
@@ -104,7 +104,7 @@ func take_bottle() -> bool:
 func drink_kind() -> String:
 	if item_name == "Bierkasten":
 		return "beer"
-	if item_name == "Wasserkanister":
+	if item_name == "Wasserflasche":
 		return "water"
 	return ""
 
@@ -118,7 +118,7 @@ func drinks_left() -> int:
 func take_drink() -> bool:
 	if item_name == "Bierkasten":
 		return take_bottle()
-	if item_name == "Wasserkanister":
+	if item_name == "Wasserflasche":
 		if water_left <= 0:
 			return false
 		water_left -= 1
@@ -143,8 +143,8 @@ func get_prompt() -> String:
 		if beers_left() > 0:
 			return "E: Bierkasten aufheben (%d kg)   F: Bier trinken (%d übrig)" % [int(weight), beers_left()]
 		return "E: leeren Bierkasten aufheben (%d kg)" % int(weight)
-	if item_name == "Wasserkanister":
-		return "E: Wasserkanister aufheben (%d kg)   F: Wasser trinken (%d Schluck)" % [int(weight), water_left]
+	if item_name == "Wasserflasche":
+		return "E: Wasserflasche aufheben (%d kg)   F: Wasser trinken (%d Schluck)" % [int(weight), water_left]
 	return "E: %s aufheben (%d kg)" % [display_name(), int(weight)]
 
 

@@ -14,6 +14,8 @@ static func placed_size(kind: String, size: Vector3) -> Vector3:
 		return Vector3(0.5, 0.95, 0.5)
 	if kind == "Rutenständer":
 		return Vector3(0.6, 0.9, 0.6)
+	if kind == "Wasserflasche":
+		return Vector3(0.084, 0.3, 0.084)
 	if kind == "Gasgrill":
 		return Vector3(0.66, 0.9, 0.55)
 	if kind == "Kiste mit Proviant":
@@ -44,7 +46,7 @@ static func add_visual(parent: Node3D, kind: String, size: Vector3, color: Color
 			return _oven(parent, size)
 		"Campingstühle", "Campingstuhl":
 			return _chair_bag(parent, size, color)
-		"Wasserkanister":
+		"Wasserflasche":
 			return _canister(parent, size, color)
 		"Brennholz":
 			return _firewood(parent, size)
@@ -63,7 +65,7 @@ static func add_visual(parent: Node3D, kind: String, size: Vector3, color: Color
 	if Game.INGREDIENT_COLORS.has(kind):
 		return _ingredient(parent, kind, color)
 	if kind.ends_with("kg"):
-		return _fish(parent, size, color)
+		return _fish(parent, size, color, kind)
 	Util.add_box(parent, size, color)
 	return {}
 
@@ -269,6 +271,10 @@ static func _chair(parent: Node3D, color: Color) -> void:
 
 
 static func _canister(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
+	var wm := _glb(parent, "wasserflasche")
+	if wm != null:
+		wm.scale = Vector3.ONE * (size.y / 0.3)
+		return {}
 	Util.add_box(parent, size, color)
 	Util.add_cylinder(parent, 0.035, 0.05, Color(0.1, 0.1, 0.12), Vector3(0.07, size.y / 2.0 + 0.025, 0))
 	Util.add_box(parent, Vector3(0.12, 0.03, 0.05), Color(0.1, 0.1, 0.12), Vector3(-0.06, size.y / 2.0 + 0.015, 0))
@@ -409,7 +415,15 @@ static func _ingredient(parent: Node3D, kind: String, color: Color) -> Dictionar
 	return {}
 
 
-static func _fish(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
+static func _fish(parent: Node3D, size: Vector3, color: Color, kind: String = "") -> Dictionary:
+	var fm: Node3D = null
+	if kind.begins_with("Karpfen"):
+		fm = _glb(parent, "karpfen")
+	elif kind.begins_with("Hecht"):
+		fm = _glb(parent, "hecht")
+	if fm != null:
+		fm.scale = Vector3.ONE * size.x
+		return {}
 	var body := Util.add_sphere(parent, 0.5, color, Vector3.ZERO)
 	body.scale = Vector3(size.x * 0.6, size.y * 0.5 + 0.02, size.z * 0.6)
 	var tail := Util.add_cone(parent, 0.5, 1.0, color.darkened(0.2), Vector3(size.x * 0.5, 0, 0))
@@ -446,6 +460,10 @@ static func _rodpod(parent: Node3D) -> Dictionary:
 
 
 static func _hammock_bag(parent: Node3D, size: Vector3, color: Color) -> Dictionary:
+	var hm := _glb(parent, "haengematte_sack")
+	if hm != null:
+		hm.scale = Vector3.ONE * (size.x / 0.55)
+		return {}
 	var roll := Util.add_cylinder(parent, size.z * 0.5, size.x, color, Vector3.ZERO)
 	roll.rotation_degrees.z = 90.0
 	Util.add_cylinder(parent, size.z * 0.5 + 0.01, 0.05, Color(0.1, 0.1, 0.1), Vector3(-0.1, 0, 0)).rotation_degrees.z = 90.0

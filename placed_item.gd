@@ -2,7 +2,7 @@ class_name PlacedItem
 extends StaticBody3D
 ## Ein aufgestellter Gegenstand im Lager. Je nach Art kann man ihn benutzen:
 ## Stuhl (hinsetzen), Grill (an/aus), Kühlbox (öffnen), Dutch Oven (Chili kochen), Rucksack (Zutaten),
-## Feuerschale (Feuer machen), Brennholz (Holz nehmen), Bierkasten / Wasserkanister (trinken). X baut ab.
+## Feuerschale (Feuer machen), Brennholz (Holz nehmen), Bierkasten / Wasserflasche (trinken). X baut ab.
 
 var item_name: String = ""
 var weight: float = 5.0
@@ -166,7 +166,7 @@ func _make_smoke(col: Color, size: float, life: float) -> CPUParticles3D:
 func drink_kind() -> String:
 	if item_name == "Bierkasten":
 		return "beer"
-	if item_name == "Wasserkanister":
+	if item_name == "Wasserflasche":
 		return "water"
 	return ""
 
@@ -228,7 +228,7 @@ func get_prompt() -> String:
 				t = "E: Zutat nehmen: %s   (Z: andere Zutat, %d übrig)" % [pack[sel % pack.size()], pack.size()]
 		"Bierkasten":
 			t = "F: Bier trinken (%d übrig)" % drinks_left()
-		"Wasserkanister":
+		"Wasserflasche":
 			t = "F: Wasser trinken (%d Schluck)" % drinks_left()
 		"Brennholz":
 			t = "E: Holzscheit nehmen (%d übrig)" % wood_left if wood_left > 0 else "Das Brennholz ist aufgebraucht"
@@ -845,7 +845,7 @@ func get_state() -> Dictionary:
 	var st := {}
 	if item_name == "Bierkasten":
 		st["beers"] = drinks_left()
-	if item_name == "Wasserkanister":
+	if item_name == "Wasserflasche":
 		st["water"] = water_left
 	if item_name == "Brennholz":
 		st["wood"] = wood_left
@@ -881,7 +881,7 @@ func dismantle(player: Node) -> void:
 	if item_name == "Bierkasten":
 		while it.beers_left() > drinks_left():
 			it.take_bottle()
-	if item_name == "Wasserkanister":
+	if item_name == "Wasserflasche":
 		it.water_left = water_left
 	if item_name == "Brennholz":
 		it.extra["wood"] = wood_left
