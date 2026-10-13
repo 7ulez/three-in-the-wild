@@ -66,26 +66,7 @@ func setup(p: Player, layer: CanvasLayer) -> void:
 		panel.add_child(row)
 		bars[key] = bar
 
-	pee_particles = CPUParticles3D.new()
-	pee_particles.emitting = false
-	pee_particles.amount = 60
-	pee_particles.lifetime = 0.7
-	pee_particles.direction = Vector3(0, 0.25, -1)
-	pee_particles.spread = 4.0
-	pee_particles.initial_velocity_min = 2.6
-	pee_particles.initial_velocity_max = 3.0
-	pee_particles.gravity = Vector3(0, -9.8, 0)
-	var pm := SphereMesh.new()
-	pm.radius = 0.02
-	pm.height = 0.04
-	pm.radial_segments = 4
-	pm.rings = 2
-	var pmat := StandardMaterial3D.new()
-	pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	pmat.albedo_color = Color(0.95, 0.9, 0.2)
-	pm.material = pmat
-	pee_particles.mesh = pm
-	pee_particles.position = Vector3(0, 0.95, -0.25)
+	pee_particles = Fx.pee_stream()
 	player.add_child(pee_particles)
 
 	vape_particles = CPUParticles3D.new()
@@ -219,6 +200,8 @@ func _check_pee_target() -> void:
 			if Game.fish_penalty_until < Game.now():
 				player.toast("Du pinkelst in den See. Die Fische sind nicht begeistert.", 3.5)
 			Game.fish_penalty_until = Game.now() + 120.0
+		else:
+			Fx.wet_spot(main, Vector3(target.x, 0.0, target.z))
 	# Ans Zelt
 	for t in Game.tents:
 		if is_instance_valid(t) and (t as Node3D).global_position.distance_to(target) < 1.8 and not t.smelly:
@@ -261,7 +244,10 @@ func _finish_big() -> void:
 	var pile := Poop.new()
 	player.get_parent().add_child(pile)
 	pile.build()
-	pile.global_position = player.global_position - player.global_transform.basis.z * 0.2
+	# Der Haufen liegt hinter dir, nicht unter deinen Füßen
+	pile.global_position = player.global_position + player.global_transform.basis.z * 0.7
+	if Net.instance != null and Net.instance.multiplayer.multiplayer_peer != null:
+		Net.instance.send_poop(pile.global_position)
 	Sfx.play("plop", pile.global_position)
 	player.toast("Puh. Das hat gutgetan. Barometer leer. (Der Haufen bleibt liegen - E: vergraben)", 4.5)
 

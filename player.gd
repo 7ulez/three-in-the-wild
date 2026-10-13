@@ -325,6 +325,8 @@ func anim_flags() -> int:
 		f |= 32
 	if vape_t > 0.0:
 		f |= 64
+	if needs != null and needs.peeing:
+		f |= 128
 	return f
 
 
@@ -1075,7 +1077,7 @@ func _start_item_placement() -> void:
 	held.collision_mask = 0
 	var psize := ItemModels.placed_size(held.item_name, held.item_size)
 	if held.item_name == "Campingstühle":
-		psize = Vector3(1.6, 0.95, 0.5)
+		psize = Vector3(1.8, 0.95, 0.5)
 	item_ghost = Node3D.new()
 	get_parent().add_child(item_ghost)
 	item_ghost_mat = StandardMaterial3D.new()
@@ -1170,8 +1172,8 @@ func _confirm_item_placement() -> void:
 		state["pack"] = it.extra["pack"]
 	if it.item_name == "Campingstühle":
 		var right := Vector3(cos(yaw), 0, -sin(yaw))
-		for sgn in [-1.0, 1.0]:
-			_spawn_placed("Campingstuhl", it.weight / 2.0, Vector3(0.3, 0.9, 0.5), it.item_color, pos + right * 0.55 * sgn, yaw, {})
+		for sgn in [-1.0, 0.0, 1.0]:
+			_spawn_placed("Campingstuhl", it.weight / 3.0, Vector3(0.3, 0.9, 0.5), it.item_color, pos + right * 0.6 * sgn, yaw, {})
 	else:
 		var placed := _spawn_placed(it.item_name, it.weight, it.item_size, it.item_color, pos, yaw, state)
 		if snap != null:

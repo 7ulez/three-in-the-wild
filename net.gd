@@ -23,6 +23,9 @@ class RemoteAvatar:
 	var target_yaw: float = 0.0
 	var char_name: String = ""
 	var anim: int = 0
+	var _pee: CPUParticles3D = null
+	var _pee_on: bool = false
+	var _wet_cd: float = 0.0
 
 	func set_look(p_char: String, p_name: String) -> void:
 		if p_char == char_name:
@@ -49,6 +52,22 @@ class RemoteAvatar:
 		if delta > 0.0:
 			var sp := Vector2(global_position.x - _last_pos.x, global_position.z - _last_pos.z).length() / delta
 			Player.animate_body(self, minf(sp, 9.0), (anim & 1) != 0, (anim & 2) != 0, (anim >> 2) & 3, (anim & 16) != 0, (anim & 32) != 0, (anim & 64) != 0)
+		# Pinkeln der anderen: Strahl + nasse Stelle
+		var pee_now := (anim & 128) != 0
+		if _pee == null:
+			_pee = Fx.pee_stream()
+			add_child(_pee)
+		if pee_now != _pee_on:
+			_pee_on = pee_now
+			_pee.emitting = pee_now
+			if pee_now:
+				Sfx.play("trickle", global_position)
+		if pee_now:
+			_wet_cd -= delta
+			if _wet_cd <= 0.0:
+				_wet_cd = 0.1
+				var tp := global_position - global_transform.basis.z * 1.8
+				Fx.wet_spot(get_parent(), Vector3(tp.x, 0.0, tp.z))
 		_last_pos = global_position
 		rotation.y = lerp_angle(rotation.y, target_yaw, minf(delta * 12.0, 1.0))
 
@@ -282,6 +301,21 @@ func send_tent(pos: Vector3, yaw: float) -> void:
 
 func send_placed(p: PlacedItem, state: Dictionary) -> void:
 	rpc("remote_placed", p.item_name, p.weight, p.item_size, p.item_color, p.global_position, p.rotation.y, state)
+
+
+func send_poop(pos: Vector3) -> void:
+	rpc("remote_poop", pos)
+
+
+@rpc("any_peer", "reliable")
+func remote_poop(pos: Vector3) -> void:
+	if main == null or main.player == null:
+		return
+	var pile := Poop.new()
+	main.add_child(pile)
+	pile.build()
+	pile.global_position = pos
+	Sfx.play("plop", pos)
 
 
 func send_removed(pos: Vector3, item_name: String) -> void:

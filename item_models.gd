@@ -61,7 +61,7 @@ static func add_visual(parent: Node3D, kind: String, size: Vector3, color: Color
 ## Modell, wie es aufgestellt aussieht (Stühle sind aufgeklappt).
 static func add_placed_visual(parent: Node3D, kind: String, size: Vector3, color: Color) -> Dictionary:
 	if kind == "Campingstühle":
-		for x in [-0.55, 0.55]:
+		for x in [-0.6, 0.0, 0.6]:
 			var holder := Node3D.new()
 			holder.position.x = x
 			parent.add_child(holder)

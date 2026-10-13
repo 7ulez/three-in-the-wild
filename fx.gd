@@ -87,3 +87,74 @@ static func sparks(parent: Node3D, pos: Vector3) -> CPUParticles3D:
 	p.position = pos
 	parent.add_child(p)
 	return p
+
+
+## Pinkelstrahl (für den eigenen Spieler und die Figuren der anderen).
+static func pee_stream() -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.emitting = false
+	p.amount = 60
+	p.lifetime = 0.7
+	p.direction = Vector3(0, 0.25, -1)
+	p.spread = 4.0
+	p.initial_velocity_min = 2.6
+	p.initial_velocity_max = 3.0
+	p.gravity = Vector3(0, -9.8, 0)
+	var pm := SphereMesh.new()
+	pm.radius = 0.02
+	pm.height = 0.04
+	pm.radial_segments = 4
+	pm.rings = 2
+	var pmat := StandardMaterial3D.new()
+	pmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pmat.albedo_color = Color(0.95, 0.9, 0.2)
+	pm.material = pmat
+	p.mesh = pm
+	p.position = Vector3(0, 0.95, -0.25)
+	return p
+
+
+## Nasse Stelle am Boden: wird größer, wenn man weiter hinpinkelt, und trocknet nach einer Weile wieder.
+static func wet_spot(parent: Node, pos: Vector3) -> void:
+	var last: Variant = parent.get_meta("wet_last", null)
+	if last != null and is_instance_valid(last):
+		var ls := last as MeshInstance3D
+		if Vector2(ls.global_position.x - pos.x, ls.global_position.z - pos.z).length() < 0.5:
+			var now := Time.get_ticks_msec()
+			if now - int(ls.get_meta("grown", 0)) < 250:
+				return
+			ls.set_meta("grown", now)
+			var s := minf(ls.scale.x + 0.04, 1.7)
+			ls.scale = Vector3(s, 1.0, s)
+			var old: Tween = ls.get_meta("tw", null)
+			if old != null:
+				old.kill()
+			(ls.material_override as StandardMaterial3D).albedo_color.a = 0.6
+			ls.set_meta("tw", _dry(ls))
+			return
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.3
+	cm.bottom_radius = 0.3
+	cm.height = 0.01
+	cm.radial_segments = 20
+	mi.mesh = cm
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.12, 0.09, 0.05, 0.6)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.roughness = 0.3
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.scale = Vector3(0.45, 1.0, 0.45)
+	parent.add_child(mi)
+	mi.global_position = Vector3(pos.x, 0.05, pos.z)
+	parent.set_meta("wet_last", mi)
+	mi.set_meta("tw", _dry(mi))
+
+
+static func _dry(mi: MeshInstance3D) -> Tween:
+	var tw := mi.create_tween()
+	tw.tween_interval(30.0)
+	tw.tween_property(mi.material_override, "albedo_color:a", 0.0, 40.0)
+	tw.tween_callback(mi.queue_free)
+	return tw
