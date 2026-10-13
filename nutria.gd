@@ -17,6 +17,8 @@ var _anim: float = 0.0
 var _rustles: int = 0
 var _body: Node3D
 var flee_dir: Vector3 = Vector3.ZERO
+var _ap: AnimationPlayer = null
+var _cur_anim: String = ""
 
 
 func setup(p_main: Node, pos: Vector3) -> void:
@@ -24,6 +26,17 @@ func setup(p_main: Node, pos: Vector3) -> void:
 	position = pos
 	_body = Node3D.new()
 	add_child(_body)
+	if ResourceLoader.exists("res://assets/fauna/nutria.glb"):
+		var inst := (load("res://assets/fauna/nutria.glb") as PackedScene).instantiate() as Node3D
+		_body.add_child(inst)
+		_ap = _find_ap(inst)
+		if _ap != null:
+			for n in _ap.get_animation_list():
+				_ap.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+			_play("Idle")
+		Fx.blob_shadow(_body, 0.45)
+		_choose_target()
+		return
 	var fur := Color(0.42, 0.28, 0.16)
 	var b := Util.add_sphere(_body, 0.5, fur, Vector3(0, 0.3, 0))
 	b.scale = Vector3(0.55, 0.34, 0.34)
@@ -41,6 +54,23 @@ func setup(p_main: Node, pos: Vector3) -> void:
 		for sz in [-0.15, 0.2]:
 			Util.add_box(_body, Vector3(0.07, 0.14, 0.09), fur.darkened(0.25), Vector3(sx * 0.14, 0.07, sz))
 	_choose_target()
+
+
+func _find_ap(n: Node) -> AnimationPlayer:
+	if n is AnimationPlayer:
+		return n as AnimationPlayer
+	for c in n.get_children():
+		var r := _find_ap(c)
+		if r != null:
+			return r
+	return null
+
+
+func _play(a: String) -> void:
+	if _ap == null or a == _cur_anim or not _ap.has_animation(a):
+		return
+	_cur_anim = a
+	_ap.play(a, 0.15)
 
 
 func _choose_target() -> void:
@@ -94,7 +124,8 @@ func _process(delta: float) -> void:
 				_start_flee(ppos)
 		S.EAT:
 			eat_t += delta
-			_body.rotation.z = sin(_anim * 1.5) * 0.12
+			if _ap == null:
+				_body.rotation.z = sin(_anim * 1.5) * 0.12
 			if action == "rustle":
 				if target is Tent:
 					(target as Tent).shake()
@@ -122,7 +153,15 @@ func _process(delta: float) -> void:
 		global_position.y = 0.0
 		var yaw := atan2(-dir.x, -dir.z)
 		rotation.y = lerp_angle(rotation.y, yaw, minf(delta * 8.0, 1.0))
-		_body.position.y = absf(sin(_anim)) * 0.05
+		if _ap == null:
+			_body.position.y = absf(sin(_anim)) * 0.05
+	if _ap != null:
+		if dir != Vector3.ZERO:
+			_play("Run" if state == S.FLEE else "Walk")
+		elif state == S.EAT:
+			_play("Eat")
+		else:
+			_play("Idle")
 	if life > 240.0:
 		_drop_loot(ppos)
 		queue_free()
