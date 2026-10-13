@@ -5,10 +5,11 @@ extends Node3D
 
 const WIDTH: float = 2.4
 const HEIGHT: float = 1.5
-const DEPTH: float = 2.2
+const DEPTH: float = 3.1
 const FABRIC: Color = Color(0.95, 0.5, 0.15)
 
 var shell: MeshInstance3D
+var model: Node3D = null
 var door: MeshInstance3D
 var mat_flat: MeshInstance3D
 var pegs_driven: int = 0
@@ -45,11 +46,12 @@ func shake() -> void:
 func _process(delta: float) -> void:
 	if lamp != null:
 		lamp.light_energy = lerpf(lamp.light_energy, 0.9 if Game.is_night() else 0.0, minf(delta * 1.5, 1.0))
-	if _shake_t > 0.0 and shell != null:
+	var vis: Node3D = model if model != null else shell
+	if _shake_t > 0.0 and vis != null:
 		_shake_t -= delta
-		shell.rotation.z = sin(Time.get_ticks_msec() / 25.0) * 0.04
+		vis.rotation.z = sin(Time.get_ticks_msec() / 25.0) * 0.04
 		if _shake_t <= 0.0:
-			shell.rotation.z = 0.0
+			vis.rotation.z = 0.0
 
 
 func build_ghost() -> void:
@@ -88,7 +90,7 @@ func begin_site() -> void:
 			var peg := TentPeg.new()
 			peg.tent = self
 			peg.build()
-			peg.position = Vector3(sx * 1.55, 0.0, sz * 1.4)
+			peg.position = Vector3(sx * 1.55, 0.0, sz * 1.75)
 			add_child(peg)
 
 
@@ -103,11 +105,18 @@ func _finish(player: Node) -> void:
 	if player != null and Net.instance != null:
 		Net.instance.send_tent(global_position, rotation.y)
 	mat_flat.visible = false
-	shell.visible = true
-	shell.scale = Vector3(1, 0.05, 1)
-	shell.position.y = HEIGHT * 0.05 / 2.0
 	var tw := create_tween()
-	tw.tween_method(_grow, 0.05, 1.0, 1.2)
+	if ResourceLoader.exists("res://assets/zelt.glb"):
+		shell.visible = false
+		model = (load("res://assets/zelt.glb") as PackedScene).instantiate() as Node3D
+		model.scale = Vector3(1, 0.05, 1)
+		add_child(model)
+		tw.tween_property(model, "scale:y", 1.0, 1.2)
+	else:
+		shell.visible = true
+		shell.scale = Vector3(1, 0.05, 1)
+		shell.position.y = HEIGHT * 0.05 / 2.0
+		tw.tween_method(_grow, 0.05, 1.0, 1.2)
 	tw.tween_callback(_on_grown)
 	if player != null and player.has_method("toast"):
 		player.toast("Das Zelt steht!", 5.0)
@@ -119,7 +128,7 @@ func _grow(s: float) -> void:
 
 
 func _on_grown() -> void:
-	door.visible = true
+	door.visible = model == null
 	lamp = OmniLight3D.new()
 	lamp.light_color = Color(1.0, 0.72, 0.4)
 	lamp.light_energy = 0.0
@@ -141,6 +150,6 @@ func _on_grown() -> void:
 	var dbs := BoxShape3D.new()
 	dbs.size = Vector3(0.9, 1.1, 0.3)
 	dcs.shape = dbs
-	dcs.position = Vector3(0, 0.55, -DEPTH / 2.0 - 0.18)
+	dcs.position = Vector3(0, 0.55, -DEPTH / 2.0 - 0.45)
 	door_body.add_child(dcs)
 	add_child(door_body)
