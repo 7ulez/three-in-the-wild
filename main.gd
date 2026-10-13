@@ -352,8 +352,8 @@ func _tree_blocked(pos: Vector3) -> bool:
 	for hp in HAMMOCK_PAIRS:
 		if Vector2(pos.x - hp.x, pos.z - hp.y).length() < 5.0:
 			return true
-	# Felsmassiv mit Klippenpfad
-	if pos.x > 56.0 and pos.x < 138.0 and pos.z > -103.0 and pos.z < -38.0:
+	# Berg mit Geröllpfad
+	if Vector2(pos.x - 100.0, pos.z + 72.0).length() < 38.0:
 		return true
 	# See samt Rand (Ellipse um die Seemitte)
 	var ex := pos.x / 29.0
@@ -596,6 +596,8 @@ func _build_pickups() -> void:
 			continue
 		if absf(p.x) < 14.0 and p.z > -3.0 and p.z < 9.0:
 			continue   # Parkplatz
+		if Vector2(p.x - 100.0, p.z + 72.0).length() < 38.0:
+			continue   # Berg
 		var ok := true
 		for t in tree_spots:
 			if (t as Vector3).distance_squared_to(p) < 2.5:
