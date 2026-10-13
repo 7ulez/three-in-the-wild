@@ -1199,7 +1199,7 @@ func _spawn_placed(p_name: String, weight: float, size: Vector3, color: Color, p
 	p.global_position = pos
 	p.rotation.y = yaw
 	Game.placed.append(p)
-	Sfx.play("thunk", pos)
+	Sfx.play("crate" if p_name == "Bierkasten" else "thunk", pos, 2.0 if p_name == "Bierkasten" else 0.0)
 	if Net.instance != null:
 		Net.instance.send_placed(p, state)
 	return p

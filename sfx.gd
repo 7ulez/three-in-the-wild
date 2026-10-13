@@ -4,8 +4,8 @@ extends Node
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
-const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "pop": 2, "spark": 2}
-const LOWRATE: Array = ["wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak"]
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2}
+const LOWRATE: Array = ["wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close"]
 var _warm: Array = []
 var _warm_t: float = 2.0
 static var inst: Sfx = null
@@ -329,6 +329,40 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			var s := _sine(0.4, randf_range(95.0, 115.0), 48.0, 15.0, 0.9, 0.002, 0.15)
 			s = _add(s, _env(_nf(_white(0.15), 0, 650.0, 0.8), 0.001, 40.0, 1.0))
 			s = _add(s, _env(_nf(_white(0.3), 1, randf_range(380.0, 520.0), 5.0), 0.001, 22.0, 0.6))
+			return _wav(s, 0.85)
+		"trunk_open":
+			# Entriegeln (Klack), Scharnier-Quietschen, sanftes Anschlagen der Dämpfer
+			var s := _env(_nf(_white(0.06), 1, 2800.0, 2.5), 0.0003, 100.0, 1.0)
+			s = _add(s, _sine(0.05, 900.0, 700.0, 80.0, 0.5, 0.0005))
+			s = _add(s, _env(_nf(_white(0.12), 0, 250.0, 0.8), 0.002, 30.0, 0.9), 0.06)
+			var creak := _sine(0.45, 330.0, 470.0, 3.0, 0.16, 0.05, 0.6)
+			for i in range(creak.size()):
+				creak[i] *= 0.6 + 0.4 * sin(i * 0.03)
+			s = _add(s, creak, 0.08)
+			s = _add(s, _env(_nf(_white(0.4), 1, 1400.0, 3.0), 0.1, 4.0, 0.12), 0.1)
+			s = _add(s, _sine(0.25, 85.0, 50.0, 18.0, 0.55, 0.002), 0.55)
+			s = _add(s, _env(_nf(_white(0.1), 0, 500.0, 0.8), 0.002, 40.0, 0.6), 0.55)
+			return _wav(s, 0.8)
+		"trunk_close":
+			# Schwung, dumpfer Schlag der Klappe, Schlossfalle rastet ein
+			var s := _env(_sweep(0.4, 300.0, 900.0, 1.5), 0.15, 5.0, 0.25)
+			s = _add(s, _sine(0.3, 95.0, 45.0, 14.0, 0.95, 0.002, 0.2), 0.3)
+			s = _add(s, _env(_nf(_white(0.15), 0, 700.0, 0.8), 0.001, 30.0, 0.9), 0.3)
+			s = _add(s, _env(_nf(_white(0.2), 1, 1700.0, 4.0), 0.001, 30.0, 0.3), 0.3)
+			s = _add(s, _env(_nf(_white(0.06), 1, 3000.0, 2.5), 0.0003, 120.0, 0.55), 0.38)
+			s = _add(s, _sine(0.05, 1000.0, 800.0, 90.0, 0.35, 0.0005), 0.38)
+			return _wav(s, 0.9)
+		"crate":
+			# Bierkasten abstellen: Plastikkasten-Knall, Flaschen klirren aneinander
+			var s := _sine(0.25, 105.0, 55.0, 18.0, 0.8, 0.002, 0.2)
+			s = _add(s, _env(_nf(_white(0.12), 0, 900.0, 0.8), 0.001, 38.0, 0.9))
+			s = _add(s, _env(_nf(_white(0.2), 1, randf_range(420.0, 560.0), 4.0), 0.001, 24.0, 0.45))
+			for k in range(int(randf_range(5, 9))):
+				var f := randf_range(2600.0, 5200.0)
+				var o := randf_range(0.0, 0.3)
+				s = _add(s, _sine(0.25, f, f, randf_range(14.0, 28.0), randf_range(0.08, 0.22), 0.0003), o)
+				s = _add(s, _sine(0.18, f * 1.62, f * 1.62, 30.0, 0.07, 0.0003), o)
+				s = _add(s, _env(_nf(_white(0.01), 2, 3000.0, 0.8), 0.0002, 250.0, 0.4), o)
 			return _wav(s, 0.85)
 		"whoosh":
 			var s := _filt(_sweep(0.65, 500.0, 2400.0, 2.0), 0, 3200.0, 0.7)

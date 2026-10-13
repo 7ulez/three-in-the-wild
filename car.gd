@@ -97,6 +97,7 @@ func _add_collision(width: float, length: float) -> void:
 
 func toggle_trunk() -> void:
 	trunk_open = not trunk_open
+	Sfx.play("trunk_open" if trunk_open else "trunk_close", global_transform * Vector3(0, 1.0, car_length / 2.0), 2.0)
 	var tw := create_tween()
 	tw.tween_property(trunk_pivot, "rotation_degrees:x", -115.0 if trunk_open else 0.0, 0.5)
 	if trunk_open and not loot_spawned:
