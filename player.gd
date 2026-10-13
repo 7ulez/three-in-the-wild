@@ -296,6 +296,19 @@ static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air
 
 
 
+## Animationszustand als Bitmaske für die anderen Spieler (Bit0 ducken, Bit1 Luft, Bit2-3 Angeln, Bit4 Hocke).
+func anim_flags() -> int:
+	var f := 0
+	if crouching:
+		f |= 1
+	if _air_t > 0.18:
+		f |= 2
+	f |= (_fish_anim() & 3) << 2
+	if needs != null and needs.squatting:
+		f |= 16
+	return f
+
+
 func _fish_anim() -> int:
 	if fisher == null or not fisher.has_rod():
 		return 0

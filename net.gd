@@ -22,6 +22,7 @@ class RemoteAvatar:
 	var target_pos: Vector3
 	var target_yaw: float = 0.0
 	var char_name: String = ""
+	var anim: int = 0
 
 	func set_look(p_char: String, p_name: String) -> void:
 		if p_char == char_name:
@@ -47,7 +48,7 @@ class RemoteAvatar:
 		global_position = global_position.lerp(target_pos, minf(delta * 12.0, 1.0))
 		if delta > 0.0:
 			var sp := Vector2(global_position.x - _last_pos.x, global_position.z - _last_pos.z).length() / delta
-			Player.animate_body(self, minf(sp, 9.0))
+			Player.animate_body(self, minf(sp, 9.0), (anim & 1) != 0, (anim & 2) != 0, (anim >> 2) & 3, (anim & 16) != 0)
 		_last_pos = global_position
 		rotation.y = lerp_angle(rotation.y, target_yaw, minf(delta * 12.0, 1.0))
 
@@ -215,7 +216,7 @@ func _process(delta: float) -> void:
 	elif _timer >= 0.066:
 		_timer = 0.0
 		var p: Player = main.player
-		rpc("sync_state", p.global_position, p.rotation.y, p.character_name, Game.player_name, p.sleeping)
+		rpc("sync_state", p.global_position, p.rotation.y, p.character_name, Game.player_name, p.sleeping, p.anim_flags())
 	if is_host():
 		_time_timer += delta
 		if _time_timer > 3.0:
@@ -224,7 +225,7 @@ func _process(delta: float) -> void:
 
 
 @rpc("any_peer", "unreliable_ordered")
-func sync_state(pos: Vector3, yaw: float, char_name: String, p_name: String, sleeping: bool) -> void:
+func sync_state(pos: Vector3, yaw: float, char_name: String, p_name: String, sleeping: bool, anim: int = 0) -> void:
 	var id := multiplayer.get_remote_sender_id()
 	if is_host() and not (avatars.has(id) and avatars[id].has_meta("slot")):
 		return
@@ -233,6 +234,7 @@ func sync_state(pos: Vector3, yaw: float, char_name: String, p_name: String, sle
 		av.global_position = pos
 	av.target_pos = pos
 	av.target_yaw = yaw
+	av.anim = anim
 	av.set_look(char_name, p_name)
 	av.visible = not sleeping
 
