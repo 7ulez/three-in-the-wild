@@ -155,7 +155,7 @@ func _ready() -> void:
 	lamp.spot_angle = 38.0
 	lamp.spot_attenuation = 0.6
 	lamp.light_energy = 7.0
-	lamp.shadow_enabled = true
+	lamp.shadow_enabled = not Game.low
 	lamp.visible = false
 	head.add_child(lamp)
 

@@ -92,7 +92,7 @@ func _update_sky() -> void:
 	var night := 1.0 - day
 	sun.rotation = Vector3(-asin(clampf(elev, -1.0, 1.0)) - 0.12, deg_to_rad(40.0) + cos(a) * 0.9, 0)
 	sun.light_energy = lerpf(0.0, 1.05, day)
-	sun.shadow_enabled = elev > 0.02
+	sun.shadow_enabled = elev > 0.02 and not Game.low
 	var warm := clampf(1.0 - absf(elev) * 2.5, 0.0, 1.0)   # Abend-/Morgenrot
 	sun.light_color = Color(1.0, 0.95, 0.85).lerp(Color(1.0, 0.55, 0.3), warm)
 	moon.light_energy = lerpf(0.0, 0.35, night)
@@ -137,7 +137,7 @@ func _setup_environment() -> void:
 	env.fog_enabled = true
 	env.fog_light_color = Color(1.0, 0.85, 0.65)
 	env.fog_density = 0.002
-	env.glow_enabled = true
+	env.glow_enabled = not Game.low
 
 	var we := WorldEnvironment.new()
 	we.environment = env
@@ -147,7 +147,7 @@ func _setup_environment() -> void:
 	sun.rotation_degrees = Vector3(-35, 40, 0)
 	sun.light_color = Color(1.0, 0.9, 0.75)
 	sun.light_energy = 1.2
-	sun.shadow_enabled = true
+	sun.shadow_enabled = not Game.low
 	add_child(sun)
 	moon = DirectionalLight3D.new()
 	moon.light_color = Color(0.55, 0.65, 1.0)
@@ -455,7 +455,7 @@ func _build_trees() -> void:
 			_part(parts, "l_c2", base, 3.0, crown.darkened(0.12), Vector3(0.9, 0, 0.4))
 
 		# Unterholz: Büsche (ohne Kollision)
-		if rng.randf() < 0.55:
+		if rng.randf() < 0.55 and not Game.low:
 			var bp := pos + Vector3(rng.randf_range(-2.0, 2.0), 0.0, rng.randf_range(-2.0, 2.0))
 			if not _tree_blocked(bp):
 				var bs := rng.randf_range(0.6, 1.2)

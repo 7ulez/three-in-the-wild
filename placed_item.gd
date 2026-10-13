@@ -108,7 +108,7 @@ func build(p_name: String, p_weight: float, p_size: Vector3, p_color: Color, sta
 		light.light_energy = 0.0
 		light.omni_range = 14.0
 		light.position = Vector3(0, 0.9, 0)
-		light.shadow_enabled = true
+		light.shadow_enabled = not Game.low
 		add_child(light)
 		smoke = _make_smoke(Color(0.35, 0.35, 0.37, 0.4), 0.7, 2.0)
 		smoke.position = Vector3(0, 0.9, 0)

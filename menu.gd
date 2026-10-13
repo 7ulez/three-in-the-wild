@@ -265,6 +265,12 @@ func _ready() -> void:
 		return
 	if OS.has_feature("web"):
 		Game.touch = bool(JavaScriptBridge.eval("window.matchMedia('(pointer: coarse)').matches || window.location.search.includes('touch')"))
+		Game.low = Game.touch
+		if bool(JavaScriptBridge.eval("window.location.search.includes('low')")):
+			Game.low = true
+		if bool(JavaScriptBridge.eval("window.location.search.includes('high')")):
+			Game.low = false
+	Game.apply_quality(get_window())
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	theme = _make_theme()
@@ -423,6 +429,16 @@ func _ready() -> void:
 	solo_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1))
 	solo_btn.pressed.connect(_on_solo)
 	bottom.add_child(solo_btn)
+	var q_btn := Button.new()
+	q_btn.flat = true
+	q_btn.add_theme_color_override("font_color", TEXT_DIM)
+	q_btn.add_theme_color_override("font_hover_color", Color(1, 1, 1))
+	q_btn.text = "Grafik: Niedrig" if Game.low else "Grafik: Hoch"
+	q_btn.pressed.connect(func() -> void:
+		Game.low = not Game.low
+		Game.apply_quality(get_window())
+		q_btn.text = "Grafik: Niedrig" if Game.low else "Grafik: Hoch")
+	bottom.add_child(q_btn)
 
 	# Nur in der PC-Version: Server-Adresse / Hosten (im Browser kommt die Adresse vom Server)
 	if not OS.has_feature("web"):

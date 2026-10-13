@@ -28,6 +28,19 @@ static var all_done_shown: bool = false
 
 # Tablet/Handy: Bildschirm-Steuerung statt Maus und Tastatur
 static var touch: bool = false
+static var low: bool = false          # leichtere Grafik (Tablets/Handys): keine Schatten, weniger Deko, 720p-Rendering
+
+
+## Schaltet die leichte Grafikstufe ein/aus (Auflösung, Schatten, Glühen).
+static func apply_quality(win: Window) -> void:
+	if low:
+		win.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+		win.content_scale_size = Vector2i(1280, 720)
+		win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	else:
+		win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		win.content_scale_size = Vector2i(1280, 720)
+		win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
 static var touch_reel: bool = false   # "Aktion"-Knopf wird gehalten (Angel einholen)
 
 
