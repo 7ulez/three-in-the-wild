@@ -35,11 +35,16 @@ class TentDoor:
 			player.toast("Du bist noch nicht müde. Es ist erst %s." % Game.clock_text(), 3.0)
 
 
+var lamp: OmniLight3D = null
+
+
 func shake() -> void:
 	_shake_t = 0.4
 
 
 func _process(delta: float) -> void:
+	if lamp != null:
+		lamp.light_energy = lerpf(lamp.light_energy, 0.9 if Game.is_night() else 0.0, minf(delta * 1.5, 1.0))
 	if _shake_t > 0.0 and shell != null:
 		_shake_t -= delta
 		shell.rotation.z = sin(Time.get_ticks_msec() / 25.0) * 0.04
@@ -115,6 +120,12 @@ func _grow(s: float) -> void:
 
 func _on_grown() -> void:
 	door.visible = true
+	lamp = OmniLight3D.new()
+	lamp.light_color = Color(1.0, 0.72, 0.4)
+	lamp.light_energy = 0.0
+	lamp.omni_range = 4.5
+	lamp.position = Vector3(0, 1.0, 0)
+	add_child(lamp)
 	# Vorerst massiv; den Eingang zum Schlafen bauen wir später.
 	var body := StaticBody3D.new()
 	var cs := CollisionShape3D.new()

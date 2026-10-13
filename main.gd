@@ -57,6 +57,10 @@ func _ready() -> void:
 	player.character_name = Game.start_char
 	add_child(player)
 	player.global_position = Vector3(0, 1.0, 10)
+	var amb := Ambient.new()
+	amb.name = "Ambient"
+	add_child(amb)
+	amb.start(self, player)
 	if Game.net_mode != "solo":
 		var net := Net.new()
 		add_child(net)

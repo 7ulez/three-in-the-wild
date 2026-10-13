@@ -185,6 +185,7 @@ func _build_visual() -> void:
 
 ## Baut die Figur (auch für die Avatare der Mitspieler).
 static func build_body(parent: Node3D, char_name: String) -> void:
+	Fx.blob_shadow(parent, 0.5)
 	# Fertiges, animiertes Modell (aus Blender), falls vorhanden.
 	var path := "res://assets/chars/%s.glb" % char_name.to_lower()
 	if ResourceLoader.exists(path):

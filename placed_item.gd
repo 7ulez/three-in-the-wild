@@ -58,6 +58,8 @@ var quality: float = 100.0
 var cook_char: String = ""
 var food: MeshInstance3D = null
 var steam: CPUParticles3D = null
+var fire_sparks: CPUParticles3D = null
+var fire_glow: MeshInstance3D = null
 
 
 func build(p_name: String, p_weight: float, p_size: Vector3, p_color: Color, state: Dictionary = {}) -> void:
@@ -113,6 +115,15 @@ func build(p_name: String, p_weight: float, p_size: Vector3, p_color: Color, sta
 		smoke = _make_smoke(Color(0.35, 0.35, 0.37, 0.4), 0.7, 2.0)
 		smoke.position = Vector3(0, 0.9, 0)
 		add_child(smoke)
+		fire_sparks = Fx.sparks(self, Vector3(0, 0.95, 0))
+		fire_glow = Fx.glow_disc(self, 9.0, Color(1.0, 0.55, 0.18, 1.0), 0.0, 0.035, 2.2)
+		fire_glow.visible = false
+		for si in 8:
+			var sa := TAU * float(si) / 8.0 + float(si % 2) * 0.2
+			var sr := 0.62 + float(si % 3) * 0.04
+			var st := Util.add_sphere(self, 0.16, Color(0.46, 0.45, 0.44).lerp(Color(0.6, 0.57, 0.5), float(si % 4) / 4.0), Vector3(cos(sa) * sr, 0.07, sin(sa) * sr))
+			st.scale = Vector3(1.3, 0.7, 1.0)
+			st.rotation.y = sa
 
 	if p_name == "Dutch Oven":
 		food = Util.add_cylinder(holder, 0.17, 0.03, Color(0.6, 0.18, 0.1), Vector3(0, 0.03, 0))
@@ -586,6 +597,10 @@ func _update_fire_visual() -> void:
 		fl.visible = burning
 	if smoke != null:
 		smoke.emitting = burning
+	if fire_sparks != null:
+		fire_sparks.emitting = burning
+	if fire_glow != null:
+		fire_glow.visible = burning
 	if light != null and item_name == "Feuerschale":
 		light.light_energy = 3.0 if burning else 0.0
 

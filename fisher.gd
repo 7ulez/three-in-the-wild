@@ -34,6 +34,7 @@ var _alarm_cd: float = 0.0
 var _t: float = 0.0
 
 var bobber: MeshInstance3D
+var _ripple_cd: float = 0.0
 var line: MeshInstance3D
 var alarm: AudioStreamPlayer
 var panel: VBoxContainer
@@ -219,7 +220,9 @@ func _left_click() -> void:
 func cast(p: Vector3) -> void:
 	player.fish_cast_t = 0.8
 	Sfx.play("whoosh", player.global_position, -2.0)
-	get_tree().create_timer(0.5).timeout.connect(func() -> void: Sfx.play("splash_small", p))
+	get_tree().create_timer(0.5).timeout.connect(func() -> void:
+		Sfx.play("splash_small", p)
+		Fx.ripple(get_tree().current_scene, p, 0.8))
 	target = p
 	cast_dist = player.head.global_position.distance_to(p)
 	bobber.visible = true
@@ -350,6 +353,10 @@ func _process(delta: float) -> void:
 					reel_in("Nichts gebissen. Nochmal auswerfen.")
 		S.BITE:
 			bite_left -= delta
+			_ripple_cd -= delta
+			if _ripple_cd <= 0.0:
+				_ripple_cd = 0.7
+				Fx.ripple(get_tree().current_scene, bobber.global_position, 0.6)
 			_alarm_cd -= delta
 			if mode == 0:
 				led.light_energy = 3.0 if int(_t * 6.0) % 2 == 0 else 0.0

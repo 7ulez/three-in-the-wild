@@ -135,8 +135,11 @@ func _fish_jump() -> void:
 		fish.rotation.x = cos(t * PI) * 0.8, 0.0, 1.0, 0.8)
 	tw.tween_callback(func() -> void:
 		Sfx.play("splash_small", p, -2.0)
+		Fx.ripple(self, fish.global_position, 1.1)
+		Fx.ripple(self, fish.global_position, 0.7, 0.25)
 		fish.queue_free())
 	Sfx.play("splash_small", p, -4.0)
+	Fx.ripple(self, p, 0.9)
 
 
 class Animal extends Node3D:
