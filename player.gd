@@ -1078,16 +1078,27 @@ func _start_item_placement() -> void:
 		psize = Vector3(1.6, 0.95, 0.5)
 	item_ghost = Node3D.new()
 	get_parent().add_child(item_ghost)
-	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = psize
-	mi.mesh = bm
-	mi.position.y = psize.y / 2.0
 	item_ghost_mat = StandardMaterial3D.new()
 	item_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	item_ghost_mat.albedo_color = Color(0.3, 1.0, 0.3, 0.45)
-	mi.material_override = item_ghost_mat
-	item_ghost.add_child(mi)
+	# Blaupause = das echte aufgestellte Modell, durchsichtig eingefärbt (man erkennt vorne/hinten)
+	var holder := Node3D.new()
+	holder.position.y = psize.y / 2.0
+	item_ghost.add_child(holder)
+	ItemModels.add_placed_visual(holder, held.item_name, psize, held.item_color)
+	for n in holder.find_children("*", "", true, false):
+		if n is MeshInstance3D:
+			(n as MeshInstance3D).material_override = item_ghost_mat
+			(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		elif n is Light3D or n is CPUParticles3D or n is GPUParticles3D:
+			n.queue_free()
+	if holder.get_child_count() == 0:
+		var mi := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = psize
+		mi.mesh = bm
+		mi.material_override = item_ghost_mat
+		holder.add_child(mi)
 	item_ghost.visible = false
 	ghost_valid = false
 

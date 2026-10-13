@@ -10,6 +10,8 @@ const FABRIC: Color = Color(0.95, 0.5, 0.15)
 
 var shell: MeshInstance3D
 var model: Node3D = null
+var ghost_model: Node3D = null
+var ghost_mat: StandardMaterial3D = null
 var door: MeshInstance3D
 var mat_flat: MeshInstance3D
 var pegs_driven: int = 0
@@ -61,6 +63,16 @@ func build_ghost() -> void:
 	shell.mesh = pm
 	shell.position.y = HEIGHT / 2.0
 	add_child(shell)
+	# Vorschau = das fertige Zelt als durchsichtige Blaupause (man sieht vorne/hinten)
+	if ResourceLoader.exists("res://assets/zelt.glb"):
+		ghost_mat = StandardMaterial3D.new()
+		ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		ghost_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		ghost_model = (load("res://assets/zelt.glb") as PackedScene).instantiate() as Node3D
+		add_child(ghost_model)
+		for mi in ghost_model.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).material_override = ghost_mat
+		shell.visible = false
 
 	door = Util.add_box(self, Vector3(0.7, 1.0, 0.04), Color(0.05, 0.05, 0.06), Vector3(0, 0.5, -DEPTH / 2.0 - 0.01))
 	door.visible = false
@@ -74,6 +86,8 @@ func set_ghost_valid(valid: bool) -> void:
 	if v == _last_valid:
 		return
 	_last_valid = v
+	if ghost_mat != null:
+		ghost_mat.albedo_color = Color(0.2, 0.9, 0.3, 0.5) if valid else Color(0.95, 0.2, 0.2, 0.5)
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color(0.2, 0.9, 0.3, 0.5) if valid else Color(0.95, 0.2, 0.2, 0.5)
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -82,6 +96,9 @@ func set_ghost_valid(valid: bool) -> void:
 
 ## Aus der Vorschau wird die ausgelegte Plane mit vier Heringen.
 func begin_site() -> void:
+	if ghost_model != null:
+		ghost_model.queue_free()
+		ghost_model = null
 	shell.material_override = Util.mat(FABRIC)
 	shell.visible = false
 	mat_flat.visible = true
