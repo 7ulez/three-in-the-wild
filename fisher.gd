@@ -215,6 +215,7 @@ func _left_click() -> void:
 
 
 func cast(p: Vector3) -> void:
+	player.fish_cast_t = 0.8
 	Sfx.play("whoosh", player.global_position, -2.0)
 	get_tree().create_timer(0.5).timeout.connect(func() -> void: Sfx.play("splash_small", p))
 	target = p
