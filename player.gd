@@ -621,7 +621,7 @@ func _update_help() -> void:
 			[tinder, sticks, logs, stones, beers_drunk, water_drunk, Game.catches.size(), Game.chili_served], others)
 	if Game.touch:
 		var hl: PackedStringArray = help_label.text.split("\n")
-		help_label.text = hl[0] + "\n" + hl[1] + "\nLinks: Joystick laufen (ganz raus = rennen) · Rechts wischen: umschauen · Mehr: alle weiteren Aktionen"
+		help_label.text = hl[0] + "\n" + hl[1] + "\nLinks: Joystick laufen (ganz raus = rennen) · Rechts wischen: umschauen · BENUTZEN: Tür, Kiste, Feuer ... · Mehr: alles andere"
 
 
 func _unhandled_input(event: InputEvent) -> void:

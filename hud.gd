@@ -258,6 +258,7 @@ func _build_prompt() -> void:
 
 ## Text wie "E: Heckklappe öffnen   G: werfen" -> Taste-Chips und Text. Zweite Zeile (nach \n) = Hinweis.
 func set_prompt(text: String) -> void:
+	text = Game.touchify(text)
 	if text == _prompt_text:
 		return
 	_prompt_text = text
@@ -273,7 +274,7 @@ func set_prompt(text: String) -> void:
 		if s == "":
 			continue
 		var ci := s.find(": ")
-		if ci > 0 and ci <= 8 and s.substr(0, ci) == s.substr(0, ci).to_upper():
+		if ci > 0 and ci <= (12 if _touch else 8) and s.substr(0, ci) == s.substr(0, ci).to_upper():
 			_prompt_row.add_child(key_chip(s.substr(0, ci)))
 			_prompt_row.add_child(_lbl(s.substr(ci + 2), 17, UI.PAPER, UI.f_label))
 		else:
@@ -302,6 +303,7 @@ func _build_toast() -> void:
 
 
 func toast(text: String, seconds: float = 4.0) -> void:
+	text = Game.touchify(text)
 	if _toast_tween != null and _toast_tween.is_valid():
 		_toast_tween.kill()
 	var alarm := text.begins_with("ALLE") or text.contains("RUMMS") or text.contains("Zu spät") or text.contains("PLATSCH") or text.contains("Achtung") or text.contains("!!")

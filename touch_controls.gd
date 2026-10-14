@@ -11,9 +11,9 @@ const JOY_RADIUS: float = 95.0
 
 # id, Beschriftung, Art ("key", "hold", "lmb", "rmb", "wheel", "more", "full"), Taste
 var main_buttons: Array = [
-	{"id": "act", "label": "Aktion", "kind": "lmb", "r": 62.0},
+	{"id": "act", "label": "Aktion", "kind": "lmb", "r": 68.0},
 	{"id": "jump", "label": "Springen", "kind": "hold", "key": KEY_SPACE, "r": 48.0},
-	{"id": "use", "label": "Benutzen", "kind": "key", "key": KEY_E, "r": 52.0},
+	{"id": "use", "label": "Benutzen", "kind": "key", "key": KEY_E, "r": 60.0},
 	{"id": "reel", "label": "Einholen", "kind": "rmb", "r": 40.0},
 	{"id": "duck", "label": "Ducken", "kind": "hold", "key": KEY_C, "r": 40.0},
 	{"id": "throw", "label": "Werfen", "kind": "key", "key": KEY_G, "r": 40.0},
@@ -46,6 +46,8 @@ var look_fingers: Dictionary = {}     # finger -> letzte Position
 var held: Dictionary = {}             # finger -> Knopf (Dictionary)
 var keys_down: Dictionary = {}        # keycode -> true
 var font: Font
+var _sig: String = ""
+var _player: Player = null
 
 
 func _ready() -> void:
@@ -58,6 +60,55 @@ func _ready() -> void:
 	add_child(pad)
 	get_viewport().size_changed.connect(_layout)
 	_layout()
+
+
+## Passt Beschriftung und Sichtbarkeit der Knöpfe an die Lage an (Angel in der Hand, Minispiel ...).
+func _process(_delta: float) -> void:
+	if _player == null or not is_instance_valid(_player):
+		_player = get_tree().get_first_node_in_group("local_player") as Player
+		if _player == null:
+			return
+	var rod := _player.held != null and _player.held.item_name == "Angelrute"
+	var fst: int = _player.fisher.state if _player.fisher != null else 0
+	var act := "Aktion"
+	var reel_vis := false
+	if rod:
+		match fst:
+			Fisher.S.IDLE:
+				act = "Auswerfen"
+			Fisher.S.WAITING:
+				act = "Warten"
+				reel_vis = true
+			Fisher.S.BITE:
+				act = "ANSCHLAG!"
+				reel_vis = true
+			Fisher.S.RETRIEVE:
+				act = "Kurbeln"
+				reel_vis = true
+			Fisher.S.FIGHT:
+				act = "KURBELN"
+	var use := "Benutzen"
+	if _player.fire_bowl != null:
+		use = "Funken!"
+	elif _player.stir_oven != null:
+		use = "Rühren!"
+	var throw_vis := _player.held != null
+	var sig := "%s|%s|%s|%s" % [act, use, reel_vis, throw_vis]
+	if sig == _sig:
+		return
+	_sig = sig
+	for b in main_buttons:
+		match b["id"]:
+			"act":
+				b["dyn"] = act
+			"use":
+				b["dyn"] = use
+			"reel":
+				b["hidden"] = not reel_vis
+				b["dyn"] = "Schnur ein"
+			"throw":
+				b["hidden"] = not throw_vis
+	pad.queue_redraw()
 
 
 func _size() -> Vector2:
@@ -131,6 +182,8 @@ func _touch_down(f: int, p: Vector2) -> void:
 				pad.queue_redraw()
 				return
 	for b in main_buttons:
+		if b.get("hidden", false):
+			continue
 		if p.distance_to(b["pos"]) <= float(b["r2"]) + 12.0:
 			held[f] = b
 			_press(b, true)
@@ -279,11 +332,13 @@ func _draw_pad() -> void:
 	pad.draw_circle(c + joy_vec * JOY_RADIUS, 42.0, Color(1, 1, 1, 0.45 if joy_finger != -1 else 0.3))
 	# Hauptknöpfe
 	for b in main_buttons:
+		if b.get("hidden", false):
+			continue
 		var on: bool = _is_held(b) or (b["kind"] == "more" and more_open)
 		var r: float = b["r2"]
 		pad.draw_circle(b["pos"], r, Color(1, 1, 1, 0.42) if on else Color(0, 0, 0, 0.32))
 		pad.draw_arc(b["pos"], r, 0, TAU, 40, Color(1, 1, 1, 0.55), 2.5)
-		_label(b["pos"], b["label"], 17 if r > 45.0 else 15, r * 2.2)
+		_label(b["pos"], b.get("dyn", b["label"]), 17 if r > 45.0 else 15, r * 2.4)
 	# Mehr-Feld
 	if more_open:
 		for b in more_buttons:

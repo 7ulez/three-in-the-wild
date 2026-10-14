@@ -91,7 +91,8 @@ func _draw() -> void:
 
 # ---------- Bausteine ----------
 
-func _text(pos: Vector2, s: String, fs: int, col: Color, align: int = HORIZONTAL_ALIGNMENT_CENTER, _width: float = -1.0) -> void:
+func _text(pos: Vector2, text: String, fs: int, col: Color, align: int = HORIZONTAL_ALIGNMENT_CENTER, _width: float = -1.0) -> void:
+	var s := Game.touchify(text)
 	var f: Font = UI.f_head
 	var w := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var p := pos
@@ -109,12 +110,17 @@ func _panel(r: Rect2, bg: Color = Color(0.08, 0.1, 0.09, 0.82)) -> void:
 	draw_rect(r, UI.INK, false, 2.0)
 
 
-func _keycap(center: Vector2, s: String, lit: bool) -> void:
-	var r := Rect2(center - Vector2(18, 18), Vector2(36, 36))
+func _keycap(center: Vector2, key: String, lit: bool) -> void:
+	var s := key
+	var wd := 36.0
+	if Game.touch:
+		s = {"E": "BENUTZEN", "A": "<", "D": ">"}.get(key, key)
+		wd = 118.0 if s.length() > 2 else 36.0
+	var r := Rect2(center - Vector2(wd / 2.0, 18), Vector2(wd, 36))
 	draw_rect(Rect2(r.position + Vector2(2, 3), r.size), Color(0, 0, 0, 0.5))
 	draw_rect(r, UI.FIRE if lit else UI.PAPER)
 	draw_rect(r, UI.INK, false, 2.0)
-	draw_string(UI.f_head, center + Vector2(-18, 8), s, HORIZONTAL_ALIGNMENT_CENTER, 36, 22, UI.INK)
+	draw_string(UI.f_head, center + Vector2(-wd / 2.0, 8), s, HORIZONTAL_ALIGNMENT_CENTER, wd, 20 if wd > 40.0 else 22, UI.INK)
 
 
 func _draw_card() -> void:

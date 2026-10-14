@@ -153,3 +153,26 @@ static func goals() -> Array:
 		["Schatz in der Höhle finden", treasure_found],
 		["Verstecke rund um den See finden (%d/5)" % Stash.found(), Stash.found() >= 5],
 	]
+
+
+static var _touch_re: RegEx = null
+
+## Tablet/Handy: Tastennamen in Texten durch die Namen der Bildschirm-Knöpfe ersetzen.
+static func touchify(text: String) -> String:
+	if not touch or text == "":
+		return text
+	var t := text
+	for pair in [["Linksklick", "AKTION-Knopf"], ["Rechtsklick", "SCHNUR-EIN-Knopf"], ["Maustaste", "AKTION-Knopf"], ["Mausklick", "AKTION-Knopf"],
+			["Klick,", "AKTION,"], ["KLICK", "AKTION"], ["A / D: gegenhalten", "Gegenhalten klappt automatisch"], ["A / D", "automatisch"],
+			["Esc", "Menü"]]:
+		t = t.replace(pair[0], pair[1])
+	if _touch_re == null:
+		_touch_re = RegEx.create_from_string("(?<![A-Za-zÄÖÜäöü0-9])([EXRZFGTQHLCV])(?![A-Za-zÄÖÜäöü0-9])")
+	var names := {"E": "BENUTZEN", "X": "ABBAUEN", "R": "AUFSTELLEN", "Z": "ZUTAT", "F": "TRINKEN", "G": "WERFEN", "T": "ANGELART", "Q": "VAPE", "H": "GESCHÄFT", "L": "LAMPE", "C": "DUCKEN", "V": "ANSICHT"}
+	var out := ""
+	var last := 0
+	for m in _touch_re.search_all(t):
+		out += t.substr(last, m.get_start() - last) + names[m.get_string(1)]
+		last = m.get_end()
+	out += t.substr(last)
+	return out

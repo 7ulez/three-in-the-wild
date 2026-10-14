@@ -657,4 +657,4 @@ func _update_hud() -> void:
 			hud.d = {"tension": tension, "stamina": stamina, "dist01": clampf((distance - 1.5) / maxf(cast_dist + 8.5, 1.0), 0.0, 1.0),
 				"dist": distance, "pull": pull if running else 0, "jump": jump_t, "reeling": _reeling(),
 				"counter": _counter_axis(), "name": fish_name, "kg": fish_kg}
-	status.text = t
+	status.text = Game.touchify(t)
