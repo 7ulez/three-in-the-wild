@@ -496,8 +496,12 @@ func _fight(delta: float) -> void:
 	if reeling:
 		_reel_cd -= delta
 		if _reel_cd <= 0.0:
-			_reel_cd = 0.2
-			Sfx.play("reel", player.global_position, -10.0, 0.9 + tension * 0.5)
+			if Sfx.has_file("reel"):
+				_reel_cd = 1.7      # echte Aufnahme dauert ~2 s
+				Sfx.play("reel", player.global_position, -6.0)
+			else:
+				_reel_cd = 0.2
+				Sfx.play("reel", player.global_position, -10.0, 0.9 + tension * 0.5)
 	stamina = clampf(stamina, 0.0, 1.0)
 	tension = clampf(tension, 0.0, 1.05)
 	if tension > 0.85:
@@ -528,7 +532,7 @@ func _start_leap() -> void:
 	get_tree().current_scene.add_child(_leap)
 	ItemModels.add_visual(_leap, "%s %.1f kg" % [fish_name, fish_kg], Vector3(cm, cm * 0.28, cm * 0.2), d["color"])
 	_leap.global_position = bobber.global_position
-	Sfx.play("splash", bobber.global_position)
+	Sfx.play("fish_jump", bobber.global_position)
 	Fx.splash(get_tree().current_scene, Vector3(bobber.global_position.x, 0.05, bobber.global_position.z), 1.2)
 	player.shake = 3.0
 	hud.flash(Color(1.0, 0.9, 0.2, 0.6))
@@ -553,7 +557,7 @@ func _end_leap(splash: bool = false) -> void:
 		return
 	if splash:
 		var p := _leap.global_position
-		Sfx.play("splash", p)
+		Sfx.play("splash", p, -3.0)
 		Fx.splash(get_tree().current_scene, Vector3(p.x, 0.05, p.z), 1.0)
 	_leap.queue_free()
 	_leap = null

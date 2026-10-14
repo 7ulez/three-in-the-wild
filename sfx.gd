@@ -1,6 +1,7 @@
 class_name Sfx
 extends Node
-## Alle Geräusche werden beim Spielstart per Code erzeugt (keine Audiodateien nötig).
+## Geräusche: Liegt unter res://assets/sounds/ eine Datei <name>_1.ogg, <name>_2.ogg ... (oder <name>.ogg),
+## wird sie (zufällige Variante) benutzt. Sonst wird das Geräusch wie früher per Code erzeugt.
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
@@ -10,16 +11,24 @@ var _warm: Array = []
 var _warm_t: float = 2.0
 static var inst: Sfx = null
 static var cache: Dictionary = {}
+static var _files: Dictionary = {}     # Name -> Array von AudioStream (leer = keine Dateien)
 var _amb_wind: AudioStreamPlayer
 var _amb_birds_t: float = 4.0
 var _amb_night_t: float = 3.0
-var _amb_water: AudioStreamPlayer3D
+var _amb_water: AudioStreamPlayer
+var _water_near: float = 0.0
 var _player: Node3D = null
 var enabled: bool = true
 
 
 func _ready() -> void:
 	inst = self
+	if has_file("water"):
+		_amb_water = AudioStreamPlayer.new()
+		_amb_water.stream = get_stream("water")
+		_amb_water.volume_db = -60.0
+		add_child(_amb_water)
+		_amb_water.play()
 	_amb_wind = AudioStreamPlayer.new()
 	_amb_wind.stream = get_stream("wind")
 	_amb_wind.volume_db = -22.0
@@ -61,6 +70,20 @@ func _process(delta: float) -> void:
 			if randf() < 0.12:
 				play("owl", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * 30.0 + Vector3(0, 5, 0), -6.0)
 	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -22.0 if not night else -27.0, 0.02)
+	if _amb_water != null:
+		# Wellenplätschern: nur in Ufernähe, mit weichem Ein-/Ausblenden
+		var lake: Variant = get_tree().current_scene.get("lake_root") if get_tree().current_scene != null else null
+		var near := 0.0
+		if lake is Node3D:
+			var lp: Vector3 = _player.global_position - (lake as Node3D).global_position
+			for k in range(9):
+				var a3 := TAU * float(k) / 8.0
+				var off := Vector2.ZERO if k == 8 else Vector2(cos(a3), sin(a3)) * 7.0
+				if LakeShape.contains(Vector2(lp.x, lp.z) + off):
+					near += 1.0
+			near = clampf(near / 4.0, 0.0, 1.0)
+		_water_near = lerpf(_water_near, near, minf(delta * 1.5, 1.0))
+		_amb_water.volume_db = lerpf(-60.0, -13.0, _water_near)
 
 
 static func play(sound: String, pos: Vector3 = Vector3.INF, vol_db: float = 0.0, pitch: float = 1.0) -> void:
@@ -69,7 +92,7 @@ static func play(sound: String, pos: Vector3 = Vector3.INF, vol_db: float = 0.0,
 	var st := get_stream(sound)
 	if st == null:
 		return
-	if VARIANTS.has(sound):
+	if VARIANTS.has(sound) or has_file(sound):
 		pitch *= randf_range(0.96, 1.04)
 	if pos == Vector3.INF:
 		var p := AudioStreamPlayer.new()
@@ -105,7 +128,33 @@ static func loop_at(parent: Node, sound: String, vol_db: float = -6.0, unit: flo
 	return p3
 
 
-static func get_stream(sound: String) -> AudioStreamWAV:
+## Gibt es echte Aufnahmen für dieses Geräusch?
+static func has_file(sound: String) -> bool:
+	return not _file_streams(sound).is_empty()
+
+
+static func _file_streams(sound: String) -> Array:
+	if _files.has(sound):
+		return _files[sound]
+	var list: Array = []
+	var base := "res://assets/sounds/%s" % sound
+	if ResourceLoader.exists(base + ".ogg"):
+		list.append(load(base + ".ogg"))
+	for i in range(1, 9):
+		var path := "%s_%d.ogg" % [base, i]
+		if ResourceLoader.exists(path):
+			list.append(load(path))
+	if sound == "water":
+		for st in list:
+			(st as AudioStreamOggVorbis).loop = true
+	_files[sound] = list
+	return list
+
+
+static func get_stream(sound: String) -> AudioStream:
+	var fl := _file_streams(sound)
+	if not fl.is_empty():
+		return fl[randi() % fl.size()]
 	var n: int = int(VARIANTS.get(sound, 1))
 	return _variant(sound, randi() % n)
 
@@ -115,7 +164,7 @@ static func _variant(sound: String, v: int) -> AudioStreamWAV:
 	if cache.has(key):
 		return cache[key]
 	SR = 16000.0 if LOWRATE.has(sound) else 32000.0
-	var s := _generate(sound, v)
+	var s := _generate("splash" if sound == "fish_jump" else sound, v)
 	if s != null:
 		cache[key] = s
 	return s
