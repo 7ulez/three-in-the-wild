@@ -5,7 +5,7 @@ extends Node
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
-const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2}
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2, "reload": 1}
 const LOWRATE: Array = ["wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit"]
 var _warm: Array = []
 var _warm_t: float = 2.0
@@ -349,6 +349,15 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			thud = _add(thud, _sine(0.12, randf_range(95.0, 130.0), 55.0, 34.0, 0.5, 0.003))
 			var leaf := _env(_nf(_white(0.25), 1, randf_range(1800.0, 2800.0), 1.5), 0.012, 16.0, 0.7)
 			return _wav(_add(thud, leaf, randf_range(0.01, 0.035)), 0.6)
+		"reload":
+			# Nachladen: Magazin raus (Klick), Patronen (Ticks), Verschluss (Klack)
+			var s := _env(_nf(_white(0.05), 1, 3500.0, 1.2), 0.0005, 90.0, 0.8)
+			s = _add(s, _env(_nf(_white(0.04), 0, 700.0, 1.0), 0.0005, 110.0, 0.6), 0.0)
+			for k in range(5):
+				s = _add(s, _env(_nf(_white(0.02), 1, randf_range(2500.0, 3500.0), 1.5), 0.0003, 200.0, 0.5), 0.45 + k * 0.1)
+			s = _add(s, _env(_nf(_white(0.07), 1, 2200.0, 1.0), 0.0005, 70.0, 0.9), 1.15)
+			s = _add(s, _env(_nf(_white(0.08), 0, 500.0, 0.9), 0.0008, 60.0, 0.9), 1.15)
+			return _wav(s, 0.8)
 		"airgun":
 			# Luftgewehr: scharfes Pfff, kurzer Knack und metallisches Nachklingen
 			var s := _env(_nf(_white(0.18), 1, randf_range(3500.0, 5000.0), 0.9), 0.0008, 32.0, 1.0)

@@ -59,6 +59,14 @@ var trip_t: float = 0.0              # Restdauer der Joint-Wirkung (Sekunden)
 var trip_i: float = 0.0              # aktuelle Stärke 0..1 (blendet weich ein und aus)
 var _trip_fx: TripFx = null
 var _gun_cd: float = 0.0
+const GUN_MAG: int = 5               # Patronen im Magazin des Luftgewehrs
+const GUN_RELOAD: float = 1.7        # Nachladedauer in Sekunden
+const GUN_SIGHT_Z: float = 0.097     # Höhe der Visierlinie (Kimme/Korn) über dem Modellmittelpunkt
+var crosshair: Label = null
+var aiming: bool = false             # Rechtsklick: über Kimme und Korn zielen
+var _aim_f: float = 0.0              # 0 = Hüfte, 1 = Visier
+var _reload_t: float = 0.0
+var _gun_kick: float = 0.0
 const USE_VM_HAMMER: bool = false     # false = alter Hammer: schwebt vor dir, keine Hand- und Schlag-Animation
 var vm_hand: Node3D = null         # Hand mit Werkzeug in der Ego-Ansicht
 var _vm_swing: float = 0.0
@@ -522,11 +530,11 @@ func _build_hud() -> void:
 	for old in [help_label, clock_label, prompt_label, toast_label, goals_label]:
 		old.visible = false
 
-	var cross := _make_label(layer, 28)
-	cross.text = "+"
-	cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	cross.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cross.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	crosshair = _make_label(layer, 28)
+	crosshair.text = "+"
+	crosshair.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	crosshair.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	crosshair.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 
 func _make_label(parent: Node, font_size: int) -> Label:
@@ -634,8 +642,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseMotion and Game.is_captured():
 		var mm := event as InputEventMouseMotion
-		rotate_y(-mm.screen_relative.x * MOUSE_SENS)
-		pitch = clampf(pitch - mm.screen_relative.y * MOUSE_SENS, -1.45, 1.45)
+		var sens := MOUSE_SENS * (1.0 - 0.45 * _aim_f)
+		rotate_y(-mm.screen_relative.x * sens)
+		pitch = clampf(pitch - mm.screen_relative.y * sens, -1.45, 1.45)
 		head.rotation.x = pitch
 	elif event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
@@ -680,7 +689,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				if zc != null and zc.has_method("cycle_selection"):
 					zc.cycle_selection()
 			KEY_R:
-				if placing:
+				if held != null and held.item_name == "Luftgewehr" and not placing:
+					_reload()
+				elif placing:
 					_cancel_placement()
 				else:
 					_start_placement()
@@ -694,6 +705,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	_gun_cd = maxf(_gun_cd - delta, 0.0)
+	_reload_t = maxf(_reload_t - delta, 0.0)
+	_gun_kick = lerpf(_gun_kick, 0.0, minf(delta * 9.0, 1.0))
+	var gun_ready := held != null and held.item_name == "Luftgewehr" and not placing and not sleeping
+	aiming = gun_ready and Game.is_captured() and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and _reload_t <= 0.0
+	_aim_f = move_toward(_aim_f, 1.0 if aiming else 0.0, delta * 7.0)
+	if crosshair != null:
+		crosshair.visible = _aim_f < 0.3
 	_update_trip(delta)
 	vape_t = maxf(vape_t - delta, 0.0)
 	drink_t = maxf(drink_t - delta, 0.0)
@@ -780,6 +798,7 @@ func _physics_process(delta: float) -> void:
 		speed *= 0.5
 	speed *= 1.0 - 0.45 * water_d
 	speed *= 1.0 - 0.25 * minf(drunk, 1.0)
+	speed *= 1.0 - 0.4 * _aim_f
 	var target := dir * speed
 	if vomit_t > 0.0:
 		target = Vector3.ZERO
@@ -837,7 +856,7 @@ func _process(delta: float) -> void:
 	elif camera.h_offset != 0.0:
 		camera.h_offset = 0.0
 		camera.v_offset = 0.0
-	camera.fov = 75.0 + sin(t * 0.5) * 8.0 * drunk + sin(t * 1.3) * 4.0 * trip_i
+	camera.fov = 75.0 + sin(t * 0.5) * 8.0 * drunk + sin(t * 1.3) * 4.0 * trip_i - 15.0 * _aim_f
 	blur_rect.visible = drunk > 0.05
 	if blur_rect.visible:
 		blur_mat.set_shader_parameter("amount", minf(drunk * 0.8, 1.0))
@@ -1056,12 +1075,21 @@ func _update_trip(delta: float) -> void:
 
 ## Luftgewehr: trifft Tiere (sie fallen um) und Mitspieler (verletzt sie).
 func _shoot() -> void:
-	if _gun_cd > 0.0 or placing or held == null:
+	if _gun_cd > 0.0 or placing or held == null or _reload_t > 0.0:
 		return
+	var ammo := int(held.extra.get("ammo", GUN_MAG))
+	if ammo <= 0:
+		_gun_cd = 0.35
+		Sfx.play("click", global_position, -2.0, 0.8)
+		toast("Magazin leer - R: nachladen", 1.5)
+		return
+	held.extra["ammo"] = ammo - 1
 	_gun_cd = 0.6
+	_gun_kick = 1.0
+	var spr := lerpf(0.012, 0.0015, _aim_f)
 	var cb := camera.global_transform.basis
 	var origin := camera.global_position
-	var dir := (-cb.z + cb.x * randf_range(-0.004, 0.004) + cb.y * randf_range(-0.004, 0.004)).normalized()
+	var dir := (-cb.z + cb.x * randf_range(-spr, spr) + cb.y * randf_range(-spr, spr)).normalized()
 	var space := get_world_3d().direct_space_state
 	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * 120.0)
 	q.exclude = [get_rid(), held.get_rid()]
@@ -1117,6 +1145,24 @@ func _shoot() -> void:
 		Sfx.play("thunk", Vector3.INF, -4.0, 1.6)
 
 
+func _reload() -> void:
+	if held == null or held.item_name != "Luftgewehr" or _reload_t > 0.0:
+		return
+	if int(held.extra.get("ammo", GUN_MAG)) >= GUN_MAG:
+		toast("Magazin ist voll (%d/%d)" % [GUN_MAG, GUN_MAG], 1.5)
+		return
+	_reload_t = GUN_RELOAD
+	_gun_cd = maxf(_gun_cd, GUN_RELOAD)
+	Sfx.play("reload", global_position, -2.0)
+	toast("Nachladen...", GUN_RELOAD)
+	var weak: WeakRef = weakref(held)
+	get_tree().create_timer(GUN_RELOAD).timeout.connect(func() -> void:
+		var o: Object = weak.get_ref()
+		if o != null and held == o:
+			(o as Item).extra["ammo"] = GUN_MAG
+			toast("Geladen: %d/%d" % [GUN_MAG, GUN_MAG], 1.5))
+
+
 func _update_held() -> void:
 	if held == null:
 		return
@@ -1138,10 +1184,18 @@ func _update_held() -> void:
 	elif held.item_name == "Luftgewehr":
 		# Gewehr liegt rechts unten im Bild und zeigt immer dorthin, wohin man schaut
 		var hb := head.global_transform.basis
-		var gt := head.global_position + (-hb.z) * 0.85 + hb.x * 0.3 - hb.y * 0.28
+		var hip := head.global_position + (-hb.z) * 0.85 + hb.x * 0.3 - hb.y * 0.28
+		var ads := head.global_position + (-hb.z) * 0.52 - hb.y * GUN_SIGHT_Z
+		var gt := hip.lerp(ads, _aim_f)
+		gt += hb.z * 0.05 * _gun_kick
+		var gb := hb.rotated(hb.x, 0.05 * _gun_kick)
+		if _reload_t > 0.0:
+			var rp := sin((1.0 - _reload_t / GUN_RELOAD) * PI)
+			gt += -hb.y * 0.22 * rp - hb.x * 0.08 * rp
+			gb = gb.rotated(hb.z, 0.5 * rp)
 		held.linear_velocity = ((gt - held.global_position) * 20.0).limit_length(20.0)
 		held.angular_velocity = Vector3.ZERO
-		held.global_transform.basis = hb
+		held.global_transform.basis = gb
 
 
 ## Das Objekt, auf das man zielt, wenn es nah genug ist (sonst null).
@@ -1176,7 +1230,7 @@ func _update_prompt() -> void:
 			if held.item_name == "Zeltpaket":
 				text += "   R: Zelt aufstellen"
 			elif held.item_name == "Luftgewehr":
-				text += "   LINKSKLICK: schießen"
+				text += "   LINKS: schießen  RECHTS: zielen  R: nachladen [%d/%d]" % [int(held.extra.get("ammo", GUN_MAG)), GUN_MAG]
 			elif held.item_name == "Joint":
 				text += "   F: rauchen (%d Züge)" % int(held.extra.get("puffs", 4))
 			elif held.item_name != "Hammer":
