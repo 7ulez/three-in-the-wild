@@ -21,7 +21,10 @@ func _process(_delta: float) -> void:
 	if Vector2(pl.global_position.x - global_position.x, pl.global_position.z - global_position.z).length() < 0.4 and pl.global_position.y < global_position.y + 0.6:
 		stepped = true
 		scale = Vector3(1.5, 0.35, 1.5) if variant == 0 else Vector3(1.25, 0.6, 1.25)
-		Sfx.play("plop", global_position, 2.0, 1.3)
+		if Sfx.has_file("squelch"):
+			Sfx.play("squelch", global_position, 0.0, randf_range(0.95, 1.05))
+		else:
+			Sfx.play("plop", global_position, 2.0, 1.3)
 		pl.step_in_poop()
 
 
