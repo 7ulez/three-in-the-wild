@@ -366,6 +366,36 @@ func remote_poop(pos: Vector3, variant: int = 0) -> void:
 	Sfx.play("plop", pos)
 
 
+## Luftgewehr: Schuss für alle sichtbar und hörbar machen
+func send_shot(from: Vector3, to: Vector3) -> void:
+	rpc("remote_shot", from, to)
+
+
+@rpc("any_peer", "unreliable")
+func remote_shot(from: Vector3, to: Vector3) -> void:
+	if main == null or main.player == null:
+		return
+	Sfx.play("airgun", from, 0.0)
+	Fx.tracer(main, from, to)
+
+
+## Treffer auf einen Mitspieler: nur dessen Spiel zieht die Gesundheit ab
+func send_hit(victim: String, dmg: float, shooter: String) -> void:
+	rpc("remote_hit", victim, dmg, shooter)
+
+
+@rpc("any_peer", "reliable")
+func remote_hit(victim: String, dmg: float, shooter: String) -> void:
+	if main == null or main.player == null:
+		return
+	if victim != Game.player_name:
+		return
+	var pl: Player = main.player
+	if pl.needs != null:
+		pl.shake = 2.0
+		pl.needs.damage(dmg, "%s hat dich mit dem Luftgewehr getroffen." % shooter)
+
+
 func send_removed(pos: Vector3, item_name: String) -> void:
 	rpc("remote_removed", pos, item_name)
 

@@ -95,6 +95,7 @@ func _add(kind: String, pos: Vector3) -> void:
 	add_child(a)
 	a.setup(self, kind)
 	a.global_position = pos
+	a.home = pos
 	animals.append(a)
 
 
@@ -160,6 +161,63 @@ class Animal extends Node3D:
 	var _snd_cd: float = 0.0
 	var ap: AnimationPlayer = null
 	var _cur: String = ""
+	var dead: bool = false
+	var home: Vector3 = Vector3.ZERO
+
+	## Trefferzone (Mittelpunkt über dem Boden und Radius) für das Luftgewehr
+	func hit_center_y() -> float:
+		match kind:
+			"deer": return 0.95
+			"hare": return 0.22
+			"duck": return 0.18
+			"frog": return 0.06
+		return 0.0
+
+	func hit_radius() -> float:
+		match kind:
+			"deer": return 0.65
+			"hare": return 0.3
+			"duck": return 0.3
+			"frog": return 0.18
+		return 0.3
+
+	func display_name() -> String:
+		match kind:
+			"deer": return "Reh"
+			"hare": return "Hase"
+			"duck": return "Ente"
+			"frog": return "Frosch"
+		return "Vogel"
+
+	## Abgeschossen: kippt um, bleibt kurz liegen und kommt später als neues Tier wieder.
+	func die() -> void:
+		if dead:
+			return
+		dead = true
+		if ap != null:
+			ap.stop()
+		fauna.animals.erase(self)
+		visible = true
+		var tw := create_tween()
+		if kind == "bird":
+			tw.tween_property(self, "global_position:y", 0.1, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tw.parallel().tween_property(self, "rotation:z", 2.6, 0.9)
+		else:
+			tw.tween_property(body, "rotation:z", deg_to_rad(88.0) * (1.0 if randf() < 0.5 else -1.0), 0.35).set_trans(Tween.TRANS_QUAD)
+		match kind:
+			"duck": Sfx.play("quack", global_position, 0.0, 0.7)
+			"frog": Sfx.play("croak", global_position, -2.0, 1.4)
+			_: Sfx.play("thunk", global_position, 0.0, 0.8)
+		var f := fauna
+		var k := kind
+		var spawn := home if home != Vector3.ZERO else global_position
+		get_tree().create_timer(25.0).timeout.connect(func() -> void:
+			if is_instance_valid(self):
+				queue_free()
+			if is_instance_valid(f):
+				f.get_tree().create_timer(20.0).timeout.connect(func() -> void:
+					if is_instance_valid(f):
+						f._add(k, spawn)))
 
 	func setup(f: Fauna, k: String) -> void:
 		fauna = f
@@ -314,6 +372,8 @@ class Animal extends Node3D:
 		return false
 
 	func _process(delta: float) -> void:
+		if dead:
+			return
 		_t += delta
 		_snd_cd -= delta
 		var night := Game.is_night()

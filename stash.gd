@@ -2,7 +2,9 @@ class_name Stash
 extends StaticBody3D
 ## Ein Versteck mit Beute (Kiste, Baumhöhle, ...). Jedes Versteck zählt für das Ziel "Verstecke finden".
 
-const LOOT: Array = ["Notration", "Verbandskasten", "Goldköder", "Alte Karte", "Bier-Vorrat"]
+## Inhalt der 5 Verstecke (Reihenfolge = Reihenfolge, in der sie gebaut werden).
+## Die letzten zwei sind Platzhalter, bis die neuen Gegenstände feststehen.
+const LOOT: Array = ["Bierkiste", "Joint", "Luftgewehr", "Notration", "Verbandskasten"]
 static var count: int = 0
 static var all: Array = []
 
@@ -66,6 +68,15 @@ func interact(player: Node) -> void:
 	var kind: String = LOOT[index % LOOT.size()]
 	var msg := ""
 	match kind:
+		"Bierkiste":
+			_spawn_item(player, "Bierkasten", 14.0, Vector3(0.5, 0.3, 0.35), Color(0.9, 0.75, 0.2))
+			msg = "Eine volle Kiste Bier! Nimm sie mit (E)."
+		"Joint":
+			_spawn_item(player, "Joint", 0.05, Vector3(0.12, 0.02, 0.02), Color(0.92, 0.9, 0.8))
+			msg = "Ein selbstgedrehter Joint. Aufheben (E), dann F zum Rauchen."
+		"Luftgewehr":
+			_spawn_item(player, "Luftgewehr", 2.5, Vector3(0.12, 0.16, 0.95), Color(0.3, 0.3, 0.33))
+			msg = "Ein Luftgewehr! Aufheben (E), mit Linksklick schießen."
 		"Notration":
 			if n != null:
 				n.eat(0.5)
@@ -85,6 +96,14 @@ func interact(player: Node) -> void:
 				n.drank_beer()
 			msg = "Zwei vergessene Dosen Bier. Eine trinkst du sofort. Prost!"
 	player.toast("%s: %s  (Verstecke %d/%d)" % [label, msg, found_n + 1 if found_n < all.size() else found_n, all.size()], 7.0)
+
+
+## Der Inhalt liegt als echter Gegenstand auf der Kiste und fällt von dort herunter.
+func _spawn_item(player: Node, item_name: String, weight: float, size: Vector3, color: Color) -> void:
+	var it := Item.new().setup(item_name, weight, size, color)
+	player.get_parent().add_child(it)
+	it.global_position = global_position + Vector3(0, 0.75, 0.45).rotated(Vector3.UP, global_rotation.y)
+	it.linear_velocity = Vector3(0, 1.5, 0)
 
 
 func _hint(player: Node) -> String:

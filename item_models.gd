@@ -36,6 +36,10 @@ static func add_visual(parent: Node3D, kind: String, size: Vector3, color: Color
 			return _beer_crate(parent, size, color)
 		"Hammer":
 			return _hammer(parent)
+		"Joint":
+			return _joint(parent)
+		"Luftgewehr":
+			return _airgun(parent)
 		"Kühlbox":
 			return _cooler(parent, size, color)
 		"Gasgrill":
@@ -154,6 +158,27 @@ static func _hammer(parent: Node3D) -> Dictionary:
 		return {}
 	Util.add_box(parent, Vector3(0.3, 0.035, 0.035), Color(0.5, 0.33, 0.17), Vector3(-0.05, 0, 0))
 	Util.add_box(parent, Vector3(0.1, 0.09, 0.07), Color(0.4, 0.4, 0.43), Vector3(0.13, 0, 0))
+	return {}
+
+
+## Joint: weißes Papier, glimmende Spitze, Filter
+static func _joint(parent: Node3D) -> Dictionary:
+	var paper := Util.add_cylinder(parent, 0.011, 0.11, Color(0.93, 0.91, 0.82), Vector3.ZERO)
+	paper.rotation_degrees.z = 90.0
+	var tip := Util.add_cylinder(parent, 0.013, 0.012, Color(0.9, 0.35, 0.1), Vector3(0.056, 0, 0))
+	tip.rotation_degrees.z = 90.0
+	var filt := Util.add_cylinder(parent, 0.009, 0.025, Color(0.7, 0.55, 0.35), Vector3(-0.06, 0, 0))
+	filt.rotation_degrees.z = 90.0
+	return {}
+
+
+## Luftgewehr: Lauf zeigt nach -Z (vorne), Schaft aus Holz hinten
+static func _airgun(parent: Node3D) -> Dictionary:
+	Util.add_box(parent, Vector3(0.03, 0.03, 0.55), Color(0.2, 0.2, 0.22), Vector3(0, 0.04, -0.2))       # Lauf
+	Util.add_box(parent, Vector3(0.05, 0.07, 0.3), Color(0.25, 0.25, 0.28), Vector3(0, 0.0, 0.05))      # Gehäuse
+	Util.add_box(parent, Vector3(0.05, 0.1, 0.34), Color(0.5, 0.32, 0.16), Vector3(0, -0.03, 0.33)).rotation_degrees.x = -6.0   # Schaft
+	Util.add_box(parent, Vector3(0.02, 0.07, 0.04), Color(0.2, 0.2, 0.22), Vector3(0, -0.07, 0.0))      # Abzugbügel
+	Util.add_box(parent, Vector3(0.02, 0.035, 0.06), Color(0.15, 0.15, 0.17), Vector3(0, 0.09, -0.05))  # Visier
 	return {}
 
 

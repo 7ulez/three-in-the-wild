@@ -30,6 +30,8 @@ func _process(delta: float) -> void:
 			label.visible = false
 			return
 	label.visible = global_position.distance_to(_pl.global_position) < 4.2
+	if label.visible and (item_name == "Luftgewehr" or item_name == "Joint") and _pl.get("held") == self:
+		label.visible = false     # in der Hand stört das Schild im Bild
 
 
 var _sunk: bool = false

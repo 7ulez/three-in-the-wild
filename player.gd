@@ -55,6 +55,10 @@ var promille: float = 0.0
 var vomit_t: float = 0.0           # >0: gerade am Übergeben
 var sober_t: float = 0.0           # >0: nach dem Kotzen baut sich der Alkohol schneller ab
 var vomit_tilt: float = 0.0
+var trip_t: float = 0.0              # Restdauer der Joint-Wirkung (Sekunden)
+var trip_i: float = 0.0              # aktuelle Stärke 0..1 (blendet weich ein und aus)
+var _trip_fx: TripFx = null
+var _gun_cd: float = 0.0
 const USE_VM_HAMMER: bool = false     # false = alter Hammer: schwebt vor dir, keine Hand- und Schlag-Animation
 var vm_hand: Node3D = null         # Hand mit Werkzeug in der Ego-Ansicht
 var _vm_swing: float = 0.0
@@ -645,6 +649,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_rotate_ghost(-0.25)
 				MOUSE_BUTTON_LEFT:
 					_confirm_placement()
+		elif mb.button_index == MOUSE_BUTTON_LEFT and held != null and held.item_name == "Luftgewehr":
+			_shoot()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var key := event as InputEventKey
 		match key.keycode:
@@ -687,6 +693,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_gun_cd = maxf(_gun_cd - delta, 0.0)
+	_update_trip(delta)
 	vape_t = maxf(vape_t - delta, 0.0)
 	drink_t = maxf(drink_t - delta, 0.0)
 	if sober_t > 0.0:
@@ -829,7 +837,7 @@ func _process(delta: float) -> void:
 	elif camera.h_offset != 0.0:
 		camera.h_offset = 0.0
 		camera.v_offset = 0.0
-	camera.fov = 75.0 + sin(t * 0.5) * 8.0 * drunk
+	camera.fov = 75.0 + sin(t * 0.5) * 8.0 * drunk + sin(t * 1.3) * 4.0 * trip_i
 	blur_rect.visible = drunk > 0.05
 	if blur_rect.visible:
 		blur_mat.set_shader_parameter("amount", minf(drunk * 0.8, 1.0))
@@ -849,6 +857,9 @@ func _process(delta: float) -> void:
 
 func _drink() -> void:
 	if _drink_cd > 0.0 or placing:
+		return
+	if held != null and held.item_name == "Joint":
+		_smoke()
 		return
 	var src: Object = null
 	if held != null and held.drink_kind() != "":
@@ -1008,6 +1019,104 @@ func _build_vm() -> void:
 		(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+## Joint rauchen: Zug für Zug, danach wird das Bild für einen Moment ganz bunt.
+func _smoke() -> void:
+	if _drink_cd > 0.0:
+		return
+	_drink_cd = 2.4
+	var left: int = int(held.extra.get("puffs", 4)) - 1
+	held.extra["puffs"] = left
+	vape_t = 2.2
+	if needs != null and needs.vape_particles != null:
+		needs.vape_particles.restart()
+		needs.vape_particles.emitting = true
+	Sfx.play("whoosh", Vector3.INF, -10.0, 0.5)
+	trip_t = minf(trip_t + 10.0, 24.0)
+	var lines := ["Pfffff... das zieht.", "Die Farben werden... lauter.", "Alles leuchtet. Wow.", "Die Bäume atmen."]
+	toast(lines[left % lines.size()] if left >= 0 else lines[0], 3.0)
+	if left <= 0:
+		var it := held
+		_drop()
+		it.queue_free()
+		toast("Der Joint ist aufgeraucht. Die Welt ist bunt.", 3.5)
+		_update_help()
+
+
+## Stärke der Joint-Wirkung weich ein- und ausblenden; Bild wellt und leuchtet bunt.
+func _update_trip(delta: float) -> void:
+	if trip_t > 0.0:
+		trip_t = maxf(trip_t - delta, 0.0)
+	trip_i = move_toward(trip_i, 1.0 if trip_t > 0.0 else 0.0, delta * (1.1 if trip_t > 0.0 else 0.3))
+	if trip_i > 0.0 and _trip_fx == null:
+		_trip_fx = TripFx.new()
+		add_child(_trip_fx)
+	if _trip_fx != null:
+		_trip_fx.set_intensity(trip_i)
+
+
+## Luftgewehr: trifft Tiere (sie fallen um) und Mitspieler (verletzt sie).
+func _shoot() -> void:
+	if _gun_cd > 0.0 or placing or held == null:
+		return
+	_gun_cd = 0.6
+	var cb := camera.global_transform.basis
+	var origin := camera.global_position
+	var dir := (-cb.z + cb.x * randf_range(-0.004, 0.004) + cb.y * randf_range(-0.004, 0.004)).normalized()
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(origin, origin + dir * 120.0)
+	q.exclude = [get_rid(), held.get_rid()]
+	var hit := space.intersect_ray(q)
+	var end := origin + dir * 120.0
+	var best := 120.0
+	if not hit.is_empty():
+		end = hit["position"]
+		best = origin.distance_to(end)
+	var target_animal: Object = null
+	var target_name := ""
+	var dmg := 0.0
+	var fauna := get_parent().get_node_or_null("Fauna")
+	if fauna != null:
+		for a in fauna.animals:
+			if not is_instance_valid(a) or a.dead:
+				continue
+			var c: Vector3 = a.global_position + Vector3(0, a.hit_center_y(), 0)
+			var t := (c - origin).dot(dir)
+			if t > 0.5 and t < best and (origin + dir * t).distance_to(c) < a.hit_radius():
+				best = t
+				target_animal = a
+				target_name = ""
+	if Net.instance != null:
+		for k in Net.instance.avatars.keys():
+			var av: Node3D = Net.instance.avatars[k]
+			if not is_instance_valid(av) or not av.visible or av.get("label") == null:
+				continue
+			for h in [0.35, 0.95, 1.55]:
+				var c2: Vector3 = av.global_position + Vector3(0, h, 0)
+				var t2 := (c2 - origin).dot(dir)
+				if t2 > 0.5 and t2 < best and (origin + dir * t2).distance_to(c2) < 0.34:
+					best = t2
+					target_animal = null
+					target_name = (av.label as Label3D).text
+					dmg = 35.0 if h > 1.4 else 16.0
+	end = origin + dir * best
+	var muzzle := origin + dir * 0.7 + cb.x * 0.2 - cb.y * 0.18
+	Sfx.play("airgun", muzzle, 0.0)
+	Fx.tracer(get_parent(), muzzle, end)
+	if Net.instance != null:
+		Net.instance.send_shot(muzzle, end)
+	pitch = clampf(pitch + 0.025, -1.45, 1.45)
+	head.rotation.x = pitch
+	shake = maxf(shake, 0.9)
+	if target_animal != null:
+		var an: Object = target_animal
+		toast("%s getroffen!" % an.display_name(), 2.0)
+		an.die()
+	elif target_name != "":
+		Net.instance.send_hit(target_name, dmg, Game.player_name)
+		toast("Treffer: %s%s" % [target_name, " (Kopf!)" if dmg > 20.0 else ""], 2.0)
+		Sfx.play("thunk", Vector3.INF, -4.0, 1.6)
+
+
 func _update_held() -> void:
 	if held == null:
 		return
@@ -1019,6 +1128,13 @@ func _update_held() -> void:
 		return
 	held.linear_velocity = (diff * 12.0).limit_length(14.0)
 	held.angular_velocity *= 0.8
+	if held.item_name == "Luftgewehr":
+		# Gewehr liegt rechts unten im Bild und zeigt immer dorthin, wohin man schaut
+		var hb := head.global_transform.basis
+		var gt := head.global_position + (-hb.z) * 0.85 + hb.x * 0.3 - hb.y * 0.28
+		held.linear_velocity = ((gt - held.global_position) * 20.0).limit_length(20.0)
+		held.angular_velocity = Vector3.ZERO
+		held.global_transform.basis = hb
 
 
 ## Das Objekt, auf das man zielt, wenn es nah genug ist (sonst null).
@@ -1052,6 +1168,10 @@ func _update_prompt() -> void:
 			text = "E: %s ablegen   G: werfen" % held.item_name
 			if held.item_name == "Zeltpaket":
 				text += "   R: Zelt aufstellen"
+			elif held.item_name == "Luftgewehr":
+				text += "   LINKSKLICK: schießen"
+			elif held.item_name == "Joint":
+				text += "   F: rauchen (%d Züge)" % int(held.extra.get("puffs", 4))
 			elif held.item_name != "Hammer":
 				text += "   R: aufstellen"
 			if held.drink_kind() == "beer":
@@ -1187,6 +1307,9 @@ func _start_placement() -> void:
 		return
 	if held.item_name == "Hammer":
 		toast("Den Hammer brauchst du für die Zeltheringe - der bleibt in der Hand.", 3.0)
+		return
+	if held.item_name == "Joint" or held.item_name == "Luftgewehr":
+		toast("Das stellt man nicht auf - einfach in der Hand behalten.", 2.5)
 		return
 	if not Game.camp_claimed and held.item_name != "Zeltpaket":
 		toast("Stell zuerst das Zelt auf - dort ist dann dein Lager (Angelplatz ist überall).", 4.0)

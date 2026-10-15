@@ -279,3 +279,45 @@ static func splash(parent: Node, pos: Vector3, power: float = 1.0, col: Color = 
 		ripple(parent, pos, 1.4 * power)
 		ripple(parent, pos, 2.2 * power, 0.15)
 	p.get_tree().create_timer(1.6).timeout.connect(p.queue_free)
+
+
+## Leuchtspur eines Luftgewehr-Schusses (kurz sichtbar) und ein kleiner Einschlagsblitz.
+static func tracer(parent: Node, a: Vector3, b: Vector3) -> void:
+	if parent == null or not parent.is_inside_tree():
+		return
+	var len := a.distance_to(b)
+	if len < 0.3:
+		return
+	var mi := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.012, 0.012, len)
+	mi.mesh = bm
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(1.0, 0.92, 0.55, 0.8)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	mi.global_position = (a + b) * 0.5
+	mi.look_at(b, Vector3.UP)
+	var tw := mi.create_tween()
+	tw.tween_property(m, "albedo_color:a", 0.0, 0.12)
+	tw.tween_callback(mi.queue_free)
+	var fl := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.07
+	sm.height = 0.14
+	sm.radial_segments = 6
+	sm.rings = 3
+	fl.mesh = sm
+	var fm := StandardMaterial3D.new()
+	fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fm.albedo_color = Color(1.0, 0.85, 0.4)
+	fl.material_override = fm
+	fl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(fl)
+	fl.global_position = b
+	var tw2 := fl.create_tween()
+	tw2.tween_property(fl, "scale", Vector3.ZERO, 0.18)
+	tw2.tween_callback(fl.queue_free)

@@ -5,7 +5,7 @@ extends Node
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
-const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2}
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2}
 const LOWRATE: Array = ["wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit"]
 var _warm: Array = []
 var _warm_t: float = 2.0
@@ -349,6 +349,12 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			thud = _add(thud, _sine(0.12, randf_range(95.0, 130.0), 55.0, 34.0, 0.5, 0.003))
 			var leaf := _env(_nf(_white(0.25), 1, randf_range(1800.0, 2800.0), 1.5), 0.012, 16.0, 0.7)
 			return _wav(_add(thud, leaf, randf_range(0.01, 0.035)), 0.6)
+		"airgun":
+			# Luftgewehr: scharfes Pfff, kurzer Knack und metallisches Nachklingen
+			var s := _env(_nf(_white(0.18), 1, randf_range(3500.0, 5000.0), 0.9), 0.0008, 32.0, 1.0)
+			s = _add(s, _env(_nf(_white(0.08), 0, 900.0, 0.8), 0.0005, 70.0, 0.9))
+			s = _add(s, _sine(0.12, randf_range(1500.0, 1900.0), 600.0, 30.0, 0.35, 0.0005), 0.004)
+			return _wav(s, 0.8)
 		"step_gravel":
 			var s := _env(_nf(_white(0.15), 0, 400.0, 0.8), 0.004, 40.0, 0.7)
 			var grains := int(randf_range(7, 12))
