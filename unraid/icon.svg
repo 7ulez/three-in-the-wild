@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fb4e8"/>
+      <stop offset="0.62" stop-color="#bfe6f5"/>
+      <stop offset="1" stop-color="#f6e3b4"/>
+    </linearGradient>
+    <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f98c9"/>
+      <stop offset="1" stop-color="#1f6a99"/>
+    </linearGradient>
+    <clipPath id="r"><rect x="8" y="8" width="496" height="496" rx="96"/></clipPath>
+  </defs>
+  <g clip-path="url(#r)">
+    <rect width="512" height="512" fill="url(#sky)"/>
+    <!-- Sonne -->
+    <circle cx="392" cy="120" r="46" fill="#ffe9a0"/>
+    <circle cx="392" cy="120" r="32" fill="#ffd25c"/>
+    <!-- ferne Berge -->
+    <polygon points="-10,330 110,170 190,262 250,206 340,330" fill="#8fa6c4"/>
+    <polygon points="200,330 330,150 420,260 470,208 530,330" fill="#7b94b6"/>
+    <polygon points="330,150 300,196 330,184 352,206 372,190" fill="#f4f8fc"/>
+    <polygon points="110,170 86,206 112,196 132,214 140,200" fill="#f4f8fc"/>
+    <!-- vordere Hügel -->
+    <polygon points="-10,350 90,262 200,350" fill="#4f8a4a"/>
+    <polygon points="300,350 420,270 530,350" fill="#3f7a44"/>
+    <!-- Tannen -->
+    <g fill="#2f6b3c">
+      <polygon points="64,330 90,262 116,330"/>
+      <polygon points="74,296 90,246 106,296"/>
+      <polygon points="404,336 426,274 448,336"/>
+      <polygon points="413,306 426,258 439,306"/>
+      <polygon points="440,340 458,288 476,340"/>
+    </g>
+    <g fill="#5b3b22">
+      <rect x="86" y="326" width="8" height="14"/>
+      <rect x="422" y="332" width="8" height="12"/>
+      <rect x="454" y="336" width="8" height="12"/>
+    </g>
+    <!-- See -->
+    <rect x="0" y="336" width="512" height="190" fill="url(#lake)"/>
+    <g stroke="#cfeaf7" stroke-width="5" stroke-linecap="round" opacity="0.8">
+      <line x1="60" y1="372" x2="130" y2="372"/>
+      <line x1="360" y1="388" x2="450" y2="388"/>
+      <line x1="90" y1="428" x2="190" y2="428"/>
+      <line x1="320" y1="452" x2="420" y2="452"/>
+    </g>
+    <!-- Wellenringe -->
+    <ellipse cx="256" cy="402" rx="92" ry="20" fill="none" stroke="#e6f6ff" stroke-width="6" opacity="0.9"/>
+    <ellipse cx="256" cy="402" rx="58" ry="12" fill="none" stroke="#e6f6ff" stroke-width="5" opacity="0.9"/>
+    <!-- springender Fisch -->
+    <g transform="translate(256,268) rotate(-26)">
+      <polygon points="-96,0 -128,-34 -118,0 -128,34" fill="#e0792f"/>
+      <polygon points="-96,0 -128,-34 -118,0" fill="#f09a4d"/>
+      <polygon points="-70,-30 -42,-60 -22,-30" fill="#e0792f"/>
+      <polygon points="-40,26 -22,56 0,28" fill="#e0792f"/>
+      <path d="M-100,0 L-60,-36 L10,-44 L78,-18 L102,2 L78,24 L10,40 L-60,34 Z" fill="#7fc15a"/>
+      <path d="M-100,0 L-60,-36 L10,-44 L78,-18 L102,2 L60,-4 L-10,-6 L-60,-2 Z" fill="#5da243"/>
+      <path d="M-60,34 L10,40 L78,24 L102,2 L60,10 L0,12 L-60,10 Z" fill="#f3efc2"/>
+      <circle cx="68" cy="-4" r="9" fill="#fffdf0"/>
+      <circle cx="70" cy="-4" r="5" fill="#1b2b1f"/>
+      <path d="M-34,-24 L-24,12 M-6,-30 L4,14 M22,-30 L30,10" stroke="#3f8036" stroke-width="5" stroke-linecap="round" fill="none"/>
+    </g>
+    <!-- Spritzer -->
+    <g fill="#e6f6ff">
+      <circle cx="176" cy="372" r="8"/>
+      <circle cx="152" cy="352" r="5"/>
+      <circle cx="338" cy="366" r="8"/>
+      <circle cx="362" cy="346" r="5"/>
+      <circle cx="318" cy="340" r="4"/>
+    </g>
+    <!-- Rand -->
+    <rect x="8" y="8" width="496" height="496" rx="96" fill="none" stroke="#1f3a2c" stroke-width="10"/>
+  </g>
+</svg>
