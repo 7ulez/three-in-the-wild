@@ -1776,6 +1776,48 @@ var _step_dist: float = 0.0
 var _was_in_water: bool = false
 
 
+## Sandstreifen rund um den See (der Sandrand ist der See 1,14-fach vergrößert).
+func _on_sand(gp: Vector3) -> bool:
+	var main := get_parent()
+	if main.get("lake_root") == null:
+		return false
+	var lp: Vector3 = gp - (main.lake_root as Node3D).global_position
+	var v := Vector2(lp.x, lp.z)
+	return LakeShape.contains(LakeShape.CENTER + (v - LakeShape.CENTER) / 1.14)
+
+
+## Welcher Untergrund liegt unter den Füßen? Gibt den Namen des Schritt-Sounds zurück.
+## Erst ein Strahl nach unten (Holzboden, Fels, Berg), sonst nach Lage (Parkplatz-Kies, Sandufer, Gras).
+func _surface_sound(gp: Vector3) -> String:
+	var kind := ""
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsRayQueryParameters3D.create(gp + Vector3(0, 0.4, 0), gp + Vector3(0, -1.2, 0))
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	if not hit.is_empty():
+		var col: Object = hit.get("collider")
+		var node := col as Node
+		while node != null and not node.has_meta("surface"):
+			node = node.get_parent()
+			if node == get_parent():
+				node = null
+		if node != null:
+			kind = str(node.get_meta("surface"))
+	if kind == "massif":
+		kind = "snow" if gp.y > 23.5 else "gravel"
+	if kind == "":
+		if pow(gp.x / 13.0, 2.0) + pow((gp.z - 1.0) / 7.0, 2.0) < 1.0:
+			kind = "gravel"
+		elif gp.y < 1.0 and _on_sand(gp):
+			kind = "sand"
+		else:
+			kind = "grass"
+	var snd := "step_" + kind
+	if Sfx.has_file(snd):
+		return snd
+	return "step_gravel" if kind in ["gravel", "rock", "sand", "snow"] else "step"
+
+
 func _footsteps(delta: float) -> void:
 	var sp := Vector2(velocity.x, velocity.z).length()
 	if is_on_floor() and sp > 1.0:
@@ -1783,11 +1825,10 @@ func _footsteps(delta: float) -> void:
 		if _step_dist > 2.1:
 			_step_dist = 0.0
 			if water_d > 0.15:
-				Sfx.play("splash_small", global_position, -8.0, randf_range(0.9, 1.2))
+				Sfx.play("step_wade" if Sfx.has_file("step_wade") else "splash_small", global_position, -8.0, randf_range(0.9, 1.2))
 			else:
 				var gp := global_position
-				var gravel := pow(gp.x / 13.0, 2.0) + pow((gp.z - 1.0) / 7.0, 2.0) < 1.0
-				Sfx.play("step_gravel" if gravel else "step", gp, -6.0, randf_range(0.9, 1.1))
+				Sfx.play(_surface_sound(gp), gp, -6.0, randf_range(0.92, 1.08))
 	var wet := water_d > 0.3
 	if wet and not _was_in_water:
 		Sfx.play("splash", global_position, 0.0)

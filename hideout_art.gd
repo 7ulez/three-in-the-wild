@@ -72,6 +72,7 @@ static func rock(parent: Node, pos: Vector3, radii: Vector3, seed_v: int, color:
 		var cs := CollisionShape3D.new()
 		cs.shape = mesh.create_convex_shape()
 		body.add_child(cs)
+		body.set_meta("surface", "rock")
 		mi.add_child(body)
 	return mi
 

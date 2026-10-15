@@ -302,10 +302,12 @@ func _build_mountain() -> void:
 		var cs := CollisionShape3D.new()
 		cs.shape = load(SHAPE_FILE)
 		body.add_child(cs)
+		body.set_meta("surface", "massif")
 		add_child(body)
 	else:
 		var comb := make_csg()
 		comb.use_collision = true
+		comb.set_meta("surface", "massif")
 		add_child(comb)
 
 

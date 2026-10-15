@@ -239,7 +239,7 @@ func _hut(root: Node3D) -> void:
 	var wood := Color(0.42, 0.28, 0.16)
 	var dk := Color(0.33, 0.22, 0.12)
 	var lr := 0.15
-	_solid(root, Vector3(4.6, 0.12, 3.8), dk, Vector3(0, 0.06, 0))           # Boden
+	_solid(root, Vector3(4.6, 0.12, 3.8), dk, Vector3(0, 0.06, 0)).set_meta("surface", "wood")           # Boden
 	# Kollisionswände (unsichtbar) - die Optik sind Blockhaus-Stämme
 	HideoutArt.hidden_wall(root, Vector3(4.4, 2.3, 0.18), Vector3(0, 1.2, 1.8))
 	HideoutArt.hidden_wall(root, Vector3(0.18, 2.3, 3.6), Vector3(-2.2, 1.2, 0))
