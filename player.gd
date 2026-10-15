@@ -55,6 +55,7 @@ var promille: float = 0.0
 var vomit_t: float = 0.0           # >0: gerade am Übergeben
 var sober_t: float = 0.0           # >0: nach dem Kotzen baut sich der Alkohol schneller ab
 var vomit_tilt: float = 0.0
+const USE_VM_HAMMER: bool = false     # false = alter Hammer: schwebt vor dir, keine Hand- und Schlag-Animation
 var vm_hand: Node3D = null         # Hand mit Werkzeug in der Ego-Ansicht
 var _vm_swing: float = 0.0
 var _vomit_fx: CPUParticles3D = null
@@ -959,7 +960,7 @@ func _carry_factor() -> float:
 
 ## Hammer in der Ego-Ansicht: sichtbare Hand mit Ärmel hält den Hammer vor dem Körper.
 func _update_vm(delta: float) -> void:
-	var want := held != null and held.item_name == "Hammer" and not third_person and not sleeping and not placing
+	var want := USE_VM_HAMMER and held != null and held.item_name == "Hammer" and not third_person and not sleeping and not placing
 	if want and vm_hand == null:
 		_build_vm()
 	if vm_hand != null:
@@ -969,14 +970,15 @@ func _update_vm(delta: float) -> void:
 			var t := Time.get_ticks_msec() / 1000.0
 			vm_hand.position = Vector3(0.2, -0.22, -0.55) + Vector3(sin(t * 6.0) * 0.008, absf(sin(t * 6.0)) * 0.012, 0.0) * clampf(sp / 3.0, 0.0, 1.5)
 			vm_hand.rotation_degrees.x = -_vm_swing * 70.0
-	if held != null and held.item_name == "Hammer":
+	if USE_VM_HAMMER and held != null and held.item_name == "Hammer":
 		held.visible = not want
 
 
 func swing_hammer() -> void:
-	var tw := create_tween()
-	tw.tween_property(self, "_vm_swing", 1.0, 0.1)
-	tw.tween_property(self, "_vm_swing", 0.0, 0.18)
+	if USE_VM_HAMMER:
+		var tw := create_tween()
+		tw.tween_property(self, "_vm_swing", 1.0, 0.1)
+		tw.tween_property(self, "_vm_swing", 0.0, 0.18)
 	Sfx.play("thunk", global_position - global_transform.basis.z * 1.5, 0.0, 1.4)
 
 
