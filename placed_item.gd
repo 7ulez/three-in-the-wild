@@ -959,7 +959,7 @@ func _stir_result(b: Dictionary, res: String) -> void:
 			if added.size() >= Game.RECIPE.size():
 				cook_t += 1.5
 			Sfx.play("ding", global_position, -6.0, 1.0 + minf(stir_combo, 8) * 0.05)
-			Sfx.play("plop", global_position, -2.0)
+			Sfx.play("bubble", global_position, -2.0)
 			_stir_fx(1.0)
 			pl.shake = 0.8
 		"GUT":
@@ -967,7 +967,7 @@ func _stir_result(b: Dictionary, res: String) -> void:
 			stir_score += 50
 			burn = maxf(burn - 0.03, 0.0)
 			flavor = minf(flavor + 0.6, 15.0)
-			Sfx.play("plop", global_position, -3.0)
+			Sfx.play("bubble", global_position, -3.0)
 			_stir_fx(0.6)
 		_:
 			stir_combo = 0

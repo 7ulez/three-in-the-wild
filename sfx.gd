@@ -144,7 +144,7 @@ static func _file_streams(sound: String) -> Array:
 		var path := "%s_%d.ogg" % [base, i]
 		if ResourceLoader.exists(path):
 			list.append(load(path))
-	if sound == "water":
+	if sound == "water" or sound == "fire":
 		for st in list:
 			(st as AudioStreamOggVorbis).loop = true
 	_files[sound] = list
@@ -164,7 +164,8 @@ static func _variant(sound: String, v: int) -> AudioStreamWAV:
 	if cache.has(key):
 		return cache[key]
 	SR = 16000.0 if LOWRATE.has(sound) else 32000.0
-	var s := _generate("splash" if sound == "fish_jump" else sound, v)
+	var alias := {"fish_jump": "splash", "bottle": "pop", "bubble": "plop"}
+	var s := _generate(alias.get(sound, sound), v)
 	if s != null:
 		cache[key] = s
 	return s

@@ -877,7 +877,7 @@ func _drink() -> void:
 		needs.drank_water()
 		promille = maxf(promille - 0.12, 0.0)
 		msg = "Ahh, frisches Wasser." if promille < 0.3 else "Wasser hilft. Ein bisschen."
-	Sfx.play("gulp" if kind == "water" else "pop", Vector3.INF, -2.0)
+	Sfx.play("gulp" if kind == "water" else "bottle", Vector3.INF, -2.0)
 	if kind == "beer" and promille > 1.4 and randf() < clampf((promille - 1.4) * 0.6, 0.0, 1.0):
 		get_tree().create_timer(1.7).timeout.connect(start_vomit)
 	if kind == "beer" and randf() < 0.3:
