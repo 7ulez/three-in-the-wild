@@ -1128,7 +1128,14 @@ func _update_held() -> void:
 		return
 	held.linear_velocity = (diff * 12.0).limit_length(14.0)
 	held.angular_velocity *= 0.8
-	if held.item_name == "Luftgewehr":
+	if held.item_name == "Joint":
+		# Joint hängt zwischen den Fingern rechts unten im Bild, Glut zeigt nach oben-vorn
+		var jb := head.global_transform.basis
+		var jt := head.global_position + (-jb.z) * 0.5 + jb.x * 0.14 - jb.y * 0.13
+		held.linear_velocity = ((jt - held.global_position) * 20.0).limit_length(20.0)
+		held.angular_velocity = Vector3.ZERO
+		held.global_transform.basis = jb * Basis.from_euler(Vector3(0.0, deg_to_rad(-30.0), deg_to_rad(50.0)))
+	elif held.item_name == "Luftgewehr":
 		# Gewehr liegt rechts unten im Bild und zeigt immer dorthin, wohin man schaut
 		var hb := head.global_transform.basis
 		var gt := head.global_position + (-hb.z) * 0.85 + hb.x * 0.3 - hb.y * 0.28
