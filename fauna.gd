@@ -422,9 +422,9 @@ class Animal extends Node3D:
 						wait = randf_range(2.0, 6.0)
 						hop = 0.35
 					body.position.y = sin(hop / 0.35 * PI) * 0.08 if hop > 0.0 else 0.0
-					if night and _snd_cd <= 0.0 and pd < 28.0:
-						_snd_cd = randf_range(3.0, 8.0)
-						Sfx.play("croak", global_position, -4.0, randf_range(0.8, 1.2))
+					if night and _snd_cd <= 0.0 and pd < 22.0:
+						_snd_cd = randf_range(15.0, 40.0)
+						Sfx.play("croak", global_position, -8.0, randf_range(0.8, 1.2))
 			"deer", "hare":
 				var flee_d := 14.0 if kind == "deer" else 8.0
 				var fleeing := pd < flee_d

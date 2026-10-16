@@ -63,10 +63,10 @@ func _process(delta: float) -> void:
 			play("chirp", _player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(8.0, 25.0) + Vector3(0, 6, 0), -6.0, randf_range(0.85, 1.2))
 	_amb_night_t -= delta
 	if _amb_night_t <= 0.0:
-		_amb_night_t = randf_range(0.5, 1.6)
+		_amb_night_t = randf_range(3.0, 7.0)
 		if night:
 			var a2 := randf() * TAU
-			play("cricket", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * randf_range(4.0, 20.0), -10.0)
+			play("cricket", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * randf_range(4.0, 20.0), -13.0)
 			if randf() < 0.12:
 				play("owl", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * 30.0 + Vector3(0, 5, 0), -6.0)
 	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -22.0 if not night else -27.0, 0.02)
