@@ -106,6 +106,15 @@ func _build_rain() -> void:
 
 
 func _process(delta: float) -> void:
+	if (kind == K.RAIN or kind == K.STORM) and not Game.rain_fire:
+		for o in Game.placed:
+			if is_instance_valid(o) and o.item_name == "Feuerschale" and o.burning:
+				Game.rain_fire_t += delta
+				if Game.rain_fire_t >= 30.0:
+					Game.rain_fire = true
+					if player != null and is_instance_valid(player):
+						player._update_help()
+				break
 	if _is_authority():
 		_left -= delta
 		if _left <= 0.0:

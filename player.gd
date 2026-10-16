@@ -620,11 +620,26 @@ func _update_goals() -> void:
 		if not g[1]:
 			all = false
 	goals_label.text = "\n".join(lines)
+	var gl: Array = Game.goals()
+	if Game.goals_done_prev.size() == gl.size():
+		for i in gl.size():
+			if gl[i][1] and not Game.goals_done_prev[i]:
+				_goal_done(str(gl[i][0]))
+	Game.goals_done_prev = gl.map(func(g): return g[1])
 	if hud != null:
-		hud.set_goals(Game.goals())
+		hud.set_goals(gl)
 	if all and not Game.all_done_shown:
 		Game.all_done_shown = true
 		toast("ALLE ZIELE GESCHAFFT! Ein perfekter Angelausflug. Du darfst weitercampen (und noch ein Bier trinken).", 10.0)
+
+
+func _goal_done(text: String) -> void:
+	Sfx.play("pop", Vector3.INF, -2.0, 1.3)
+	Sfx.play("chirp", Vector3.INF, -6.0, 1.6)
+	var mh := get_minihud()
+	if mh != null:
+		mh.card("ZIEL GESCHAFFT!", "✓ " + text, Color(0.45, 0.85, 0.4), 4.5)
+	toast("✓ Ziel geschafft: %s" % text, 5.0)
 
 
 func step_in_poop() -> void:
@@ -1123,6 +1138,8 @@ func _smoke() -> void:
 	var left: int = int(held.extra.get("puffs", 4)) - 1
 	held.extra["puffs"] = left
 	vape_t = 2.2
+	Game.joint_smoked = true
+	_update_help()
 	if needs != null and needs.vape_particles != null:
 		needs.vape_particles.restart()
 		needs.vape_particles.emitting = true
@@ -1758,7 +1775,7 @@ func unlie_tent() -> void:
 	var t := tent_lying
 	tent_lying = null
 	if is_instance_valid(t):
-		global_position = t.global_transform * Vector3(0, 0.1, -2.1)
+		global_position = t.global_transform * Vector3(0, 0.1, 2.1)
 	head.position.y = 1.6
 	collision_layer = 1
 	collision_mask = 1
@@ -2076,7 +2093,7 @@ func sleep(tent: Tent) -> void:
 			bite_at = -1.0
 	if not by_fish:
 		Game.hour = 6.5
-	teleport_to(tent.global_transform * Vector3(0, 0.1, -2.1))
+	teleport_to(tent.global_transform * Vector3(0, 0.1, 2.1))
 	_peak_y = global_position.y
 	sleeping = false
 	var tw2 := create_tween()

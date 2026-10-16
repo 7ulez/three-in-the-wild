@@ -575,7 +575,14 @@ func _on_pit(body: Node) -> void:
 
 
 func _process(_delta: float) -> void:
-	if main == null or main.player == null or summit_reached:
+	if main == null or main.player == null:
+		return
+	if summit_reached and not Game.summit_sunrise:
+		var sp: Vector3 = main.player.global_position
+		if sp.y > TOP_Y - 1.5 and Vector2(sp.x - C.x, sp.z - C.z).length() < 11.0 and Game.hour >= 5.0 and Game.hour < 7.5:
+			Game.summit_sunrise = true
+			main.player._update_help()
+	if summit_reached:
 		return
 	var p: Vector3 = main.player.global_position
 	if p.y > TOP_Y - 0.8 and Vector2(p.x - C.x, p.z - C.z).length() < 9.0:

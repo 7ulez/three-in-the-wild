@@ -141,6 +141,14 @@ func _process(delta: float) -> void:
 			vol = pow(clampf(1.0 - (best - 1.5) / 20.0, 0.0, 1.0), 1.6)
 			if main != null and main.get("_in_cave") == true:
 				vol *= 0.4
+	if on and not Game.radio_camp and Game.camp_claimed:
+		for r in _radios():
+			var rp: Vector3 = (r as Node3D).global_position
+			if player != null and player.held != r and Vector2(rp.x - Game.camp_center.x, rp.z - Game.camp_center.z).length() < 25.0 \
+					and player.global_position.distance_to(rp) < 15.0:
+				Game.radio_camp = true
+				player._update_help()
+				break
 	_vol = lerpf(_vol, vol, minf(delta * 5.0, 1.0))
 	if _web:
 		JavaScriptBridge.eval("window.__radio.setvol(%.3f);" % (_vol * 0.9 * volume), true)

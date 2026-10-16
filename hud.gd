@@ -24,6 +24,8 @@ var _help_t: float = 28.0
 var _info: Control
 var _touch: bool = false
 var _goals_sig: String = ""
+var _prev_done: Array = []
+var _last_done: int = -1
 var _goals_full: PanelContainer = null
 var _goals_full_box: VBoxContainer = null
 
@@ -195,8 +197,11 @@ func set_goals(goals: Array) -> void:
 	for i in goals.size():
 		if goals[i][1]:
 			done += 1
+			if _prev_done.size() == goals.size() and not _prev_done[i]:
+				_last_done = i
 		elif cur < 0:
 			cur = i
+	_prev_done = goals.map(func(g): return g[1])
 	var head := HBoxContainer.new()
 	var t := _lbl("Ziele", 18, UI.INK, UI.f_head)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -206,8 +211,9 @@ func set_goals(goals: Array) -> void:
 	_goals_box.add_child(_progress_bar(done, goals.size(), 8.0))
 	_build_goals_full(goals, done)
 	# zuletzt erledigt (eins), aktuelles Ziel hervorgehoben, nächste zwei
-	if cur > 0:
-		_goal_row(goals[cur - 1][0], true, false)
+	var shown_done := _last_done if _last_done >= 0 and goals[_last_done][1] else cur - 1
+	if shown_done >= 0:
+		_goal_row(goals[shown_done][0], true, false)
 	if cur >= 0:
 		_goal_row(goals[cur][0], false, true)
 		var shown := 0

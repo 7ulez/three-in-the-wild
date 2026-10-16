@@ -53,6 +53,7 @@ func interact_with_held(player: Node, held: Node) -> bool:
 		player.toast("Der zweite Baum ist zu weit weg.", 2.5)
 		return true
 	spawn_hammock()
+	Game.hammock_hung = true
 	player.consume_held()
 	player.toast("Hängematte aufgespannt! E: reinlegen · X: abbauen", 4.0)
 	return true

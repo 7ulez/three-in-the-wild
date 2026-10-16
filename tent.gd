@@ -172,6 +172,6 @@ func _on_grown() -> void:
 	var dbs := BoxShape3D.new()
 	dbs.size = Vector3(0.9, 1.1, 0.3)
 	dcs.shape = dbs
-	dcs.position = Vector3(0, 0.55, -DEPTH / 2.0 - 0.45)
+	dcs.position = Vector3(0, 0.55, DEPTH / 2.0 + 0.45)   # Eingang des Zeltmodells liegt auf +Z
 	door_body.add_child(dcs)
 	add_child(door_body)

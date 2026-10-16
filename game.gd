@@ -26,6 +26,13 @@ static var slept: bool = false
 static var deaths: int = 0
 static var beer_debt: bool = false      # nach dem Tod: erst Bier ins Camp, dann wieder angeln
 static var summit: bool = false
+static var summit_sunrise: bool = false
+static var radio_camp: bool = false
+static var hammock_hung: bool = false
+static var rain_fire: bool = false
+static var rain_fire_t: float = 0.0
+static var joint_smoked: bool = false
+static var goals_done_prev: Array = []
 static var all_done_shown: bool = false
 
 # Tablet/Handy: Bildschirm-Steuerung statt Maus und Tastatur
@@ -127,6 +134,13 @@ static func reset() -> void:
 	cars_opened = 0
 	slept = false
 	summit = false
+	summit_sunrise = false
+	radio_camp = false
+	hammock_hung = false
+	rain_fire = false
+	rain_fire_t = 0.0
+	joint_smoked = false
+	goals_done_prev = []
 	all_done_shown = false
 
 
@@ -155,6 +169,11 @@ static func goals() -> Array:
 		["Aussichtspunkt erklimmen", summit],
 		["Schatz in der Höhle finden", treasure_found],
 		["Verstecke rund um den See finden (%d/5)" % Stash.found(), Stash.found() >= 5],
+		["Das Radio im Camp aufstellen und einen Sender hören", radio_camp],
+		["Hängematte aufhängen", hammock_hung],
+		["Bei Regen ein Feuer am Brennen halten", rain_fire],
+		["Auf den Berg steigen und von dort den Sonnenaufgang sehen", summit_sunrise],
+		["Einen Joint rauchen", joint_smoked],
 	]
 
 
