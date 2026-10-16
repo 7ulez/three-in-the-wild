@@ -1,6 +1,6 @@
 class_name LeaderboardBoard
 extends Node3D
-## Holztafel auf dem Parkplatz mit den zehn größten Fängen (beidseitig lesbar).
+## Holztafel auf dem Parkplatz mit den zehn größten Fängen (nur zum Parkplatz hin beschriftet, massiv).
 
 const PAPER: Color = Color(0.957, 0.937, 0.894)
 const INK: Color = Color(0.114, 0.122, 0.102)
@@ -15,12 +15,13 @@ var _ver: int = -1
 func build() -> void:
 	UI.fonts()
 	for sx in [-2.25, 2.25]:
-		Util.add_box(self, Vector3(0.16, 3.0, 0.16), WOOD, Vector3(sx, 1.5, 0))
+		Util.add_box(self, Vector3(0.16, 3.0, 0.16), WOOD, Vector3(sx, 1.5, -0.14))   # Pfosten hinter der Tafel
 	Util.add_box(self, Vector3(4.2, 2.45, 0.1), WOOD, Vector3(0, 2.0, 0))
 	Util.add_box(self, Vector3(3.95, 2.2, 0.12), PANEL, Vector3(0, 2.0, 0))
 	Util.add_box(self, Vector3(3.95, 0.42, 0.14), FIRE, Vector3(0, 2.9, 0))
 	Util.add_box(self, Vector3(4.5, 0.12, 0.45), WOOD, Vector3(0, 3.22, 0))
-	for side in [1.0, -1.0]:
+	# Nur eine Seite beschriftet: zum Parkplatz (+Z)
+	for side in [1.0]:
 		var z: float = side * 0.075
 		var title := Label3D.new()
 		title.text = "GRÖSSTE FÄNGE"
@@ -47,6 +48,15 @@ func build() -> void:
 		add_child(title)
 		add_child(body)
 		_labels.append(body)
+	# Massiv: man kann weder hindurch noch auf die Tafel laufen
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(4.6, 3.4, 0.5)
+	cs.shape = bs
+	body.add_child(cs)
+	body.position = Vector3(0, 1.7, -0.05)
+	add_child(body)
 	_refresh()
 
 

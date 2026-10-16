@@ -46,7 +46,7 @@ func _ready() -> void:
 	_build_signs()
 	var lb := LeaderboardBoard.new()
 	add_child(lb)
-	lb.position = Vector3(0, 0, 5.4)
+	lb.position = Vector3(8.6, 0, -5.0)
 	lb.build()
 
 	var fauna := Fauna.new()
