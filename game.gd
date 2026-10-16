@@ -24,6 +24,7 @@ static var chili_served: int = 0
 static var cars_opened: int = 0
 static var slept: bool = false
 static var deaths: int = 0
+static var beer_debt: bool = false      # nach dem Tod: erst Bier ins Camp, dann wieder angeln
 static var summit: bool = false
 static var all_done_shown: bool = false
 

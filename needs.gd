@@ -147,31 +147,12 @@ func accident(kind: int) -> void:
 		player.toast("Das war peinlich... die Hose ist hin. (-10 Gesundheit) Im See abwaschen oder warten.", 5.0)
 
 
-## Tod: Holzkreuz an der Stelle, Gepäck weg, Stunden später am Parkplatz wieder wach.
+## Tod: halbe Gesundheit, am Parkplatz wieder wach, Bier ins Camp tragen.
 func _die(reason: String) -> void:
 	var pos := player.global_position
 	var main := player.get_parent()
 	Game.deaths += 1
-	var cross := Node3D.new()
-	cross.name = "Grave"
-	main.add_child(cross)
-	cross.global_position = Vector3(pos.x, 0.0, pos.z)
-	Util.add_box(cross, Vector3(0.12, 1.2, 0.12), Color(0.4, 0.27, 0.14), Vector3(0, 0.6, 0))
-	Util.add_box(cross, Vector3(0.7, 0.12, 0.12), Color(0.4, 0.27, 0.14), Vector3(0, 0.95, 0))
-	Util.add_box(cross, Vector3(0.7, 0.04, 0.5), Color(0.25, 0.2, 0.15), Vector3(0, 0.02, 0.3))
-	var gl := Label3D.new()
-	gl.text = "† %s\n%s" % [Game.player_name if Game.player_name != "" else player.character_name, reason]
-	gl.font_size = 40
-	gl.pixel_size = 0.004
-	gl.outline_size = 8
-	gl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	gl.position = Vector3(0, 1.5, 0)
-	cross.add_child(gl)
-	var lost := player.logs + player.stones + player.tinder + player.sticks
-	player.logs = 0
-	player.stones = 0
-	player.tinder = 0
-	player.sticks = 0
+	Game.beer_debt = true
 	health = 50.0
 	hunger = 0.5
 	bladder = 0.2
@@ -181,9 +162,7 @@ func _die(reason: String) -> void:
 	if Net.instance == null:
 		Game.hour = fposmod(Game.hour + 3.0, 24.0)
 		msg += ", 3 Stunden vergangen"
-	if lost > 0:
-		msg += ", gesammeltes Material (%d) ist weg" % lost
-	player.toast(msg + ". Als Strafe: trag die neue Kiste Bier am Parkplatz ins Camp!", 8.0)
+	player.toast(msg + ". Angeln darfst du erst wieder, wenn du die neue Kiste Bier am Parkplatz ins Camp getragen und abgestellt hast!", 8.0)
 	player.respawn()
 	# Strafe: neuer Kasten Bier am Parkplatz, muss zum Camp getragen werden
 	var beer := Item.new().setup("Bierkasten", 14.0, Vector3(0.5, 0.3, 0.35), Color(0.9, 0.75, 0.2))

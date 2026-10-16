@@ -1669,6 +1669,11 @@ func _confirm_item_placement() -> void:
 			snap.oven = placed
 			placed.on_grill = snap
 	var nm := it.item_name
+	if nm == "Bierkasten" and Game.beer_debt:
+		var in_camp := not Game.camp_claimed or Vector2(pos.x - Game.camp_center.x, pos.z - Game.camp_center.z).length() < 25.0
+		if in_camp and not (absf(pos.x) < 27.0 and pos.z > -22.0 and pos.z < 30.0 and not Game.camp_claimed):
+			Game.beer_debt = false
+			toast("Das Bier steht im Camp - du darfst wieder angeln!", 5.0)
 	held = null
 	ray.remove_exception(it)
 	it.queue_free()

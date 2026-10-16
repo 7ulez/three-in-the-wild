@@ -223,6 +223,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _left_click() -> void:
 	match state:
 		S.IDLE:
+			if Game.beer_debt:
+				player.toast("Erst die neue Kiste Bier vom Parkplatz ins Camp tragen und abstellen - dann darfst du wieder angeln.", 4.0)
+				return
 			var p := aim_point()
 			if p == Vector3.INF:
 				player.toast("Ziel auf das Wasser, um auszuwerfen.", 2.0)
