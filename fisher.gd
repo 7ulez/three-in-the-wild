@@ -444,10 +444,23 @@ func _reeling() -> bool:
 
 
 func _counter_axis() -> int:
-	# -1 = nach links halten (A / Pfeil links), +1 = nach rechts (D / Pfeil rechts)
-	var a := Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT)
-	var d := Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT)
-	return (1 if d else 0) - (1 if a else 0)
+	# Rute neigen per Blickrichtung (Maus): -1 = nach links, +1 = nach rechts, 0 = gerade auf den Fisch.
+	if player == null:
+		return 0
+	var to_t := target - player.global_position
+	to_t.y = 0.0
+	if to_t.length() < 0.5:
+		return 0
+	var fwd := -player.global_transform.basis.z
+	fwd.y = 0.0
+	if fwd.length() < 0.01:
+		return 0
+	var ang := fwd.signed_angle_to(to_t.normalized(), Vector3.UP)   # >0: Ziel links vom Blick -> Rute zeigt nach rechts
+	if ang > 0.14:
+		return 1
+	if ang < -0.14:
+		return -1
+	return 0
 
 
 func _fight(delta: float) -> void:
@@ -456,7 +469,7 @@ func _fight(delta: float) -> void:
 	var tired := stamina < 0.25
 	var counter := _counter_axis()
 	if Game.touch:
-		counter = pull           # Touch: Mitgehen klappt automatisch
+		counter = -pull          # Touch: Gegenhalten klappt automatisch
 	# --- Fluchtläufe ---
 	run_timer -= delta
 	if run_timer <= 0.0:
@@ -469,8 +482,8 @@ func _fight(delta: float) -> void:
 		else:
 			run_timer = randf_range(1.0, 2.4) * (0.7 if tired else 1.0)
 			pull = 0
-	var countering := running and pull != 0 and counter == pull
-	var ignoring := running and pull != 0 and counter != pull
+	var countering := running and pull != 0 and counter == -pull
+	var ignoring := false
 	# --- Sprung ---
 	if jump_t > 0.0:
 		jump_t -= delta

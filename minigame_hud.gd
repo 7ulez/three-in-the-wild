@@ -241,11 +241,11 @@ func _draw_fight() -> void:
 			cc.a = 1.0 - float(i) * 0.3
 			draw_colored_polygon(arrow, cc)
 		_text(Vector2(ax, ay - 40), "Fisch zieht %s!" % ("RECHTS" if pull > 0 else "LINKS"), 22, col)
-		var need_key := "D" if pull > 0 else "A"      # in Fischrichtung mitgehen
-		_keycap(Vector2(ax, ay + 50), need_key, counter == pull)
-		_text(Vector2(ax, ay + 98), "gleiche Richtung drücken", 15, UI.PAPER)
+		var need_key := "<" if pull > 0 else ">"      # Rute entgegen neigen (Blick drehen)
+		_keycap(Vector2(ax, ay + 50), need_key, counter == -pull)
+		_text(Vector2(ax, ay + 98), "Rute entgegen neigen (Maus) = Bonus", 15, UI.PAPER)
 	else:
-		_text(Vector2(cx - 300, base - 20), "A / D: in Zugrichtung drücken", 16, Color(1, 1, 1, 0.55))
+		_text(Vector2(cx - 300, base - 20), "Maus: Rute gegen den Zug neigen = Bonus", 16, Color(1, 1, 1, 0.55))
 
 	# Sprung
 	if jump > 0.0:
