@@ -190,6 +190,45 @@ class Animal extends Node3D:
 		return "Vogel"
 
 	## Abgeschossen: kippt um, bleibt kurz liegen und kommt später als neues Tier wieder.
+	## Blutlache unter dem toten Tier: mehrere überlappende, flache Scheiben, die langsam größer werden
+	func _blood(delay: float) -> void:
+		var space := get_world_3d().direct_space_state
+		var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 1.5, 0), global_position + Vector3(0, -40.0, 0))
+		q.collision_mask = 1
+		var hit := space.intersect_ray(q)
+		var gp: Vector3 = hit["position"] if not hit.is_empty() else Vector3(global_position.x, 0.0, global_position.z)
+		var r := clampf(hit_radius() * 1.4, 0.25, 1.0)
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color(0.28, 0.0, 0.01, 0.95)
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.roughness = 0.22
+		mat.metallic_specular = 0.4
+		var root := Node3D.new()
+		root.top_level = true
+		root.scale = Vector3(0.05, 1.0, 0.05)
+		fauna.add_child(root)
+		root.global_position = gp + Vector3(randf_range(-0.05, 0.05), 0.07, randf_range(-0.05, 0.05))
+		for i in range(4):
+			var mi := MeshInstance3D.new()
+			var cm := CylinderMesh.new()
+			var rr := r * (1.0 if i == 0 else randf_range(0.45, 0.75))
+			cm.top_radius = rr
+			cm.bottom_radius = rr
+			cm.height = 0.006
+			cm.radial_segments = 14
+			mi.mesh = cm
+			mi.material_override = mat
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mi.position = Vector3(randf_range(-0.3, 0.3) * r, 0.002 * i, randf_range(-0.3, 0.3) * r) if i > 0 else Vector3.ZERO
+			mi.scale = Vector3(randf_range(0.8, 1.25), 1.0, randf_range(0.8, 1.25))
+			root.add_child(mi)
+		var tw := root.create_tween()
+		tw.tween_interval(delay)
+		tw.tween_property(root, "scale", Vector3.ONE, 3.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_interval(70.0)
+		tw.tween_property(mat, "albedo_color:a", 0.0, 8.0)
+		tw.tween_callback(root.queue_free)
+
 	func die() -> void:
 		if dead:
 			return
@@ -208,6 +247,7 @@ class Animal extends Node3D:
 			"duck": Sfx.play("quack", global_position, 0.0, 0.7)
 			"frog": Sfx.play("croak", global_position, -2.0, 1.4)
 			_: Sfx.play("thunk", global_position, 0.0, 0.8)
+		_blood(0.9 if kind == "bird" else 0.35)
 		var f := fauna
 		var k := kind
 		var spawn := home if home != Vector3.ZERO else global_position
