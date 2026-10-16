@@ -5,7 +5,7 @@ extends Node
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
-const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2, "reload": 1}
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2, "reload": 1, "chest_open": 1}
 const LOWRATE: Array = ["wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit"]
 var _warm: Array = []
 var _warm_t: float = 2.0
@@ -390,6 +390,24 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			s = _add(s, _env(_nf(_white(0.05), 0, 1600.0, 0.7), 0.0005, 70.0, 0.9))
 			s = _add(s, _env(_nf(_white(0.6), 2, 4500.0, 0.7), 0.01, 5.5, 0.18), 0.03)
 			return _wav(s, 0.75)
+		"chest_open":
+			# Schloss klackt, altes Scharnier knarzt (Haft-Gleit-Impulse), Deckel schlägt an, Münzen klimpern
+			var s := _env(_nf(_white(0.05), 1, 2600.0, 2.0), 0.0003, 100.0, 0.9)
+			s = _add(s, _env(_nf(_white(0.04), 0, 600.0, 1.0), 0.0005, 90.0, 0.6))
+			var f := 260.0
+			var t := 0.12
+			while t < 0.78:
+				f *= randf_range(1.02, 1.09)
+				var seg := _env(_nf(_white(0.07), 1, f, 9.0), 0.004, 30.0, randf_range(0.5, 0.9))
+				seg = _add(seg, _sine(0.07, f * 1.5, f * 1.6, 28.0, 0.25, 0.003))
+				s = _add(s, seg, t)
+				t += randf_range(0.035, 0.06)
+			s = _add(s, _sine(0.3, 105.0, 52.0, 14.0, 0.8, 0.002, 0.2), 0.82)
+			s = _add(s, _env(_nf(_white(0.12), 0, 700.0, 0.8), 0.001, 45.0, 0.7), 0.82)
+			for k in range(9):
+				var fr := randf_range(2300.0, 4600.0)
+				s = _add(s, _sine(0.28, fr, fr * 0.98, 13.0, 0.28, 0.0005, 0.35), 0.86 + k * randf_range(0.03, 0.07))
+			return _wav(s, 0.85)
 		"thunk":
 			var s := _sine(0.4, randf_range(95.0, 115.0), 48.0, 15.0, 0.9, 0.002, 0.15)
 			s = _add(s, _env(_nf(_white(0.15), 0, 650.0, 0.8), 0.001, 40.0, 1.0))

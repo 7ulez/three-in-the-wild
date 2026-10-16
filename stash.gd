@@ -27,12 +27,16 @@ func build(p_label: String, as_chest: bool = true) -> void:
 	cs.position.y = 0.25
 	add_child(cs)
 	if as_chest:
-		Util.add_box(self, Vector3(0.8, 0.35, 0.5), Color(0.5, 0.33, 0.16), Vector3(0, 0.18, 0))
+		var body_ok := ItemModels._glb(self, "truhe_korpus") != null
 		lid = Node3D.new()
-		lid.position = Vector3(0, 0.36, 0.25)
+		lid.position = Vector3(0, 0.32, 0.25)      # Scharnier hinten oben
 		add_child(lid)
-		Util.add_box(lid, Vector3(0.82, 0.14, 0.52), Color(0.42, 0.27, 0.12), Vector3(0, 0.07, -0.25))
-		Util.add_box(self, Vector3(0.1, 0.12, 0.04), Color(0.85, 0.7, 0.2), Vector3(0, 0.3, -0.26))
+		if body_ok and ItemModels._glb(lid, "truhe_deckel") != null:
+			pass
+		else:
+			Util.add_box(self, Vector3(0.8, 0.35, 0.5), Color(0.5, 0.33, 0.16), Vector3(0, 0.18, 0))
+			Util.add_box(lid, Vector3(0.82, 0.14, 0.52), Color(0.42, 0.27, 0.12), Vector3(0, 0.07, -0.25))
+			Util.add_box(self, Vector3(0.1, 0.12, 0.04), Color(0.85, 0.7, 0.2), Vector3(0, 0.3, -0.26))
 	else:
 		Util.add_box(self, Vector3(0.7, 0.4, 0.4), Color(0.28, 0.22, 0.14), Vector3(0, 0.2, 0))
 
@@ -61,8 +65,9 @@ func interact(player: Node) -> void:
 		return
 	opened = true
 	if lid != null:
-		create_tween().tween_property(lid, "rotation_degrees:x", -105.0, 0.5)
-	Sfx.play("thunk", global_position, -4.0)
+		var tw := create_tween()
+		tw.tween_property(lid, "rotation_degrees:x", 112.0, 0.85).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	Sfx.play("chest_open", global_position, 0.0)
 	var n := player.get_node_or_null("Needs") as Needs
 	var found_n := found()
 	var kind: String = LOOT[index % LOOT.size()]
