@@ -732,6 +732,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_apply_view()
 			KEY_I, KEY_F1:
 				hud.toggle_info()
+			KEY_TAB, KEY_O:
+				hud.toggle_goals()
 			KEY_E:
 				_interact()
 			KEY_G:

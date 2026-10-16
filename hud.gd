@@ -24,6 +24,8 @@ var _help_t: float = 28.0
 var _info: Control
 var _touch: bool = false
 var _goals_sig: String = ""
+var _goals_full: PanelContainer = null
+var _goals_full_box: VBoxContainer = null
 
 
 class DayBar:
@@ -201,6 +203,8 @@ func set_goals(goals: Array) -> void:
 	head.add_child(t)
 	head.add_child(_lbl("%d / %d" % [done, goals.size()], 13, UI.TEXT_LOW, UI.f_mono))
 	_goals_box.add_child(head)
+	_goals_box.add_child(_progress_bar(done, goals.size(), 8.0))
+	_build_goals_full(goals, done)
 	# zuletzt erledigt (eins), aktuelles Ziel hervorgehoben, nächste zwei
 	if cur > 0:
 		_goal_row(goals[cur - 1][0], true, false)
@@ -217,6 +221,70 @@ func set_goals(goals: Array) -> void:
 			_goals_box.add_child(_lbl("+ %d weitere" % rest, 12, UI.TEXT_LOW, UI.f_mono))
 	else:
 		_goals_box.add_child(_lbl("Alles geschafft!", 15, UI.INK, UI.f_head))
+	_goals_box.add_child(_lbl("Tab / O: alle Ziele", 11, UI.TEXT_LOW, UI.f_mono))
+
+
+func _progress_bar(done: int, total: int, h: float) -> Control:
+	var bg := Panel.new()
+	bg.custom_minimum_size = Vector2(0, h)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.15)
+	sb.set_corner_radius_all(int(h / 2.0))
+	bg.add_theme_stylebox_override("panel", sb)
+	var fill := Panel.new()
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var fb := StyleBoxFlat.new()
+	fb.bg_color = UI.FIRE
+	fb.set_corner_radius_all(int(h / 2.0))
+	fill.add_theme_stylebox_override("panel", fb)
+	bg.add_child(fill)
+	var frac := float(done) / maxf(float(total), 1.0)
+	fill.anchor_right = frac
+	fill.anchor_bottom = 1.0
+	return bg
+
+
+## Vollständige Übersicht aller Ziele (Tab / O)
+func _build_goals_full(goals: Array, done: int) -> void:
+	var was_visible := _goals_full != null and _goals_full.visible
+	if _goals_full != null:
+		_goals_full.queue_free()
+	_goals_full = _panel(UI.PAPER, 18, 6.0, Vector4(22, 16, 22, 18))
+	_goals_full.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_goals_full.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_goals_full.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_goals_full.visible = was_visible
+	add_child(_goals_full)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	_goals_full.add_child(box)
+	var head := HBoxContainer.new()
+	var t := _lbl("Alle Ziele", 24, UI.INK, UI.f_head)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(t)
+	head.add_child(_lbl("%d / %d  (%d %%)" % [done, goals.size(), int(round(100.0 * done / maxf(goals.size(), 1.0)))], 15, UI.TEXT_LOW, UI.f_mono))
+	box.add_child(head)
+	var pb := _progress_bar(done, goals.size(), 12.0)
+	pb.custom_minimum_size = Vector2(420, 12)
+	box.add_child(pb)
+	var first_open := true
+	for g in goals:
+		var is_done: bool = g[1]
+		var cur := not is_done and first_open
+		if not is_done:
+			first_open = false
+		var l := _lbl(("✓  " if is_done else ("▶  " if cur else "○  ")) + str(g[0]), 15,
+			UI.INK if cur else (Color(UI.TEXT_LOW, 0.75) if is_done else UI.TEXT_LOW), UI.f_head if cur else UI.f_label)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(420, 0)
+		box.add_child(l)
+	box.add_child(_lbl("Tab / O: schließen", 12, UI.TEXT_LOW, UI.f_mono))
+
+
+func toggle_goals() -> void:
+	if _goals_full != null:
+		_goals_full.visible = not _goals_full.visible
 
 
 func _goal_row(text: String, done: bool, current: bool) -> void:
