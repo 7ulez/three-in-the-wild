@@ -28,12 +28,17 @@ class TentDoor:
 
 	func get_prompt() -> String:
 		if Game.hour >= 19.0 or Game.hour < 6.0:
+			if Net.instance != null:
+				return "E: ins Zelt legen (Nacht vorbei, wenn alle liegen)"
 			return "E: im Zelt schlafen (spult die Nacht vor)"
 		return "Noch zu hell zum Schlafen (ab 19:00 Uhr, jetzt %s)" % Game.clock_text()
 
 	func interact(player: Node) -> void:
 		if Game.hour >= 19.0 or Game.hour < 6.0:
-			player.sleep(tent)
+			if Net.instance != null:
+				player.lie_in_tent(tent)
+			else:
+				player.sleep(tent)
 		else:
 			player.toast("Du bist noch nicht müde. Es ist erst %s." % Game.clock_text(), 3.0)
 

@@ -149,6 +149,8 @@ func _process(delta: float) -> void:
 				_drop_loot(ppos)
 				queue_free()
 	if dir != Vector3.ZERO:
+		dir = _dry_dir(dir, speed * delta)
+	if dir != Vector3.ZERO:
 		global_position += dir * speed * delta
 		global_position.y = 0.0
 		var yaw := atan2(-dir.x, -dir.z)
@@ -165,6 +167,25 @@ func _process(delta: float) -> void:
 	if life > 240.0:
 		_drop_loot(ppos)
 		queue_free()
+
+
+## Liegt der Punkt im See? (Nutrias laufen nicht übers Wasser)
+func _in_water(p: Vector3) -> bool:
+	if main == null or main.get("lake_root") == null:
+		return false
+	var lp: Vector3 = p - (main.lake_root as Node3D).global_position
+	return LakeShape.contains(Vector2(lp.x, lp.z))
+
+
+## Richtung, die nicht ins Wasser führt: sonst am Ufer entlang ausweichen, im Zweifel stehen bleiben.
+func _dry_dir(dir: Vector3, step: float) -> Vector3:
+	if not _in_water(global_position + dir * (step + 0.6)):
+		return dir
+	for ang in [0.45, -0.45, 0.9, -0.9, 1.35, -1.35]:
+		var d := dir.rotated(Vector3.UP, ang)
+		if not _in_water(global_position + d * (step + 0.6)):
+			return d
+	return Vector3.ZERO
 
 
 func _toast_near(ppos: Vector3, msg: String) -> void:

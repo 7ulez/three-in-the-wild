@@ -17,6 +17,7 @@ const STATIONS: Array = [
 
 static var on: bool = false
 static var idx: int = 0
+static var volume: float = 0.7     # nur lokal, 0..1
 
 var main: Node
 var player: Player
@@ -93,6 +94,13 @@ func next_station(local: bool = true) -> void:
 		_send()
 
 
+## +/-/Mausrad: Lautstärke in 10er-Schritten (nur für dich)
+func change_volume(step: int) -> void:
+	volume = clampf(snappedf(volume + step * 0.1, 0.1), 0.0, 1.0)
+	if player != null:
+		player.toast("Radio-Lautstärke: %d%%" % int(round(volume * 100.0)), 1.5)
+
+
 func remote_set(p_on: bool, p_idx: int) -> void:
 	var changed := p_on != on or p_idx != idx
 	on = p_on
@@ -133,7 +141,7 @@ func _process(delta: float) -> void:
 				vol *= 0.4
 	_vol = lerpf(_vol, vol, minf(delta * 5.0, 1.0))
 	if _web:
-		JavaScriptBridge.eval("window.__radio.setvol(%.3f);" % (_vol * 0.8), true)
+		JavaScriptBridge.eval("window.__radio.setvol(%.3f);" % (_vol * 0.9 * volume), true)
 	# Beschriftung der Geräte
 	for r in _radios():
 		var it := r as Item

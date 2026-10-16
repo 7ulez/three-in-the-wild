@@ -4,7 +4,7 @@ extends Node
 ## beim Biss Linksklick = anschlagen, dann Linksklick halten = einholen (Schnurspannung beachten!).
 
 enum S { IDLE, WAITING, BITE, FIGHT, RETRIEVE }
-const MODES: Array = ["Grundangeln (Karpfen, Nacht!)", "Posenangeln (Friedfisch)", "Spinnangeln (Hecht)"]
+const MODES: Array = ["Grundangeln (Karpfen, Aal, Nacht!)", "Posenangeln (Friedfisch)", "Spinnangeln (Hecht)"]
 
 const FISH: Dictionary = {
 	"Karpfen": {"kg": [2.0, 14.0], "strength": 1.0, "color": Color(0.6, 0.5, 0.22)},
@@ -13,6 +13,7 @@ const FISH: Dictionary = {
 	"Barsch": {"kg": [0.2, 1.2], "strength": 0.5, "color": Color(0.5, 0.55, 0.25)},
 	"Brasse": {"kg": [0.5, 2.5], "strength": 0.6, "color": Color(0.7, 0.62, 0.45)},
 	"Riesenwels": {"kg": [30.0, 130.0], "strength": 1.5, "color": Color(0.24, 0.24, 0.2)},
+	"Aal": {"kg": [0.4, 3.0], "strength": 0.9, "color": Color(0.14, 0.16, 0.08)},
 }
 
 var player: Player
@@ -298,10 +299,17 @@ func _pick_species() -> String:
 		return "Riesenwels"
 	match mode:
 		0:
+			# Aale beißen vor allem nachts am Grund
 			if night:
+				if r < 0.15:
+					return "Aal"
 				return "Karpfen" if r < 0.85 else "Brasse"
+			if r < 0.07:
+				return "Aal"
 			return "Karpfen" if r < 0.35 else ("Brasse" if r < 0.75 else "Rotauge")
 		1:
+			if r < 0.03:
+				return "Aal"
 			if r < 0.45:
 				return "Rotauge"
 			if r < 0.75:
@@ -311,6 +319,8 @@ func _pick_species() -> String:
 			return "Karpfen"
 		_:
 			var pike_p := 0.3 if night else 0.55
+			if player != null and player.character_name == "Marian":
+				pike_p *= 1.2      # Marian hat beim Hechtangeln 20 % mehr Glück
 			return "Hecht" if r < pike_p else "Barsch"
 	return "Rotauge"
 

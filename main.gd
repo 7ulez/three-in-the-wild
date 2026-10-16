@@ -754,7 +754,16 @@ func _nutria_logic(delta: float) -> void:
 func spawn_nutria_at(pos: Vector3) -> void:
 	if nutria_active != null and is_instance_valid(nutria_active):
 		return
+	# nie im See auftauchen: ggf. in Richtung Lager verschieben
+	var sp := Vector3(pos.x, 0.0, pos.z)
+	for i in range(40):
+		var lq: Vector3 = sp - lake_root.global_position
+		if not LakeShape.contains(Vector2(lq.x, lq.z)):
+			break
+		var back := Game.camp_center - sp
+		back.y = 0.0
+		sp += back.normalized() * 2.0
 	var n := Nutria.new()
 	add_child(n)
-	n.setup(self, Vector3(pos.x, 0.0, pos.z))
+	n.setup(self, sp)
 	nutria_active = n

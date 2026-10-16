@@ -234,7 +234,7 @@ func get_prompt() -> String:
 			t = _oven_prompt()
 		"Rucksack":
 			if contents.is_empty():
-				t = "Der Rucksack ist leer   (X: abbauen)"
+				t = "Der Rucksack ist leer   (Gegenstand in der Hand + E: einpacken, X: abbauen)"
 			else:
 				var c: Dictionary = contents[sel % contents.size()]
 				t = "E: auspacken: %s   (Z: anderes Teil, %d drin)" % [_pack_label(c), contents.size()]
@@ -336,6 +336,19 @@ func get_held_prompt(held: Node) -> String:
 
 
 func interact_with_held(player: Node, held: Node) -> bool:
+	if item_name == "Rucksack" and held.item_name != "Rucksack":
+		if contents.size() >= 12:
+			player.toast("Der Rucksack ist voll.", 2.0)
+			return true
+		var d := {"name": held.item_name, "weight": held.weight, "size": held.item_size, "color": held.item_color}
+		if held.extra.has("owner"):
+			d["owner"] = held.extra["owner"]
+		contents.append(d)
+		player.release_held_for_storage()
+		Sfx.play("click", global_position)
+		player.toast("%s im Rucksack verstaut. (%d drin)" % [held.item_name, contents.size()], 2.0)
+		held.queue_free()
+		return true
 	if item_name == "Kühlbox" and is_fish_item(held):
 		_store_fish(player, held)
 		return true

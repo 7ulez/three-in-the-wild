@@ -150,7 +150,7 @@ func get_prompt() -> String:
 	if item_name == "Wasserflasche":
 		return "E: Wasserflasche aufheben (%d kg)   F: Wasser trinken (%d Schluck)" % [int(weight), water_left]
 	if item_name == "Radio":
-		return "E: Radio aufheben   F: an/aus   Z: Sender wechseln  [%s]" % (Radio.station_name() if Radio.on else "aus")
+		return "E: Radio aufheben   F: an/aus   Z: Sender  +/- Lautstärke  [%s]" % (Radio.station_name() if Radio.on else "aus")
 	return "E: %s aufheben (%d kg)" % [display_name(), int(weight)]
 
 

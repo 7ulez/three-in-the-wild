@@ -9,6 +9,7 @@ const FIRE: Color = Color(0.6, 0.36, 0.12)
 const WOOD: Color = Color(0.36, 0.24, 0.13)
 
 var _labels: Array[Label3D] = []
+var _icons: Array[Sprite3D] = []
 var _ver: int = -1
 
 
@@ -48,6 +49,17 @@ func build() -> void:
 		add_child(title)
 		add_child(body)
 		_labels.append(body)
+		# Pro Platz ein Bild vom gefangenen Fisch (rechts neben dem Eintrag)
+		for r in range(Leaderboard.MAX_ENTRIES):
+			var ic := Sprite3D.new()
+			ic.shaded = false
+			ic.double_sided = false
+			ic.pixel_size = 0.34 / 384.0
+			ic.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			ic.position = Vector3(1.64, 2.0, z * 1.1 + 0.004)
+			ic.visible = false
+			add_child(ic)
+			_icons.append(ic)
 	# Massiv: man kann weder hindurch noch auf die Tafel laufen
 	var body := StaticBody3D.new()
 	var cs := CollisionShape3D.new()
@@ -84,5 +96,17 @@ func _refresh() -> void:
 		var wd := 0.0
 		for ln in lines:
 			wd = maxf(wd, UI.f_mono.get_string_size(ln, HORIZONTAL_ALIGNMENT_LEFT, -1, l.font_size).x * l.pixel_size)
-		if wd > 3.6:
-			l.pixel_size *= 3.6 / wd
+		if wd > 3.1:
+			l.pixel_size *= 3.1 / wd
+	# Fischbilder: Zeilenhöhe aus der Schrift, Zeile 0 ist die Kopfzeile
+	var lh := UI.f_mono.get_height(34) * _labels[0].pixel_size
+	for i in range(_icons.size()):
+		var ic: Sprite3D = _icons[i]
+		if i < Leaderboard.entries.size():
+			var path := "res://assets/fish_icons/%s.png" % str(Leaderboard.entries[i]["fish"]).to_lower()
+			if ResourceLoader.exists(path):
+				ic.texture = load(path)
+				ic.position.y = 2.66 - (i + 1.5) * lh
+				ic.visible = true
+				continue
+		ic.visible = false

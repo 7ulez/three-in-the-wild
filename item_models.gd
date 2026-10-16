@@ -477,10 +477,9 @@ static func _ingredient(parent: Node3D, kind: String, color: Color) -> Dictionar
 
 static func _fish(parent: Node3D, size: Vector3, color: Color, kind: String = "") -> Dictionary:
 	var fm: Node3D = null
-	if kind.begins_with("Karpfen"):
-		fm = _glb(parent, "karpfen")
-	elif kind.begins_with("Hecht"):
-		fm = _glb(parent, "hecht")
+	var sp := kind.get_slice(" ", 0).to_lower()
+	if ["karpfen", "hecht", "rotauge", "barsch", "brasse", "riesenwels", "aal"].has(sp):
+		fm = _glb(parent, sp)
 	if fm != null:
 		fm.scale = Vector3.ONE * size.x
 		return {}

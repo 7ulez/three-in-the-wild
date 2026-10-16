@@ -115,6 +115,7 @@ var logs: int = 0
 
 # Schlafen, Feuer machen, Kopflampe
 var sleeping: bool = false
+var tent_lying: Tent = null     # Multiplayer: liegt im Zelt (wartet auf die anderen)
 var lamp: SpotLight3D
 var fire_bowl: PlacedItem = null
 var fire_t: float = 0.0
@@ -416,6 +417,8 @@ func anim_flags() -> int:
 		f |= 1024
 	if drink_t > 0.0:
 		f |= 256 if drink_kind == 1 else 512
+	if is_lying():
+		f |= 2048
 	return f
 
 
@@ -652,6 +655,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if not Game.is_captured():
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		elif (mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN) and not placing and Radio.target_of(self) != null and get_parent().get("radio") != null:
+			(get_parent().radio as Radio).change_volume(1 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else -1)
 		elif placing:
 			match mb.button_index:
 				MOUSE_BUTTON_WHEEL_UP:
@@ -686,6 +691,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				needs.try_big_business()
 			KEY_Q:
 				needs.vape()
+			KEY_PLUS, KEY_KP_ADD, KEY_MINUS, KEY_KP_SUBTRACT, KEY_EQUAL, KEY_SLASH:
+				if Radio.target_of(self) != null and get_parent().get("radio") != null:
+					var up: bool = key.keycode == KEY_PLUS or key.keycode == KEY_KP_ADD or key.keycode == KEY_EQUAL
+					(get_parent().radio as Radio).change_volume(1 if up else -1)
 			KEY_Z:
 				var zc: Object = _reach_target()
 				if Radio.target_of(self) != null and get_parent().get("radio") != null:
@@ -753,7 +762,7 @@ func _physics_process(delta: float) -> void:
 			free_from_trap()
 		_update_prompt()
 		return
-	if hammock != null:
+	if hammock != null or tent_lying != null:
 		velocity = Vector3.ZERO
 		_drink_cd = maxf(_drink_cd - delta, 0.0)
 		promille = maxf(promille - delta * 0.01, 0.0)
@@ -761,6 +770,7 @@ func _physics_process(delta: float) -> void:
 				or Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_D) \
 				or Input.is_physical_key_pressed(KEY_SPACE):
 			unlie()
+			unlie_tent()
 		_update_prompt()
 		return
 	if not is_on_floor():
@@ -1247,7 +1257,7 @@ func _update_prompt() -> void:
 			elif held.item_name == "Joint":
 				text += "   F: rauchen (%d Züge)" % int(held.extra.get("puffs", 4))
 			elif held.item_name == "Radio":
-				text += "   F: an/aus   Z: Sender wechseln  [%s]" % (Radio.station_name() if Radio.on else "aus")
+				text += "   F: an/aus   Z: Sender  +/-: Lautstärke  [%s]" % (Radio.station_name() if Radio.on else "aus")
 			elif held.item_name != "Hammer":
 				text += "   R: aufstellen"
 			if held.drink_kind() == "beer":
@@ -1288,6 +1298,9 @@ func _interact() -> void:
 		return
 	if hammock != null:
 		unlie()
+		return
+	if tent_lying != null:
+		unlie_tent()
 		return
 	var c: Object = _reach_target()
 	if held != null:
@@ -1656,6 +1669,53 @@ func lie(h: Hammock) -> void:
 	global_position = h.lie_pos()
 	head.position.y = 0.45
 	toast("Du liegst in der Hängematte und baumelst. Gesundheit erholt sich. E oder WASD: aufstehen.", 4.0)
+
+
+func is_lying() -> bool:
+	return hammock != null or tent_lying != null
+
+
+## Multiplayer: im Zelt hinlegen, die Nacht wird übersprungen sobald alle liegen.
+func lie_in_tent(tent: Tent) -> void:
+	if is_lying() or seat != null or sleeping:
+		return
+	if held != null and held.item_name != "Angelrute":
+		_drop()
+	tent_lying = tent
+	collision_layer = 0
+	collision_mask = 0
+	teleport_to(tent.global_position + Vector3(0, 0.2, 0))
+	head.position.y = 0.35
+	toast("Du liegst im Zelt. Die Nacht vergeht, sobald ALLE im Zelt oder in der Hängematte liegen. E oder WASD: aufstehen.", 5.0)
+
+
+func unlie_tent() -> void:
+	if tent_lying == null:
+		return
+	var t := tent_lying
+	tent_lying = null
+	if is_instance_valid(t):
+		global_position = t.global_transform * Vector3(0, 0.1, -2.1)
+	head.position.y = 1.6
+	collision_layer = 1
+	collision_mask = 1
+
+
+## Alle liegen: die Nacht ist vorbei (vom Host ausgelöst).
+func night_skipped() -> void:
+	var was_tent := tent_lying != null
+	if hammock != null:
+		unlie()
+	unlie_tent()
+	Game.slept = true
+	if needs != null:
+		needs.hunger = minf(needs.hunger + 0.2, 1.0)
+		needs.bladder = minf(needs.bladder + 0.3, 1.0)
+		needs.health = minf(needs.health + 25.0, 100.0)
+	promille = maxf(promille - 0.8, 0.0)
+	fade_rect.color.a = 1.0
+	create_tween().tween_property(fade_rect, "color:a", 0.0, 1.5)
+	toast("Alle schlafen - die Nacht wird übersprungen. Guten Morgen! Tag %d, %s Uhr." % [Game.day_count, Game.clock_text()], 5.0)
 
 
 func unlie() -> void:

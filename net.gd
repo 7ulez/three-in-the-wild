@@ -307,12 +307,53 @@ func _process(delta: float) -> void:
 	elif _timer >= 0.066:
 		_timer = 0.0
 		var p: Player = main.player
-		rpc("sync_state", p.global_position, p.rotation.y, p.character_name, Game.player_name, p.sleeping, p.anim_flags())
+		rpc("sync_state", p.global_position, p.rotation.y, p.character_name, Game.player_name, p.sleeping or p.tent_lying != null, p.anim_flags())
 	if is_host():
+		_skip_t += delta
+		if _skip_t > 0.5:
+			_skip_t = 0.0
+			_check_night_skip()
 		_time_timer += delta
 		if _time_timer > 3.0:
 			_time_timer = 0.0
 			rpc("sync_time", Game.hour, Game.day_count, Weather.kind)
+
+
+var _skip_t: float = 0.0
+
+
+## Host: liegen alle (Zelt/Hängematte) und ist es Nacht, wird bis zum Morgen übersprungen.
+func _check_night_skip() -> void:
+	if not Game.is_night():
+		return
+	var n := 0
+	var p: Player = main.player
+	if p != null and not Game.dedicated:
+		if not p.is_lying():
+			return
+		n += 1
+	for id in avatars.keys():
+		var a = avatars[id]
+		if not is_instance_valid(a):
+			continue
+		if (int(a.anim) & 2048) == 0:
+			return
+		n += 1
+	if n == 0:
+		return
+	if Game.hour >= 12.0:
+		Game.day_count += 1
+	Game.hour = 6.5
+	if main.get("weather") != null:
+		(main.weather as Weather).set_kind(Weather.K.CLEAR, false)
+	rpc("sync_time", Game.hour, Game.day_count, Weather.kind)
+	rpc("remote_night_skipped")
+
+
+@rpc("authority", "reliable", "call_local")
+func remote_night_skipped() -> void:
+	if main != null and main.player != null:
+		main.player.night_skipped()
 
 
 @rpc("any_peer", "unreliable_ordered")
