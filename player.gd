@@ -1143,7 +1143,10 @@ func _smoke() -> void:
 	if needs != null and needs.vape_particles != null:
 		needs.vape_particles.restart()
 		needs.vape_particles.emitting = true
-	Sfx.play("whoosh", Vector3.INF, -10.0, 0.5)
+	if Sfx.has_file("joint"):
+		Sfx.play("joint", Vector3.INF, -2.0, 1.0)
+	else:
+		Sfx.play("whoosh", Vector3.INF, -10.0, 0.5)
 	trip_t = minf(trip_t + 10.0, 24.0)
 	var lines := ["Pfffff... das zieht.", "Die Farben werden... lauter.", "Alles leuchtet. Wow.", "Die Bäume atmen."]
 	toast(lines[left % lines.size()] if left >= 0 else lines[0], 3.0)

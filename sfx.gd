@@ -144,7 +144,7 @@ static func _file_streams(sound: String) -> Array:
 		var path := "%s_%d.ogg" % [base, i]
 		if ResourceLoader.exists(path):
 			list.append(load(path))
-	if sound == "water" or sound == "fire":
+	if sound == "water" or sound == "fire" or sound == "rain":
 		for st in list:
 			(st as AudioStreamOggVorbis).loop = true
 	_files[sound] = list
