@@ -296,6 +296,57 @@ static func _paint_bottle(b: Node3D, kind: int) -> void:
 
 
 ## Vornübergebeugt kotzen: Oberkörper kippt nach vorn, im Rhythmus des Würgens.
+## Nasse/braune Hose: Fleck am Schritt und an den Oberschenkeln, Stoff verfärbt sich.
+static func set_pants(parent: Node3D, kind: int) -> void:
+	if int(parent.get_meta("pants", 0)) == kind:
+		return
+	parent.set_meta("pants", kind)
+	if parent.has_meta("stain"):
+		var old: Node = parent.get_meta("stain") as Node
+		if old != null and is_instance_valid(old):
+			old.queue_free()
+		parent.remove_meta("stain")
+	var inst: Node3D = parent.get_meta("inst", null) as Node3D
+	if inst == null:
+		return
+	for mi in inst.find_children("Hose*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if kind == 0:
+			m.material_override = null
+		else:
+			var base := m.get_active_material(0) as StandardMaterial3D
+			if base != null:
+				var nm := base.duplicate() as StandardMaterial3D
+				var tint := Color(0.7, 0.58, 0.12) if kind == 1 else Color(0.3, 0.18, 0.08)
+				nm.albedo_color = base.albedo_color.lerp(tint, 0.45)
+				m.material_override = nm
+	if kind == 0:
+		return
+	var col := Color(0.72, 0.6, 0.08) if kind == 1 else Color(0.27, 0.16, 0.07)
+	var st := Node3D.new()
+	st.name = "Stain"
+	inst.add_child(st)
+	parent.set_meta("stain", st)
+	var mat := Util.mat(col, 0.9)
+	var patch := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.5
+	sm.height = 1.0
+	patch.mesh = sm
+	patch.material_override = mat
+	patch.scale = Vector3(0.3, 0.24, 0.09)
+	patch.position = Vector3(0, 0.86, 0.11)
+	st.add_child(patch)
+	for sx in [-1.0, 1.0]:
+		var dr := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.07, 0.4, 0.03)
+		dr.mesh = bm
+		dr.material_override = mat
+		dr.position = Vector3(sx * 0.1, 0.66, 0.12)
+		st.add_child(dr)
+
+
 static func vomit_pose(parent: Node3D, on: bool, delta: float) -> void:
 	var inst: Node3D = parent.get_meta("inst", null) as Node3D
 	if inst == null:
@@ -400,8 +451,12 @@ static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air
 ## Animationszustand als Bitmaske für die anderen Spieler (Bit0 ducken, Bit1 Luft, Bit2-3 Angeln, Bit4 Hocke).
 func anim_flags() -> int:
 	var f := 0
-	if crouching:
+	if crouching or (needs != null and needs.accident_t > 0.0):
 		f |= 1
+	if needs != null and needs.pants == 1:
+		f |= 4096
+	if needs != null and needs.pants == 2:
+		f |= 8192
 	if _air_t > 0.18:
 		f |= 2
 	f |= (_fish_anim() & 3) << 2
@@ -830,7 +885,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
-	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching, _air_t > 0.18, _fish_anim(), needs != null and needs.squatting, false, vape_t > 0.0, drink_kind if drink_t > 0.0 else 0, needs != null and needs.peeing)
+	Player.set_pants(body_visual, needs.pants if needs != null else 0)
+	Player.animate_body(body_visual, Vector2(velocity.x, velocity.z).length(), crouching or (needs != null and needs.accident_t > 0.0), _air_t > 0.18, _fish_anim(), needs != null and needs.squatting, false, vape_t > 0.0, drink_kind if drink_t > 0.0 else 0, needs != null and needs.peeing)
 	if is_on_floor():
 		var drop := _peak_y - global_position.y
 		if _airborne and drop > 5.0:

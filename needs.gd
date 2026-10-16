@@ -22,6 +22,11 @@ var panel: VBoxContainer
 var pee_particles: CPUParticles3D
 var vape_particles: CPUParticles3D
 var dead_until: float = 0.0
+var pants: int = 0                # 0 sauber, 1 nass, 2 braun
+var pants_t: float = 0.0
+var accident_t: float = 0.0       # >0: gerade Missgeschick (geht in die Knie)
+var _bladder_full_t: float = 0.0
+var _warned: int = 0
 
 
 func setup(p: Player, layer: CanvasLayer) -> void:
@@ -127,9 +132,58 @@ func damage(amount: float, reason: String) -> void:
 		player.toast("Autsch! %s (-%d)" % [reason, int(amount)], 2.5)
 
 
+## Missgeschick in die Hose: Hose verfärbt sich, etwas Gesundheit weg.
+func accident(kind: int) -> void:
+	pants = maxi(pants, kind)
+	pants_t = 300.0
+	accident_t = 2.2
+	var loss := 5.0 if kind == 1 else 10.0
+	health = maxf(health - loss, 1.0)
+	Sfx.play("trickle", player.global_position, -2.0, 0.9)
+	Fx.wet_spot(player.get_parent(), Vector3(player.global_position.x, 0.0, player.global_position.z))
+	if kind == 1:
+		player.toast("Oh nein... in die Hose gepinkelt. (-5 Gesundheit) Im See abwaschen oder warten, bis sie trocknet.", 5.0)
+	else:
+		player.toast("Das war peinlich... die Hose ist hin. (-10 Gesundheit) Im See abwaschen oder warten.", 5.0)
+
+
+## Tod: Holzkreuz an der Stelle, Gepäck weg, Stunden später am Parkplatz wieder wach.
 func _die(reason: String) -> void:
-	health = 100.0
-	player.toast("%s - du wachst am Parkplatz wieder auf." % reason, 5.0)
+	var pos := player.global_position
+	var main := player.get_parent()
+	Game.deaths += 1
+	var cross := Node3D.new()
+	cross.name = "Grave"
+	main.add_child(cross)
+	cross.global_position = Vector3(pos.x, 0.0, pos.z)
+	Util.add_box(cross, Vector3(0.12, 1.2, 0.12), Color(0.4, 0.27, 0.14), Vector3(0, 0.6, 0))
+	Util.add_box(cross, Vector3(0.7, 0.12, 0.12), Color(0.4, 0.27, 0.14), Vector3(0, 0.95, 0))
+	Util.add_box(cross, Vector3(0.7, 0.04, 0.5), Color(0.25, 0.2, 0.15), Vector3(0, 0.02, 0.3))
+	var gl := Label3D.new()
+	gl.text = "† %s\n%s" % [Game.player_name if Game.player_name != "" else player.character_name, reason]
+	gl.font_size = 40
+	gl.pixel_size = 0.004
+	gl.outline_size = 8
+	gl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	gl.position = Vector3(0, 1.5, 0)
+	cross.add_child(gl)
+	var lost := player.logs + player.stones + player.tinder + player.sticks
+	player.logs = 0
+	player.stones = 0
+	player.tinder = 0
+	player.sticks = 0
+	health = 50.0
+	hunger = 0.5
+	bladder = 0.2
+	pants = 0
+	player.promille = 0.0
+	var msg := "%s - du kommst am Parkplatz wieder zu dir. Halbe Gesundheit" % reason
+	if Net.instance == null:
+		Game.hour = fposmod(Game.hour + 3.0, 24.0)
+		msg += ", 3 Stunden vergangen"
+	if lost > 0:
+		msg += ", gesammeltes Material (%d) ist weg" % lost
+	player.toast(msg + ". Dein Kreuz bleibt dort stehen.", 7.0)
 	player.respawn()
 
 
@@ -150,12 +204,35 @@ func _process(delta: float) -> void:
 		if _urgent_time > 50.0:
 			_urgent_time = 0.0
 			bowel = 0.25
-			player.toast("Zu spät... Das war peinlich. Die Hose ist hin.", 5.0)
+			accident(2)
 			player.promille = maxf(player.promille - 0.2, 0.0)
 	else:
 		_urgent_time = 0.0
 	if hunger >= 1.0:
-		health = maxf(health - delta * 0.5, 1.0)
+		damage(delta * 0.8, "Verhungert")
+	elif hunger > 0.95 and _warned < 3:
+		_warned = 3
+		player.toast("Du verhungerst bald! Iss etwas (Pilze, Beeren, Äpfel, Grill).", 5.0)
+	elif hunger > 0.8 and _warned < 2:
+		_warned = 2
+		player.toast("Dein Magen knurrt. Such dir was zu essen.", 4.0)
+	if hunger < 0.7:
+		_warned = 0
+	# Blase voll: nach einiger Zeit geht es in die Hose
+	if bladder >= 1.0 and not peeing:
+		_bladder_full_t += delta
+		if _bladder_full_t > 25.0:
+			_bladder_full_t = 0.0
+			bladder = 0.15
+			accident(1)
+	else:
+		_bladder_full_t = 0.0
+	accident_t = maxf(accident_t - delta, 0.0)
+	if pants != 0:
+		pants_t -= delta
+		if player.water_d > 0.5 or pants_t <= 0.0:
+			pants = 0
+			player.toast("Die Hose ist wieder sauber.", 3.0)
 	_vape_cd = maxf(_vape_cd - delta, 0.0)
 
 	# Pinkeln: P gedrückt halten

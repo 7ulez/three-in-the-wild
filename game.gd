@@ -23,6 +23,7 @@ static var fire_lit_once: bool = false
 static var chili_served: int = 0
 static var cars_opened: int = 0
 static var slept: bool = false
+static var deaths: int = 0
 static var summit: bool = false
 static var all_done_shown: bool = false
 

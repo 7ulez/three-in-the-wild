@@ -525,21 +525,42 @@ func _scatter_forest_traps() -> void:
 		t.position = p
 		t.rotation.y = rng.randf() * TAU
 		n += 1
-	# Beeren und Pilze im ganzen Wald
-	n = 0
-	tries = 0
-	while n < 24 and tries < 600:
-		tries += 1
-		var p2 := Vector3(rng.randf_range(-70.0, 70.0), 0, rng.randf_range(-100.0, -22.0))
-		if main.call("_tree_blocked", p2) and not Hideouts.in_zone(p2):
+	# Beeren, Pilze und Äpfel auf der ganzen Karte (wachsen nach, siehe _process)
+	for i in range(FOOD_TARGET):
+		_spawn_food(true)
+
+
+const FOOD_TARGET: int = 70
+const FOOD_KINDS: Array = ["gut", "beere", "apfel", "gut", "gift", "beere", "apfel"]
+var _food_t: float = 0.0
+var _food_n: int = 0
+
+
+func _spawn_food(initial: bool = false) -> bool:
+	for k in range(40):
+		var p := Vector3(randf_range(-110.0, 110.0), 0, randf_range(-110.0, 62.0))
+		if main.call("_tree_blocked", p) or Hideouts.in_zone(p):
 			continue
-		if Hideouts.in_zone(p2):
-			continue
+		var pl: Node3D = main.get("player") as Node3D
+		if not initial and pl != null and pl.global_position.distance_to(p) < 14.0:
+			continue      # nicht vor den Augen des Spielers aufpoppen
 		var m := Mushroom.new()
+		m.add_to_group("food")
 		add_child(m)
-		m.build(["gut", "gift", "beere"][n % 3])
-		m.position = p2
-		n += 1
+		m.build(FOOD_KINDS[_food_n % FOOD_KINDS.size()])
+		_food_n += 1
+		m.position = p
+		return true
+	return false
+
+
+func _process(delta: float) -> void:
+	_food_t += delta
+	if _food_t < 12.0:
+		return
+	_food_t = 0.0
+	if get_tree().get_nodes_in_group("food").size() < FOOD_TARGET:
+		_spawn_food()
 
 
 func _signs() -> void:
