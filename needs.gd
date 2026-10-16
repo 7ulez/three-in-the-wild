@@ -183,8 +183,12 @@ func _die(reason: String) -> void:
 		msg += ", 3 Stunden vergangen"
 	if lost > 0:
 		msg += ", gesammeltes Material (%d) ist weg" % lost
-	player.toast(msg + ". Dein Kreuz bleibt dort stehen.", 7.0)
+	player.toast(msg + ". Als Strafe: trag die neue Kiste Bier am Parkplatz ins Camp!", 8.0)
 	player.respawn()
+	# Strafe: neuer Kasten Bier am Parkplatz, muss zum Camp getragen werden
+	var beer := Item.new().setup("Bierkasten", 14.0, Vector3(0.5, 0.3, 0.35), Color(0.9, 0.75, 0.2))
+	main.add_child(beer)
+	beer.global_position = Vector3(1.5, 1.0, 10.0)
 
 
 func _process(delta: float) -> void:
