@@ -6,6 +6,7 @@ const PIER_X: Array = [-12.0, 0.0, 12.0]
 ## Alles rund um den See hängt an diesem Knoten und liegt 15 m weiter vorne.
 var lake_root: Node3D
 var sun: DirectionalLight3D
+var weather: Weather
 var moon: DirectionalLight3D
 var env: Environment
 var player: Player
@@ -61,6 +62,10 @@ func _ready() -> void:
 	player.character_name = Game.start_char
 	add_child(player)
 	player.global_position = Vector3(0, 1.0, 10)
+	weather = Weather.new()
+	weather.name = "Weather"
+	add_child(weather)
+	weather.start(self, player)
 	var amb := Ambient.new()
 	amb.name = "Ambient"
 	add_child(amb)
@@ -75,6 +80,10 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if Game.dedicated:
+		if weather == null:
+			weather = Weather.new()
+			add_child(weather)
+			weather.start(self, null)
 		var dday := Game.hour >= 6.0 and Game.hour < 18.0
 		Game.hour += delta * (1.2 if dday else 1.7) / 60.0
 		if Game.hour >= 24.0:
@@ -107,13 +116,28 @@ func _update_sky() -> void:
 	moon.light_energy = lerpf(0.0, 0.35, night)
 	var top := Color(0.25, 0.55, 0.85).lerp(Color(0.02, 0.03, 0.1), night)
 	var hor := Color(0.95, 0.8, 0.62).lerp(Color(1.0, 0.45, 0.25), warm * day).lerp(Color(0.06, 0.07, 0.16), night)
+	# Wetter: Wolken grauen den Himmel ein und dimmen die Sonne, Blitze erhellen alles kurz
+	var dk := Weather.dark()
+	var grey := clampf(Weather.cloud - 0.5, 0.0, 1.2) / 1.2 * 0.7 + Weather.fog * 0.4
+	var lum := lerpf(0.12, 0.62, day)
+	top = top.lerp(Color(lum, lum * 1.03, lum * 1.08), clampf(grey, 0.0, 0.9))
+	hor = hor.lerp(Color(lum * 1.1, lum * 1.12, lum * 1.15), clampf(grey + Weather.fog * 0.3, 0.0, 0.95))
+	top = top.lerp(Color(0.85, 0.9, 1.0), Weather.flash * 0.7)
+	hor = hor.lerp(Color(0.9, 0.93, 1.0), Weather.flash * 0.7)
+	sun.light_energy = sun.light_energy * (1.0 - dk) + Weather.flash * 0.9
+	moon.light_energy = moon.light_energy * (1.0 - dk * 0.5)
 	Scenery.update_sky(top, hor, Color(0.3, 0.45, 0.3).lerp(Color(0.02, 0.03, 0.05), night), sun.global_transform.basis.z,
-		sun.light_color, moon.global_transform.basis.z, night, day)
-	env.ambient_light_energy = lerpf(0.25, 0.6, day)
+		sun.light_color, moon.global_transform.basis.z, night, day * (1.0 - 0.45 * dk))
+	if Scenery.sky_shader_mat != null:
+		Scenery.sky_shader_mat.set_shader_parameter("cloud_amt", Weather.cloud)
+		Scenery.sky_shader_mat.set_shader_parameter("cloud_shade", Color(0.62, 0.68, 0.78).lerp(Color(0.26, 0.28, 0.33), dk))
+		Scenery.sky_shader_mat.set_shader_parameter("cloud_lit", Color(1.0, 0.97, 0.92).lerp(sun.light_color, 0.3).lerp(Color(0.55, 0.58, 0.63), dk * 1.2))
+	env.ambient_light_energy = lerpf(0.25, 0.6, day) * (1.0 - 0.5 * dk) + Weather.flash * 1.6
 	if _in_cave:
 		env.ambient_light_energy = 0.04
-	env.fog_light_color = Color(0.95, 0.82, 0.65).lerp(Color(0.05, 0.06, 0.12), night)
-	env.fog_density = 0.002 + 0.0015 * night
+	env.fog_light_color = Color(0.95, 0.82, 0.65).lerp(Color(0.05, 0.06, 0.12), night).lerp(Color(lum * 1.1, lum * 1.12, lum * 1.16), clampf(grey, 0.0, 0.85))
+	env.tonemap_exposure = 0.82 * (1.0 - 0.18 * dk) + Weather.flash * 0.5
+	env.fog_density = 0.002 + 0.0015 * night + Weather.fog * 0.014 + Weather.rain * 0.0035
 
 
 var _in_cave: bool = false

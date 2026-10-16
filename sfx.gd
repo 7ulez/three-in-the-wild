@@ -5,8 +5,8 @@ extends Node
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
-const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2, "reload": 1, "chest_open": 1}
-const LOWRATE: Array = ["wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit"]
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2, "reload": 1, "chest_open": 1, "thunder": 2}
+const LOWRATE: Array = ["rain", "thunder", "wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit"]
 var _warm: Array = []
 var _warm_t: float = 2.0
 static var inst: Sfx = null
@@ -58,7 +58,7 @@ func _process(delta: float) -> void:
 	_amb_birds_t -= delta
 	if _amb_birds_t <= 0.0:
 		_amb_birds_t = randf_range(2.5, 7.0)
-		if not night:
+		if not night and Weather.rain < 0.15:
 			var a := randf() * TAU
 			play("chirp", _player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(8.0, 25.0) + Vector3(0, 6, 0), -6.0, randf_range(0.85, 1.2))
 	_amb_night_t -= delta
@@ -635,6 +635,26 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			s = _add(s, _sine(0.5, 1760.0, 1760.0, 11.0, 0.25, 0.003))
 			s = _add(s, _sine(0.3, 2640.0, 2640.0, 18.0, 0.1, 0.003))
 			return _wav(s, 0.5)
+		"rain":
+			# Gleichmäßiges Prasseln: gefiltertes Rauschen plus vieler kleiner Tropfen
+			var d := 5.0
+			var s := _nf(_white(d + 0.6), 1, 2600.0, 0.5)
+			s = _add(s, _nf(_white(d + 0.6), 0, 900.0, 0.6), 0.0, 0.8)
+			for i in range(s.size()):
+				s[i] *= 0.55 + 0.45 * _lfo(i, s.size(), 6.0, 0.2)
+			for k in range(int(d * 60)):
+				s = _add(s, _env(_nf(_white(0.012), 1, randf_range(3500.0, 7000.0), 1.5), 0.0003, 260.0, randf_range(0.2, 0.7)), randf_range(0.0, d + 0.5))
+			s.resize(int(SR * (d + 0.6)))
+			return _wav(_loopify(s, 0.6), 0.55, true)
+		"thunder":
+			# Erst ein knackender Schlag, dann langes Grollen
+			var s := _env(_nf(_white(0.5), 1, 1500.0, 0.6), 0.002, 9.0, 0.9)
+			var rum := _env(_nf(_white(4.0), 0, randf_range(110.0, 170.0), 0.7), 0.35, 1.0, 1.0)
+			for i in range(rum.size()):
+				rum[i] *= 0.6 + 0.4 * _lfo(i, rum.size(), 9.0, randf())
+			s = _add(s, rum, 0.05)
+			s = _add(s, _sine(1.2, 62.0, 38.0, 2.2, 0.8, 0.05), 0.1)
+			return _wav(s, 0.9)
 		"wind":
 			var d := 6.0
 			var raw := _white(d + 0.8)

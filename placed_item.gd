@@ -1042,7 +1042,7 @@ func _process(delta: float) -> void:
 	if rod_in:
 		_rod_process(delta)
 	if item_name == "Feuerschale" and burning:
-		burn_left -= delta
+		burn_left -= delta * (1.0 + 2.0 * Weather.rain)   # Regen löscht das Feuer schneller
 		_flicker += delta
 		var fl: Node3D = parts.get("flames", null)
 		var frac := clampf(burn_left / 120.0, 0.35, 1.0)

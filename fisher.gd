@@ -270,7 +270,7 @@ func _roll_wait() -> float:
 		w *= 0.6
 	if Game.lure_until > Game.now():
 		w *= 0.55
-	return w * wait_scale
+	return w * wait_scale * Weather.bite_factor()
 
 
 func reel_in(msg: String) -> void:

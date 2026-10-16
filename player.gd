@@ -598,17 +598,19 @@ func step_in_poop() -> void:
 
 func _day_phase() -> String:
 	var h := Game.hour
+	var ph := "Nacht"
 	if h >= 5.0 and h < 8.0:
-		return "Morgen"
-	if h >= 8.0 and h < 12.0:
-		return "Vormittag"
-	if h >= 12.0 and h < 14.0:
-		return "Mittag"
-	if h >= 14.0 and h < 18.0:
-		return "Nachmittag"
-	if h >= 18.0 and h < 21.0:
-		return "Abend"
-	return "Nacht"
+		ph = "Morgen"
+	elif h >= 8.0 and h < 12.0:
+		ph = "Vormittag"
+	elif h >= 12.0 and h < 14.0:
+		ph = "Mittag"
+	elif h >= 14.0 and h < 18.0:
+		ph = "Nachmittag"
+	elif h >= 18.0 and h < 21.0:
+		ph = "Abend"
+	var w := Weather.word()
+	return ph if w == "" else "%s · %s" % [ph, w]
 
 
 func _update_help() -> void:
@@ -1944,6 +1946,8 @@ func sleep(tent: Tent) -> void:
 	var tw2 := create_tween()
 	tw2.tween_property(fade_rect, "color:a", 0.0, 1.0)
 	Game.slept = true
+	if Net.instance == null and get_parent().get("weather") != null:
+		(get_parent().weather as Weather).set_kind(Weather.K.CLEAR, false)   # Wie in Minecraft: Schlafen vertreibt das Wetter
 	needs.hunger = minf(needs.hunger + 0.2, 1.0)
 	needs.bladder = minf(needs.bladder + 0.3, 1.0)
 	needs.health = minf(needs.health + (10.0 if tent.smelly else 30.0), 100.0)

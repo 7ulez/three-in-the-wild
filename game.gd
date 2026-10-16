@@ -114,6 +114,7 @@ static func reset() -> void:
 	placed.clear()
 	hour = 15.5
 	day_count = 1
+	Weather.reset()
 	catches.clear()
 	fish_penalty_until = 0.0
 	treasure_found = false

@@ -312,7 +312,7 @@ func _process(delta: float) -> void:
 		_time_timer += delta
 		if _time_timer > 3.0:
 			_time_timer = 0.0
-			rpc("sync_time", Game.hour, Game.day_count)
+			rpc("sync_time", Game.hour, Game.day_count, Weather.kind)
 
 
 @rpc("any_peer", "unreliable_ordered")
@@ -331,9 +331,26 @@ func sync_state(pos: Vector3, yaw: float, char_name: String, p_name: String, sle
 
 
 @rpc("authority", "unreliable")
-func sync_time(h: float, d: int) -> void:
+func sync_time(h: float, d: int, w: int = 0) -> void:
 	Game.hour = h
 	Game.day_count = d
+	_apply_weather(w)
+
+
+func _apply_weather(w: int) -> void:
+	if main != null and main.get("weather") != null:
+		(main.weather as Weather).remote_set(w)
+	else:
+		Weather.kind = w
+
+
+@rpc("authority", "reliable")
+func remote_weather(w: int) -> void:
+	_apply_weather(w)
+
+
+func send_weather(w: int) -> void:
+	rpc("remote_weather", w)
 
 
 # ---------- Ereignisse senden ----------
