@@ -688,6 +688,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				needs.vape()
 			KEY_Z:
 				var zc: Object = _reach_target()
+				if Radio.target_of(self) != null and get_parent().get("radio") != null:
+					(get_parent().radio as Radio).next_station()
+					return
 				if zc != null and zc.has_method("cycle_selection"):
 					zc.cycle_selection()
 			KEY_R:
@@ -878,6 +881,10 @@ func _process(delta: float) -> void:
 
 func _drink() -> void:
 	if _drink_cd > 0.0 or placing:
+		return
+	if Radio.target_of(self) != null and get_parent().get("radio") != null:
+		_drink_cd = 0.3
+		(get_parent().radio as Radio).toggle()
 		return
 	if held != null and held.item_name == "Joint":
 		_smoke()
@@ -1235,6 +1242,8 @@ func _update_prompt() -> void:
 				text += "   LINKS: schießen  RECHTS: zielen  R: nachladen [%d/%d]" % [int(held.extra.get("ammo", GUN_MAG)), GUN_MAG]
 			elif held.item_name == "Joint":
 				text += "   F: rauchen (%d Züge)" % int(held.extra.get("puffs", 4))
+			elif held.item_name == "Radio":
+				text += "   F: an/aus   Z: Sender wechseln  [%s]" % (Radio.station_name() if Radio.on else "aus")
 			elif held.item_name != "Hammer":
 				text += "   R: aufstellen"
 			if held.drink_kind() == "beer":
@@ -1371,7 +1380,7 @@ func _start_placement() -> void:
 	if held.item_name == "Hammer":
 		toast("Den Hammer brauchst du für die Zeltheringe - der bleibt in der Hand.", 3.0)
 		return
-	if held.item_name == "Joint" or held.item_name == "Luftgewehr":
+	if held.item_name == "Joint" or held.item_name == "Luftgewehr" or held.item_name == "Radio":
 		toast("Das stellt man nicht auf - einfach in der Hand behalten.", 2.5)
 		return
 	if not Game.camp_claimed and held.item_name != "Zeltpaket":

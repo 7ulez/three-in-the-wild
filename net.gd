@@ -413,6 +413,17 @@ func remote_hit(victim: String, dmg: float, shooter: String) -> void:
 		pl.needs.damage(dmg, "%s hat dich mit dem Luftgewehr getroffen." % shooter)
 
 
+## Radio: an/aus und Sender für alle
+func send_radio(on: bool, idx: int) -> void:
+	rpc("remote_radio", on, idx)
+
+
+@rpc("any_peer", "reliable")
+func remote_radio(on: bool, idx: int) -> void:
+	if main != null and main.get("radio") != null:
+		(main.radio as Radio).remote_set(on, idx)
+
+
 func send_removed(pos: Vector3, item_name: String) -> void:
 	rpc("remote_removed", pos, item_name)
 

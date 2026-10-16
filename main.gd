@@ -7,6 +7,7 @@ const PIER_X: Array = [-12.0, 0.0, 12.0]
 var lake_root: Node3D
 var sun: DirectionalLight3D
 var weather: Weather
+var radio: Radio
 var moon: DirectionalLight3D
 var env: Environment
 var player: Player
@@ -66,6 +67,10 @@ func _ready() -> void:
 	weather.name = "Weather"
 	add_child(weather)
 	weather.start(self, player)
+	radio = Radio.new()
+	radio.name = "Radio"
+	add_child(radio)
+	radio.start(self, player)
 	var amb := Ambient.new()
 	amb.name = "Ambient"
 	add_child(amb)
@@ -309,6 +314,7 @@ func _build_cars() -> void:
 				_loot("Dutch Oven", 8.0, Vector3(0.4, 0.3, 0.4), Color(0.08, 0.08, 0.08)),
 				_backpack_loot(Color(0.2, 0.32, 0.55), [
 					_loot("Hammer", 2.0, Vector3(0.4, 0.12, 0.1), Color(0.45, 0.3, 0.15)),
+					_loot("Radio", 1.5, Vector3(0.3, 0.18, 0.1), Color(0.75, 0.2, 0.15)),
 					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[2], "Julian"),
 					_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
 					_loot("Campingstuhl", 3.0, Vector3(0.8, 0.2, 0.2), chair_cols[0]),

@@ -30,7 +30,7 @@ func _process(delta: float) -> void:
 			label.visible = false
 			return
 	label.visible = global_position.distance_to(_pl.global_position) < 4.2
-	if label.visible and (item_name == "Luftgewehr" or item_name == "Joint") and _pl.get("held") == self:
+	if label.visible and (item_name == "Luftgewehr" or item_name == "Joint" or item_name == "Radio") and _pl.get("held") == self:
 		label.visible = false     # in der Hand stört das Schild im Bild
 
 
@@ -85,6 +85,8 @@ func setup(p_name: String, p_weight: float, size: Vector3, color: Color) -> Item
 	add_child(label)
 
 	hold_extra = size.z * 0.5
+	if p_name == "Radio":
+		add_to_group("radio_item")
 	return self
 
 
@@ -147,6 +149,8 @@ func get_prompt() -> String:
 		return "E: leeren Bierkasten aufheben (%d kg)" % int(weight)
 	if item_name == "Wasserflasche":
 		return "E: Wasserflasche aufheben (%d kg)   F: Wasser trinken (%d Schluck)" % [int(weight), water_left]
+	if item_name == "Radio":
+		return "E: Radio aufheben   F: an/aus   Z: Sender wechseln  [%s]" % (Radio.station_name() if Radio.on else "aus")
 	return "E: %s aufheben (%d kg)" % [display_name(), int(weight)]
 
 

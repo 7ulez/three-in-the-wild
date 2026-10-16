@@ -40,6 +40,8 @@ static func add_visual(parent: Node3D, kind: String, size: Vector3, color: Color
 			return _joint(parent)
 		"Luftgewehr":
 			return _airgun(parent)
+		"Radio":
+			return _radio(parent)
 		"Kühlbox":
 			return _cooler(parent, size, color)
 		"Gasgrill":
@@ -162,6 +164,33 @@ static func _hammer(parent: Node3D) -> Dictionary:
 
 
 ## Joint: weißes Papier, glimmende Spitze, Filter
+## Kleines Kofferradio: rotes Gehäuse, Lautsprechergitter, Skala, Teleskopantenne, Tragegriff
+static func _radio(parent: Node3D) -> Dictionary:
+	var body := Color(0.72, 0.16, 0.12)
+	var cream := Color(0.93, 0.88, 0.74)
+	var dark := Color(0.1, 0.1, 0.11)
+	Util.add_box(parent, Vector3(0.3, 0.18, 0.1), body, Vector3.ZERO)
+	Util.add_box(parent, Vector3(0.31, 0.012, 0.105), cream, Vector3(0, 0.09, 0))
+	Util.add_box(parent, Vector3(0.31, 0.012, 0.105), cream, Vector3(0, -0.09, 0))
+	# Lautsprecher links (Gitter aus Streifen), Skala rechts oben
+	Util.add_box(parent, Vector3(0.12, 0.12, 0.004), dark, Vector3(-0.08, 0.0, 0.051))
+	for i in range(6):
+		Util.add_box(parent, Vector3(0.11, 0.006, 0.006), Color(0.55, 0.55, 0.58), Vector3(-0.08, -0.045 + i * 0.018, 0.053))
+	Util.add_box(parent, Vector3(0.1, 0.04, 0.004), cream, Vector3(0.075, 0.04, 0.051))
+	Util.add_box(parent, Vector3(0.003, 0.034, 0.006), Color(0.9, 0.2, 0.1), Vector3(0.09, 0.04, 0.054))
+	var k1 := Util.add_cylinder(parent, 0.017, 0.012, dark, Vector3(0.05, -0.04, 0.056))
+	k1.rotation_degrees.x = 90.0
+	var k2 := Util.add_cylinder(parent, 0.017, 0.012, dark, Vector3(0.105, -0.04, 0.056))
+	k2.rotation_degrees.x = 90.0
+	# Griff und Antenne
+	Util.add_box(parent, Vector3(0.2, 0.012, 0.012), dark, Vector3(0, 0.125, 0))
+	Util.add_box(parent, Vector3(0.012, 0.04, 0.012), dark, Vector3(-0.1, 0.108, 0))
+	Util.add_box(parent, Vector3(0.012, 0.04, 0.012), dark, Vector3(0.1, 0.108, 0))
+	var ant := Util.add_cylinder(parent, 0.003, 0.28, Color(0.75, 0.75, 0.78), Vector3(0.13, 0.22, -0.03))
+	ant.rotation_degrees.z = -18.0
+	return {}
+
+
 static func _joint(parent: Node3D) -> Dictionary:
 	var jg := _glb(parent, "joint")
 	if jg != null:
