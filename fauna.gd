@@ -19,6 +19,8 @@ func start(p_main: Node) -> void:
 	rng.seed = 777
 	for i in range(5):
 		_add("duck", _lake_point(rng, 0.8))
+	for i in range(2):
+		_add("swan", _lake_point(rng, 0.7))
 	for i in range(4):
 		_add("frog", _shore_point(rng))
 	for i in range(4):
@@ -189,6 +191,7 @@ class Animal extends Node3D:
 			"deer": return 0.95
 			"hare": return 0.22
 			"duck": return 0.18
+			"swan": return 0.4
 			"frog": return 0.06
 		return 0.0
 
@@ -197,6 +200,7 @@ class Animal extends Node3D:
 			"deer": return 0.65
 			"hare": return 0.3
 			"duck": return 0.3
+			"swan": return 0.5
 			"frog": return 0.18
 		return 0.3
 
@@ -205,6 +209,7 @@ class Animal extends Node3D:
 			"deer": return "Reh"
 			"hare": return "Hase"
 			"duck": return "Ente"
+			"swan": return "Schwan"
 			"frog": return "Frosch"
 		return "Vogel"
 
@@ -264,6 +269,7 @@ class Animal extends Node3D:
 			tw.tween_property(body, "rotation:z", deg_to_rad(88.0) * (1.0 if randf() < 0.5 else -1.0), 0.35).set_trans(Tween.TRANS_QUAD)
 		match kind:
 			"duck": Sfx.play("quack", global_position, 0.0, 0.7)
+			"swan": Sfx.play("quack", global_position, 0.0, 0.45)
 			"frog": Sfx.play("croak", global_position, -2.0, 1.4)
 			_: Sfx.play("thunk", global_position, 0.0, 0.8)
 		_blood(0.9 if kind == "bird" else 0.35)
@@ -300,6 +306,22 @@ class Animal extends Node3D:
 				Util.add_box(body, Vector3(0.07, 0.03, 0.12), Color(0.95, 0.65, 0.1), Vector3(0, 0.2, -0.36))
 				Util.add_box(body, Vector3(0.12, 0.05, 0.12), Color(0.5, 0.36, 0.22), Vector3(0, 0.12, 0.28))
 				speed = 0.7
+			"swan":
+				if ResourceLoader.exists("res://assets/fauna/schwan.glb"):
+					var sw := (load("res://assets/fauna/schwan.glb") as PackedScene).instantiate() as Node3D
+					_darken(sw, 0.04)
+					sw.position.y = -0.09
+					body.add_child(sw)
+					ap = _find_ap(sw)
+					if ap != null:
+						for an in ap.get_animation_list():
+							ap.get_animation(an).loop_mode = Animation.LOOP_NONE if an == "Preen" else Animation.LOOP_LINEAR
+						ap.play("Idle")
+					speed = 0.55
+					target = global_position
+					return
+				Util.add_sphere(body, 0.3, Color(0.95, 0.95, 0.95)).scale = Vector3(1.0, 0.7, 1.8)
+				speed = 0.55
 			"frog":
 				Util.add_sphere(body, 0.1, Color(0.25, 0.6, 0.2)).scale = Vector3(1.0, 0.6, 1.2)
 				Util.add_sphere(body, 0.03, Color(0.9, 0.9, 0.3), Vector3(0.05, 0.08, -0.07))
@@ -350,13 +372,25 @@ class Animal extends Node3D:
 				Util.add_sphere(body, 0.05, Color(0.95, 0.95, 0.95), Vector3(0, 0.2, 0.22))
 				speed = 1.5
 			"bird":
-				Util.add_sphere(body, 0.12, Color(0.12, 0.12, 0.14)).scale = Vector3(0.8, 0.8, 1.6)
-				wing_l = Node3D.new()
-				wing_r = Node3D.new()
-				body.add_child(wing_l)
-				body.add_child(wing_r)
-				Util.add_box(wing_l, Vector3(0.5, 0.02, 0.18), Color(0.2, 0.2, 0.24), Vector3(-0.25, 0, 0))
-				Util.add_box(wing_r, Vector3(0.5, 0.02, 0.18), Color(0.2, 0.2, 0.24), Vector3(0.25, 0, 0))
+				var bpath := "res://assets/fauna/%s.glb" % ("rotkehlchen" if randf() < 0.5 else "meise")
+				if ResourceLoader.exists(bpath):
+					var bi := (load(bpath) as PackedScene).instantiate() as Node3D
+					bi.scale = Vector3.ONE * 4.0     # am Himmel sonst kaum zu sehen
+					body.add_child(bi)
+					ap = _find_ap(bi)
+					if ap != null:
+						for an in ap.get_animation_list():
+							ap.get_animation(an).loop_mode = Animation.LOOP_LINEAR
+						ap.play("Fly")
+						ap.speed_scale = randf_range(0.9, 1.15)
+				else:
+					Util.add_sphere(body, 0.12, Color(0.12, 0.12, 0.14)).scale = Vector3(0.8, 0.8, 1.6)
+					wing_l = Node3D.new()
+					wing_r = Node3D.new()
+					body.add_child(wing_l)
+					body.add_child(wing_r)
+					Util.add_box(wing_l, Vector3(0.5, 0.02, 0.18), Color(0.2, 0.2, 0.24), Vector3(-0.25, 0, 0))
+					Util.add_box(wing_r, Vector3(0.5, 0.02, 0.18), Color(0.2, 0.2, 0.24), Vector3(0.25, 0, 0))
 				orbit_c = Vector3(randf_range(-40, 40), 0, randf_range(-90, -10))
 				orbit_r = randf_range(8.0, 22.0)
 				orbit_a = randf() * TAU
@@ -403,6 +437,8 @@ class Animal extends Node3D:
 
 	func _valid(p: Vector3) -> bool:
 		match kind:
+			"swan":
+				return fauna._in_lake(p, 0.85)
 			"duck":
 				return fauna._in_lake(p, 0.92)
 			"frog":
@@ -438,6 +474,32 @@ class Animal extends Node3D:
 		var night := Game.is_night()
 		var pd := _pdist()
 		match kind:
+			"swan":
+				var sflee := pd < 6.0
+				if sflee and fauna.player != null:
+					var saway := _away_from_player(6.0)
+					if _valid(saway):
+						target = saway
+				elif wait > 0.0:
+					wait -= delta
+				elif _step_to(delta, speed):
+					wait = randf_range(4.0, 12.0)
+					for i in range(20):
+						var scand := global_position + Vector3(randf_range(-10, 10), 0, randf_range(-7, 7))
+						if _valid(scand):
+							target = scand
+							break
+				var moving := sflee or wait <= 0.0
+				if moving:
+					_step_to(delta, speed * (2.5 if sflee else 1.0))
+				global_position.y = 0.0
+				if ap != null:
+					if moving:
+						_play("Swim", 1.6 if sflee else 1.0)
+					elif int(_t / 11.0) % 3 == 2:
+						_play("Preen", 1.0)
+					else:
+						_play("Idle", 1.0)
 			"duck":
 				var flee := pd < 7.0
 				if flee and fauna.player != null:
@@ -537,6 +599,7 @@ class Animal extends Node3D:
 				var p := orbit_c + Vector3(cos(orbit_a) * orbit_r, 0, sin(orbit_a) * orbit_r)
 				p.y = 14.0 + sin(_t * 0.4) * 2.0
 				global_position = p
-				rotation.y = -orbit_a
-				wing_l.rotation.z = sin(_t * 12.0) * 0.6
-				wing_r.rotation.z = -sin(_t * 12.0) * 0.6
+				rotation.y = -orbit_a + PI
+				if wing_l != null:
+					wing_l.rotation.z = sin(_t * 12.0) * 0.6
+					wing_r.rotation.z = -sin(_t * 12.0) * 0.6
