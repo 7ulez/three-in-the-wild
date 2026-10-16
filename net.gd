@@ -455,14 +455,14 @@ func remote_hit(victim: String, dmg: float, shooter: String) -> void:
 
 
 ## Radio: an/aus und Sender für alle
-func send_radio(on: bool, idx: int) -> void:
-	rpc("remote_radio", on, idx)
+func send_radio(on: bool, idx: int, vol: float = 0.7) -> void:
+	rpc("remote_radio", on, idx, vol)
 
 
 @rpc("any_peer", "reliable")
-func remote_radio(on: bool, idx: int) -> void:
+func remote_radio(on: bool, idx: int, vol: float = 0.7) -> void:
 	if main != null and main.get("radio") != null:
-		(main.radio as Radio).remote_set(on, idx)
+		(main.radio as Radio).remote_set(on, idx, vol)
 
 
 ## Erschossenes Tier: bei allen Mitspielern fällt das nächstgelegene Tier derselben Art um (samt Blutlache)

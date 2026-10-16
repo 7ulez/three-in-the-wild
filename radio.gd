@@ -17,7 +17,7 @@ const STATIONS: Array = [
 
 static var on: bool = false
 static var idx: int = 0
-static var volume: float = 0.7     # nur lokal, 0..1
+static var volume: float = 0.7     # 0..1, wird mit allen geteilt
 
 var main: Node
 var player: Player
@@ -94,14 +94,16 @@ func next_station(local: bool = true) -> void:
 		_send()
 
 
-## +/-/Mausrad: Lautstärke in 10er-Schritten (nur für dich)
+## +/-/Mausrad: Lautstärke in 10er-Schritten (gilt für alle Mitspieler)
 func change_volume(step: int) -> void:
 	volume = clampf(snappedf(volume + step * 0.1, 0.1), 0.0, 1.0)
 	if player != null:
-		player.toast("Radio-Lautstärke: %d%%" % int(round(volume * 100.0)), 1.5)
+		player.toast("Radio-Lautstärke: %d%% (für alle)" % int(round(volume * 100.0)), 1.5)
+		_send()
 
 
-func remote_set(p_on: bool, p_idx: int) -> void:
+func remote_set(p_on: bool, p_idx: int, p_vol: float = 0.7) -> void:
+	volume = clampf(p_vol, 0.0, 1.0)
 	var changed := p_on != on or p_idx != idx
 	on = p_on
 	idx = clampi(p_idx, 0, STATIONS.size() - 1)
@@ -111,7 +113,7 @@ func remote_set(p_on: bool, p_idx: int) -> void:
 
 func _send() -> void:
 	if Net.instance != null:
-		Net.instance.send_radio(on, idx)
+		Net.instance.send_radio(on, idx, volume)
 
 
 func _apply() -> void:
