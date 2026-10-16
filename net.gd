@@ -424,6 +424,20 @@ func remote_radio(on: bool, idx: int) -> void:
 		(main.radio as Radio).remote_set(on, idx)
 
 
+## Erschossenes Tier: bei allen Mitspielern fällt das nächstgelegene Tier derselben Art um (samt Blutlache)
+func send_kill(kind: String, pos: Vector3) -> void:
+	rpc("remote_kill", kind, pos)
+
+
+@rpc("any_peer", "reliable")
+func remote_kill(kind: String, pos: Vector3) -> void:
+	if main == null:
+		return
+	var fa := main.get_node_or_null("Fauna")
+	if fa != null:
+		fa.kill_near(kind, pos)
+
+
 func send_removed(pos: Vector3, item_name: String) -> void:
 	rpc("remote_removed", pos, item_name)
 

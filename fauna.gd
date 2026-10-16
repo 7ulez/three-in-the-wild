@@ -99,6 +99,25 @@ func _add(kind: String, pos: Vector3) -> void:
 	animals.append(a)
 
 
+## Vom Netz: Ein Mitspieler hat ein Tier erschossen. Das nächste lebende Tier gleicher Art in der Nähe
+## stirbt hier ebenfalls; gibt es keins (jeder Spieler simuliert die Tiere für sich), entsteht dort ein totes.
+func kill_near(kind: String, pos: Vector3) -> void:
+	var best: Animal = null
+	var bd := 18.0
+	for a in animals:
+		if not is_instance_valid(a) or a.dead or a.kind != kind:
+			continue
+		var d: float = a.global_position.distance_to(pos)
+		if d < bd:
+			bd = d
+			best = a
+	if best == null:
+		_add(kind, pos)
+		best = animals[animals.size() - 1]
+		best.global_position = pos
+	best.die()
+
+
 func _process(delta: float) -> void:
 	_t += delta
 	if player == null or not is_instance_valid(player):

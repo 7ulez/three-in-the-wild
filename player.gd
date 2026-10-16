@@ -1147,7 +1147,11 @@ func _shoot() -> void:
 	if target_animal != null:
 		var an: Object = target_animal
 		toast("%s getroffen!" % an.display_name(), 2.0)
+		var ak: String = an.kind
+		var apos: Vector3 = an.global_position
 		an.die()
+		if Net.instance != null:
+			Net.instance.send_kill(ak, apos)
 	elif target_name != "":
 		Net.instance.send_hit(target_name, dmg, Game.player_name)
 		toast("Treffer: %s%s" % [target_name, " (Kopf!)" if dmg > 20.0 else ""], 2.0)
