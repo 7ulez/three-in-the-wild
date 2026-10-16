@@ -456,7 +456,7 @@ func _fight(delta: float) -> void:
 	var tired := stamina < 0.25
 	var counter := _counter_axis()
 	if Game.touch:
-		counter = -pull          # Touch: Gegenhalten klappt automatisch
+		counter = pull           # Touch: Mitgehen klappt automatisch
 	# --- Fluchtläufe ---
 	run_timer -= delta
 	if run_timer <= 0.0:
@@ -469,8 +469,8 @@ func _fight(delta: float) -> void:
 		else:
 			run_timer = randf_range(1.0, 2.4) * (0.7 if tired else 1.0)
 			pull = 0
-	var countering := running and pull != 0 and counter == -pull
-	var ignoring := running and pull != 0 and counter != -pull
+	var countering := running and pull != 0 and counter == pull
+	var ignoring := running and pull != 0 and counter != pull
 	# --- Sprung ---
 	if jump_t > 0.0:
 		jump_t -= delta

@@ -164,7 +164,7 @@ static func touchify(text: String) -> String:
 		return text
 	var t := text
 	for pair in [["Linksklick", "AKTION-Knopf"], ["Rechtsklick", "SCHNUR-EIN-Knopf"], ["Maustaste", "AKTION-Knopf"], ["Mausklick", "AKTION-Knopf"],
-			["Klick,", "AKTION,"], ["KLICK", "AKTION"], ["A / D: gegenhalten", "Gegenhalten klappt automatisch"], ["A / D", "automatisch"],
+			["Klick,", "AKTION,"], ["KLICK", "AKTION"], ["A / D: in Zugrichtung drücken", "Mitgehen klappt automatisch"], ["A / D", "automatisch"],
 			["Esc", "Menü"]]:
 		t = t.replace(pair[0], pair[1])
 	if _touch_re == null:
