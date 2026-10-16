@@ -13,6 +13,8 @@ func build(p_kind: String) -> void:
 	cs.shape = bs
 	cs.position.y = 0.2
 	add_child(cs)
+	collision_layer = 2    # nur für den Interaktions-Strahl, man bleibt nicht hängen
+	collision_mask = 0
 	match kind:
 		"gut":
 			for i in range(3):

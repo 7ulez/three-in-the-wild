@@ -31,6 +31,8 @@ func build(p_kind: String) -> void:
 		twig.rotation_degrees = Vector3(0, 0, 50)
 	cs.shape = bs
 	add_child(cs)
+	collision_layer = 2    # nur für den Interaktions-Strahl, man bleibt nicht hängen
+	collision_mask = 0
 
 
 func get_prompt() -> String:
