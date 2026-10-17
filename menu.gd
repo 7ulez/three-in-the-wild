@@ -26,6 +26,10 @@ var _busy: bool = false
 var _server_ready: bool = not OS.has_feature("web")
 var _adv_edit: LineEdit = null
 var _check: HTTPRequest = null
+var _music: AudioStreamPlayer = null
+var _music_btn: Button = null
+var _music_on: bool = true
+const MUSIC_DB := -9.0
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +325,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	theme = _make_theme()
+	_setup_music()
 
 	var bd := Backdrop.new()
 	bd.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -678,6 +683,52 @@ func _on_host() -> void:
 	_start("host")
 
 
+## Titelmusik im Menue: Schleife mit sanftem Einblenden, Stumm-Knopf oben rechts (oder Taste M).
+func _setup_music() -> void:
+	var st = load("res://assets/music/menu.ogg")
+	if st == null:
+		return
+	st.loop = true
+	_music = AudioStreamPlayer.new()
+	_music.stream = st
+	_music.volume_db = -60.0
+	add_child(_music)
+	_music.play()
+	create_tween().tween_property(_music, "volume_db", MUSIC_DB, 3.0)
+	_music_btn = Button.new()
+	_music_btn.focus_mode = Control.FOCUS_NONE
+	_music_btn.flat = true
+	_music_btn.tooltip_text = "Musik an/aus (M)"
+	_music_btn.add_theme_font_size_override("font_size", 22)
+	_music_btn.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_music_btn.offset_left = -64
+	_music_btn.offset_right = -16
+	_music_btn.offset_top = 12
+	_music_btn.offset_bottom = 52
+	_music_btn.pressed.connect(_toggle_music)
+	add_child(_music_btn)
+	_update_music_btn()
+
+
+func _toggle_music() -> void:
+	if _music == null:
+		return
+	_music_on = not _music_on
+	_music.stream_paused = not _music_on
+	_update_music_btn()
+
+
+func _update_music_btn() -> void:
+	if _music_btn != null:
+		_music_btn.text = "♪" if _music_on else "♪̸"
+		_music_btn.modulate = Color(1, 1, 1, 0.9 if _music_on else 0.4)
+
+
+func _unhandled_key_input(e: InputEvent) -> void:
+	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_M and not (name_edit != null and name_edit.has_focus()) and not (pw_edit != null and pw_edit.has_focus()):
+		_toggle_music()
+
+
 func _start(mode: String) -> void:
 	Game.reset()
 	Game.net_mode = mode
@@ -686,6 +737,10 @@ func _start(mode: String) -> void:
 	if _adv_edit != null and _adv_edit.text.strip_edges() != "":
 		Game.host_ip = _adv_edit.text.strip_edges()
 	Game.password = pw_edit.text
+	if _music != null and _music_on:
+		var tw := create_tween()
+		tw.tween_property(_music, "volume_db", -60.0, 0.6)
+		await tw.finished
 	get_tree().change_scene_to_file("res://main.tscn")
 
 
