@@ -104,11 +104,32 @@ func _respond(p: StreamPeerTCP, req: String) -> void:
 		_send(p, 404, "text/plain", "nicht gefunden".to_utf8_buffer(), false)
 		return
 	var data: PackedByteArray = FileAccess.get_file_as_bytes(full)
+	# Range-Anfragen (Audio-Element: Schleife/Spulen) mit 206 beantworten.
+	if not gz:
+		for hl in req.split("\r\n"):
+			if hl.to_lower().begins_with("range:") and hl.contains("bytes="):
+				var spec: String = hl.get_slice("bytes=", 1).strip_edges().get_slice(",", 0)
+				var a: int = int(spec.get_slice("-", 0))
+				var b: int = data.size() - 1
+				if spec.get_slice("-", 1) != "":
+					b = mini(int(spec.get_slice("-", 1)), data.size() - 1)
+				if spec.begins_with("-"):
+					a = maxi(0, data.size() - int(spec.get_slice("-", 1)))
+					b = data.size() - 1
+				if a > b or a >= data.size():
+					_send(p, 416, "text/plain", PackedByteArray(), false)
+					return
+				var part: PackedByteArray = data.slice(a, b + 1)
+				var h: String = "HTTP/1.1 206 Partial Content\r\nContent-Type: %s\r\nContent-Length: %d\r\nContent-Range: bytes %d-%d/%d\r\nAccept-Ranges: bytes\r\nConnection: close\r\nCache-Control: no-cache\r\n\r\n" % [MIME.get(ext, "application/octet-stream"), part.size(), a, b, data.size()]
+				p.put_data(h.to_utf8_buffer())
+				p.put_data(part)
+				p.disconnect_from_host()
+				return
 	_send(p, 200, MIME.get(ext, "application/octet-stream"), data, gz)
 
 
 func _send(p: StreamPeerTCP, code: int, mime: String, body: PackedByteArray, gz: bool) -> void:
-	var h: String = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\nCache-Control: no-cache\r\n" % [code, "OK" if code == 200 else "Error", mime, body.size()]
+	var h: String = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nAccept-Ranges: bytes\r\nConnection: close\r\nCache-Control: no-cache\r\n" % [code, "OK" if code == 200 else "Error", mime, body.size()]
 	if gz:
 		h += "Content-Encoding: gzip\r\n"
 	h += "\r\n"

@@ -29,6 +29,7 @@ var _check: HTTPRequest = null
 var _music: AudioStreamPlayer = null
 var _music_btn: Button = null
 var _music_on: bool = true
+var _web_music: bool = false
 const MUSIC_DB := -9.0
 
 
@@ -685,6 +686,38 @@ func _on_host() -> void:
 
 ## Titelmusik im Menue: Schleife mit sanftem Einblenden, Stumm-Knopf oben rechts (oder Taste M).
 func _setup_music() -> void:
+	if OS.has_feature("web"):
+		# Im Browser laeuft die Musik ueber ein HTML-Audio-Element (stabil, startet bei der ersten Eingabe).
+		_web_music = true
+		JavaScriptBridge.eval("""
+(function(){
+  if (window.__mm) { window.__mm.restart(); return; }
+  var a = new Audio('menu.mp3'); a.loop = true; a.volume = 0; a.preload = 'auto';
+  var on = true, started = false, tgt = 0.4, tm = null;
+  function fade(to, ms, cb) {
+    clearInterval(tm); var from = a.volume, t0 = Date.now();
+    tm = setInterval(function(){
+      var k = Math.min(1, (Date.now() - t0) / ms);
+      a.volume = from + (to - from) * k;
+      if (k >= 1) { clearInterval(tm); if (cb) cb(); }
+    }, 50);
+  }
+  function start() {
+    if (started || !on) return;
+    var p = a.play();
+    if (p && p.then) p.then(function(){ started = true; fade(tgt, 3000); }).catch(function(){});
+  }
+  ['pointerdown','keydown','touchstart','click'].forEach(function(ev){ window.addEventListener(ev, start, true); });
+  window.__mm = {
+    restart: function(){ on = true; started = false; a.volume = 0; start(); },
+    toggle: function(){ on = !on; if (on) { start(); } else { clearInterval(tm); a.pause(); started = false; } return on; },
+    stop: function(){ on = false; fade(0, 600, function(){ a.pause(); started = false; }); }
+  };
+  start();
+})();
+""", true)
+		_make_music_button()
+		return
 	var st = load("res://assets/music/menu.ogg")
 	if st == null:
 		return
@@ -695,6 +728,10 @@ func _setup_music() -> void:
 	add_child(_music)
 	_music.play()
 	create_tween().tween_property(_music, "volume_db", MUSIC_DB, 3.0)
+	_make_music_button()
+
+
+func _make_music_button() -> void:
 	_music_btn = Button.new()
 	_music_btn.focus_mode = Control.FOCUS_NONE
 	_music_btn.flat = true
@@ -711,6 +748,10 @@ func _setup_music() -> void:
 
 
 func _toggle_music() -> void:
+	if _web_music:
+		_music_on = bool(JavaScriptBridge.eval("window.__mm ? window.__mm.toggle() : false", true))
+		_update_music_btn()
+		return
 	if _music == null:
 		return
 	_music_on = not _music_on
@@ -737,7 +778,10 @@ func _start(mode: String) -> void:
 	if _adv_edit != null and _adv_edit.text.strip_edges() != "":
 		Game.host_ip = _adv_edit.text.strip_edges()
 	Game.password = pw_edit.text
-	if _music != null and _music_on:
+	if _web_music:
+		JavaScriptBridge.eval("if (window.__mm) window.__mm.stop();", true)
+		await get_tree().create_timer(0.65).timeout
+	elif _music != null and _music_on:
 		var tw := create_tween()
 		tw.tween_property(_music, "volume_db", -60.0, 0.6)
 		await tw.finished
