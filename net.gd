@@ -415,11 +415,9 @@ func send_trunk(i: int, open: bool) -> void:
 
 @rpc("any_peer", "reliable")
 func remote_trunk(i: int, open: bool) -> void:
+	# Nur merken, welche Autos schon ausgeladen wurden (fuer spaete Spieler) - die Klappe geht nur beim Oeffnenden auf.
 	if open or Game.cars_state.has(i):
 		Game.cars_state[i] = open
-	for c in main.get_tree().get_nodes_in_group("cars"):
-		if c.car_index == i:
-			c.set_trunk(open)
 
 
 func send_goal(i: int, who: String) -> void:
