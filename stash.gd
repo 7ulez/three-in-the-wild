@@ -60,10 +60,22 @@ func get_prompt() -> String:
 	return "E: %s durchsuchen" % label
 
 
+## Ein Mitspieler hat das Versteck geoeffnet (Inhalt kommt als Gegenstand ueber das Netz).
+func open_remote() -> void:
+	if opened:
+		return
+	opened = true
+	if lid != null:
+		create_tween().tween_property(lid, "rotation_degrees:x", 112.0, 0.85).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	Sfx.play("chest_open", global_position, -3.0)
+
+
 func interact(player: Node) -> void:
 	if opened:
 		return
 	opened = true
+	if Net.instance != null:
+		Net.instance.send_stash(index)
 	if lid != null:
 		var tw := create_tween()
 		tw.tween_property(lid, "rotation_degrees:x", 112.0, 0.85).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

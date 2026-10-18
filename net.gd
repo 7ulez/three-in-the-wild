@@ -247,6 +247,7 @@ func _admit(id: int) -> void:
 
 
 func _on_peer_disconnected(id: int) -> void:
+	_release_items_of(id)
 	if avatars.has(id):
 		avatars[id].queue_free()
 		avatars.erase(id)
@@ -277,7 +278,8 @@ func _snapshot() -> Dictionary:
 	for k in Game.cars_state.keys():
 		cars.append({"i": int(k), "o": bool(Game.cars_state[k])})
 	return {"hour": Game.hour, "day": Game.day_count, "camp": Game.camp_name if Game.camp_claimed else "",
-		"placed": pl, "tents": tents, "cars": cars, "goals": Game.goal_shared.duplicate()}
+		"placed": pl, "tents": tents, "cars": cars, "goals": Game.goal_shared.duplicate(),
+		"items": item_db.values(), "stashes": Game.stashes_opened.keys()}
 
 
 @rpc("authority", "reliable")
@@ -299,6 +301,11 @@ func assign_slot(s: int, snap: Dictionary) -> void:
 		for c in main.get_tree().get_nodes_in_group("cars"):
 			if c.car_index == int(cd["i"]):
 				c.restore_emptied(bool(cd["o"]))
+	for si in snap.get("stashes", []):
+		_open_stash(int(si))
+	for d in snap.get("items", []):
+		item_db[int(d["id"])] = d
+		_item_create(d)
 	var sg: Dictionary = snap.get("goals", {})
 	for k in sg.keys():
 		Game.goal_shared[int(k)] = sg[k]
@@ -415,9 +422,14 @@ func send_trunk(i: int, open: bool) -> void:
 
 @rpc("any_peer", "reliable")
 func remote_trunk(i: int, open: bool) -> void:
-	# Nur merken, welche Autos schon ausgeladen wurden (fuer spaete Spieler) - die Klappe geht nur beim Oeffnenden auf.
 	if open or Game.cars_state.has(i):
 		Game.cars_state[i] = open
+	# Nur diese eine Klappe geht bei den anderen auf; das Gepaeck kommt ueber die Gegenstands-Meldungen
+	if main == null or Game.dedicated:
+		return
+	for c in main.get_tree().get_nodes_in_group("cars"):
+		if c.car_index == i:
+			c.set_trunk(open, true)
 
 
 func send_goal(i: int, who: String) -> void:
@@ -541,6 +553,274 @@ func remote_removed(pos: Vector3, n: String) -> void:
 			Game.placed.erase(p)
 			p.queue_free()
 			return
+
+
+
+func _exit_tree() -> void:
+	if instance == self:
+		instance = null
+
+
+# ---------- Gegenstaende: jeder existiert nur einmal fuer alle ----------
+
+var item_db: Dictionary = {}       # net_id -> Beschreibung (Name, Zustand, Ort, wer traegt)
+var _item_ctr: int = 0
+
+
+func alloc_item_id() -> int:
+	if multiplayer.multiplayer_peer == null or multiplayer.get_unique_id() <= 0:
+		return 0
+	_item_ctr += 1
+	return multiplayer.get_unique_id() * 100000 + _item_ctr
+
+
+func item_desc(it: Item) -> Dictionary:
+	var d := {"id": it.net_id, "n": it.item_name, "w": it.weight, "s": it.item_size, "c": it.item_color,
+		"x": it.extra.duplicate(true), "p": it.global_position, "q": it.global_transform.basis.get_rotation_quaternion(),
+		"h": 0, "b": -1, "wa": -1}
+	if it.item_name == "Bierkasten":
+		d["b"] = it.beers_left()
+	if it.item_name == "Wasserflasche":
+		d["wa"] = it.water_left
+	return d
+
+
+## Neuer Gegenstand: den Mitspielern melden (einmalig).
+func item_announce(it: Item) -> void:
+	if it.net_id == 0 or it.net_announced or it.remote_created:
+		return
+	it.net_announced = true
+	var d := item_desc(it)
+	item_db[it.net_id] = d
+	rpc("remote_item_spawn", d)
+
+
+@rpc("any_peer", "reliable")
+func remote_item_spawn(d: Dictionary) -> void:
+	d["h"] = 0
+	item_db[int(d["id"])] = d
+	if Game.dedicated or main == null or Item.find(int(d["id"])) != null:
+		return
+	_item_create(d)
+
+
+func _item_create(d: Dictionary) -> void:
+	if main == null or Game.dedicated:
+		return
+	var id := int(d["id"])
+	if Item.find(id) != null:
+		return
+	var it := Item.new().setup(d["n"], d["w"], d["s"], d["c"])
+	it.net_id = id
+	it.remote_created = true
+	it.net_announced = true
+	main.add_child(it)
+	it.apply_net_state(d["x"], int(d["b"]), int(d["wa"]))
+	it.global_position = d["p"]
+	it.global_transform.basis = Basis(d["q"])
+	it.make_remote()
+	it._tgt_pos = d["p"]
+	it._tgt_q = d["q"]
+	it._has_tgt = true
+	var h := int(d["h"])
+	if h != 0 and h != multiplayer.get_unique_id():
+		it.attach_to(_get_avatar(h))
+
+
+func item_grab(it: Item) -> void:
+	if it.net_id == 0:
+		return
+	item_announce(it)
+	if item_db.has(it.net_id):
+		item_db[it.net_id]["h"] = multiplayer.get_unique_id()
+	rpc("remote_item_grab", it.net_id)
+
+
+@rpc("any_peer", "reliable")
+func remote_item_grab(id: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if item_db.has(id):
+		item_db[id]["h"] = sender
+	if Game.dedicated or main == null:
+		return
+	var it: Item = Item.find(id)
+	if it == null:
+		return
+	if main.player != null and main.player.held == it:
+		# Beide haben gleichzeitig zugegriffen: der Kleinere gewinnt
+		if sender < multiplayer.get_unique_id():
+			main.player.lose_held(it)
+		else:
+			return
+	it.attach_to(_get_avatar(sender))
+
+
+func item_release(it: Item) -> void:
+	if it.net_id == 0:
+		return
+	print_stack()
+	item_announce(it)
+	var q := it.global_transform.basis.get_rotation_quaternion()
+	if item_db.has(it.net_id):
+		item_db[it.net_id]["h"] = 0
+		item_db[it.net_id]["p"] = it.global_position
+		item_db[it.net_id]["q"] = q
+		item_db[it.net_id]["x"] = it.extra.duplicate(true)
+		if it.item_name == "Bierkasten":
+			item_db[it.net_id]["b"] = it.beers_left()
+		if it.item_name == "Wasserflasche":
+			item_db[it.net_id]["wa"] = it.water_left
+	it._rest_sent = false
+	rpc("remote_item_release", it.net_id, it.global_position, q, item_desc(it))
+
+
+@rpc("any_peer", "reliable")
+func remote_item_release(id: int, pos: Vector3, q: Quaternion, d: Dictionary) -> void:
+	if item_db.has(id):
+		item_db[id]["h"] = 0
+		item_db[id]["p"] = pos
+		item_db[id]["q"] = q
+		item_db[id]["x"] = d["x"]
+		item_db[id]["b"] = d["b"]
+		item_db[id]["wa"] = d["wa"]
+	else:
+		d["h"] = 0
+		item_db[id] = d
+	if Game.dedicated or main == null:
+		return
+	var it: Item = Item.find(id)
+	if it == null:
+		_item_create(item_db[id])
+		return
+	it.apply_net_state(d["x"], int(d["b"]), int(d["wa"]))
+	it.detach_to(main, pos, q)
+
+
+func item_pos(it: Item) -> void:
+	rpc("remote_item_pos", it.net_id, it.global_position, it.global_transform.basis.get_rotation_quaternion())
+
+
+@rpc("any_peer", "unreliable_ordered")
+func remote_item_pos(id: int, pos: Vector3, q: Quaternion) -> void:
+	if item_db.has(id):
+		item_db[id]["p"] = pos
+		item_db[id]["q"] = q
+	if Game.dedicated or main == null:
+		return
+	var it: Item = Item.find(id)
+	if it != null and it.remote and not it.net_attached:
+		it._tgt_pos = pos
+		it._tgt_q = q
+		it._has_tgt = true
+
+
+func item_rest(it: Item) -> void:
+	var q := it.global_transform.basis.get_rotation_quaternion()
+	if item_db.has(it.net_id):
+		item_db[it.net_id]["p"] = it.global_position
+		item_db[it.net_id]["q"] = q
+	rpc("remote_item_rest", it.net_id, it.global_position, q)
+
+
+@rpc("any_peer", "reliable")
+func remote_item_rest(id: int, pos: Vector3, q: Quaternion) -> void:
+	if item_db.has(id):
+		item_db[id]["p"] = pos
+		item_db[id]["q"] = q
+	if Game.dedicated or main == null:
+		return
+	var it: Item = Item.find(id)
+	if it != null and it.remote and not it.net_attached:
+		it._tgt_pos = pos
+		it._tgt_q = q
+		it._has_tgt = true
+
+
+func item_gone(id: int) -> void:
+	item_db.erase(id)
+	if multiplayer.multiplayer_peer != null:
+		rpc("remote_item_gone", id)
+
+
+@rpc("any_peer", "reliable")
+func remote_item_gone(id: int) -> void:
+	item_db.erase(id)
+	if Game.dedicated or main == null:
+		return
+	var it: Item = Item.find(id)
+	if it == null:
+		return
+	it.net_silent = true
+	if main.player != null and main.player.held == it:
+		main.player.lose_held(it)
+	it.queue_free()
+
+
+func item_state(it: Item) -> void:
+	if it.net_id == 0:
+		return
+	item_announce(it)
+	var d := item_desc(it)
+	if item_db.has(it.net_id):
+		item_db[it.net_id]["x"] = d["x"]
+		item_db[it.net_id]["b"] = d["b"]
+		item_db[it.net_id]["wa"] = d["wa"]
+	rpc("remote_item_state", it.net_id, d["x"], d["b"], d["wa"])
+
+
+@rpc("any_peer", "reliable")
+func remote_item_state(id: int, x: Dictionary, beers: int, water: int) -> void:
+	if item_db.has(id):
+		item_db[id]["x"] = x
+		item_db[id]["b"] = beers
+		item_db[id]["wa"] = water
+	if Game.dedicated or main == null:
+		return
+	var it: Item = Item.find(id)
+	if it != null:
+		it.apply_net_state(x, beers, water)
+
+
+## Ein Mitspieler geht: was er getragen hat, bleibt an seiner letzten Stelle liegen.
+func _release_items_of(peer: int) -> void:
+	var av: Node3D = avatars.get(peer, null)
+	var at: Vector3 = av.global_position + Vector3(0, 0.4, 0) if av != null else Vector3(0, 1, 10)
+	for k in item_db.keys():
+		var d: Dictionary = item_db[k]
+		if int(d["h"]) == peer:
+			d["h"] = 0
+			d["p"] = at
+			if not Game.dedicated and main != null:
+				var it: Item = Item.find(int(k))
+				if it != null:
+					it.detach_to(main, at, d["q"])
+
+
+## Behaelter (Rucksack, Kuehlbox, Proviantkiste) hat sich veraendert: bei allen neu aufbauen.
+func resync_placed(p: PlacedItem) -> void:
+	if multiplayer.multiplayer_peer == null:
+		return
+	send_removed(p.global_position, p.item_name)
+	send_placed(p, p.get_state())
+
+
+# ---------- Verstecke ----------
+
+func send_stash(i: int) -> void:
+	Game.stashes_opened[i] = true
+	rpc("remote_stash", i)
+
+
+@rpc("any_peer", "reliable")
+func remote_stash(i: int) -> void:
+	_open_stash(i)
+
+
+func _open_stash(i: int) -> void:
+	Game.stashes_opened[i] = true
+	for st in Stash.all:
+		if is_instance_valid(st) and (st as Stash).index == i:
+			(st as Stash).open_remote()
 
 
 # ---------- Ereignisse empfangen ----------

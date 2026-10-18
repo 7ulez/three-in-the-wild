@@ -33,6 +33,7 @@ static var rain_fire: bool = false
 static var rain_fire_t: float = 0.0
 static var joint_smoked: bool = false
 static var goals_done_prev: Array = []
+static var stashes_opened: Dictionary = {}
 static var cars_state: Dictionary = {}       # Auto-Index -> Heckklappe offen (nur Autos, die schon ausgeladen wurden)
 static var goal_shared: Dictionary = {}     # Ziel-Index -> Name des Spielers, der es fuer alle geschafft hat
 static var all_done_shown: bool = false
@@ -144,7 +145,9 @@ static func reset() -> void:
 	joint_smoked = false
 	goals_done_prev = []
 	goal_shared = {}
+	Item.registry.clear()
 	cars_state = {}
+	stashes_opened = {}
 	all_done_shown = false
 
 

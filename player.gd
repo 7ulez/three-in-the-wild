@@ -1401,10 +1401,24 @@ func _interact() -> void:
 		c.interact(self)
 
 
+## Ein Mitspieler war schneller: der Gegenstand wandert aus meiner Hand.
+func lose_held(item: Item) -> void:
+	if held != item:
+		return
+	ray.remove_exception(item)
+	held = null
+	toast("%s war schneller." % item.item_name, 2.5)
+	_update_help()
+
+
 func pick_up(item: Item) -> void:
 	if held != null:
 		return
 	held = item
+	if item.remote:
+		item.take_local()
+	if Net.instance != null:
+		Net.instance.item_grab(item)
 	Sfx.play("pop", Vector3.INF, -6.0)
 	item.gravity_scale = 0.0
 	item.add_collision_exception_with(self)
@@ -1463,6 +1477,8 @@ func _drop(impulse: Vector3 = Vector3.ZERO) -> void:
 	ray.remove_exception(it)
 	it.gravity_scale = 1.0
 	it.linear_velocity = impulse
+	if Net.instance != null:
+		Net.instance.item_release(it)
 	var weak: WeakRef = weakref(it)
 	get_tree().create_timer(0.6).timeout.connect(func() -> void:
 		var o: Object = weak.get_ref()

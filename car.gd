@@ -112,7 +112,7 @@ func restore_emptied(open: bool) -> void:
 		trunk_pivot.rotation_degrees.x = -115.0 if open else 0.0
 
 
-func set_trunk(open: bool) -> void:
+func set_trunk(open: bool, from_net: bool = false) -> void:
 	trunk_open = open
 	Sfx.play("trunk_open" if trunk_open else "trunk_close", global_transform * Vector3(0, 1.0, car_length / 2.0), 2.0)
 	if trunk_pivot != null:
@@ -121,7 +121,8 @@ func set_trunk(open: bool) -> void:
 	if trunk_open and not loot_spawned:
 		loot_spawned = true
 		Game.cars_opened += 1
-		_spawn_loot()
+		if not from_net:
+			_spawn_loot()
 	if loot_spawned:
 		Game.cars_state[car_index] = trunk_open
 

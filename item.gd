@@ -16,6 +16,126 @@ var extra: Dictionary = {}     # Zusatzzustand (Rucksack-Inhalt, Holzvorrat)
 var _lbl_t: float = 0.0
 var _pl: Node3D = null
 
+# ---- Netzwerk: Gegenstaende gibt es nur einmal fuer alle Spieler ----
+static var registry: Dictionary = {}      # net_id -> Item
+var net_id: int = 0
+var net_announced: bool = false           # den anderen Spielern schon gemeldet?
+var remote_created: bool = false          # entstand durch eine Meldung eines Mitspielers
+var net_silent: bool = false              # beim Entfernen keine Meldung senden
+var remote: bool = false                  # wird bei einem Mitspieler simuliert (hier nur eingefroren, folgt dem Netz)
+var net_attached: bool = false            # haengt gerade am Avatar eines Mitspielers
+var _net_t: float = 0.0
+var _rest_sent: bool = false
+var _last_sent_pos: Vector3 = Vector3(1e9, 0, 0)
+var _tgt_pos: Vector3 = Vector3.ZERO
+var _tgt_q: Quaternion = Quaternion.IDENTITY
+var _has_tgt: bool = false
+
+
+func _ready() -> void:
+	if net_id == 0 and Net.instance != null and is_instance_valid(Net.instance):
+		net_id = Net.instance.alloc_item_id()
+	if net_id != 0:
+		registry[net_id] = self
+		if not net_announced:
+			_announce.call_deferred()
+
+
+func _announce() -> void:
+	if is_queued_for_deletion() or not is_inside_tree():
+		return
+	if Net.instance != null and is_instance_valid(Net.instance):
+		Net.instance.item_announce(self)
+
+
+func _enter_tree() -> void:
+	# Auch nach dem Umhaengen (z.B. an den Avatar eines Mitspielers) wieder eintragen
+	if net_id != 0:
+		registry[net_id] = self
+
+
+static func find(id: int) -> Item:
+	var it = registry.get(id)
+	if it != null and is_instance_valid(it) and not (it as Item).is_queued_for_deletion():
+		return it
+	return null
+
+
+func _exit_tree() -> void:
+	# Nur echtes Entfernen (queue_free) melden, nicht Umhaengen oder das Abraeumen beim Verlassen der Szene
+	if net_id != 0 and is_queued_for_deletion():
+		if registry.get(net_id) == self:
+			registry.erase(net_id)
+		if not net_silent and Net.instance != null and is_instance_valid(Net.instance) and Net.instance.is_inside_tree():
+			Net.instance.item_gone(net_id)
+
+
+## Mitspieler simuliert diesen Gegenstand: hier nur eingefroren und dem Netz folgend.
+func make_remote() -> void:
+	remote = true
+	net_attached = false
+	freeze_mode = RigidBody3D.FREEZE_MODE_KINEMATIC
+	freeze = true
+	collision_layer = 1
+	collision_mask = 1
+	visible = true
+
+
+## Ein Mitspieler traegt den Gegenstand: haengt vor dem Avatar.
+func attach_to(node: Node3D) -> void:
+	make_remote()
+	net_attached = true
+	collision_layer = 0
+	collision_mask = 0
+	if get_parent() != node:
+		if get_parent() != null:
+			get_parent().remove_child(self)
+		node.add_child(self)
+	position = Vector3(0, 1.05, -0.9)
+	rotation = Vector3.ZERO
+
+
+## Mitspieler hat den Gegenstand abgelegt.
+func detach_to(world: Node, pos: Vector3, q: Quaternion) -> void:
+	if get_parent() != world:
+		if get_parent() != null:
+			get_parent().remove_child(self)
+		world.add_child(self)
+	make_remote()
+	global_position = pos
+	global_transform.basis = Basis(q)
+	_tgt_pos = pos
+	_tgt_q = q
+	_has_tgt = true
+
+
+## Ich nehme einen (eingefrorenen) Gegenstand auf: ab jetzt simuliere ich ihn selbst.
+func take_local() -> void:
+	remote = false
+	net_attached = false
+	_has_tgt = false
+	_rest_sent = false
+	freeze = false
+	collision_layer = 1
+	collision_mask = 1
+	sleeping = false
+
+
+func net_state_changed() -> void:
+	if net_id != 0 and Net.instance != null and is_instance_valid(Net.instance):
+		Net.instance.item_state(self)
+
+
+func apply_net_state(x: Dictionary, beers: int, water: int) -> void:
+	extra = x.duplicate(true)
+	if extra.has("owner") and label != null:
+		label.text = display_name()
+	if item_name == "Bierkasten" and beers >= 0:
+		while beers_left() > beers:
+			take_bottle()
+	if item_name == "Wasserflasche" and water >= 0:
+		water_left = water
+
 
 func _process(delta: float) -> void:
 	if label == null:
@@ -37,7 +157,8 @@ func _process(delta: float) -> void:
 var _sunk: bool = false
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
+	_net_physics(delta)
 	# Steine, die im See landen: Platsch und weg
 	if _sunk or item_name != "Flacher Stein":
 		return
@@ -54,6 +175,35 @@ func _physics_process(_delta: float) -> void:
 		visible = false
 		await get_tree().create_timer(0.3).timeout
 		queue_free()
+
+
+func _net_physics(delta: float) -> void:
+	if net_id == 0 or Net.instance == null or not is_instance_valid(Net.instance):
+		return
+	if remote:
+		if _has_tgt and not net_attached:
+			global_position = global_position.lerp(_tgt_pos, minf(delta * 14.0, 1.0))
+			var cur := global_transform.basis.get_rotation_quaternion()
+			global_transform.basis = Basis(cur.slerp(_tgt_q, minf(delta * 14.0, 1.0)))
+		return
+	if not net_announced:
+		return
+	if _pl == null or not is_instance_valid(_pl):
+		_pl = get_tree().get_first_node_in_group("local_player") as Node3D
+	if _pl != null and _pl.get("held") == self:
+		return
+	if sleeping:
+		if not _rest_sent:
+			_rest_sent = true
+			Net.instance.item_rest(self)
+		return
+	_rest_sent = false
+	_net_t += delta
+	if _net_t >= 0.1:
+		_net_t = 0.0
+		if global_position.distance_to(_last_sent_pos) > 0.02:
+			_last_sent_pos = global_position
+			Net.instance.item_pos(self)
 
 
 func setup(p_name: String, p_weight: float, size: Vector3, color: Color) -> Item:
@@ -121,11 +271,15 @@ func drinks_left() -> int:
 
 func take_drink() -> bool:
 	if item_name == "Bierkasten":
-		return take_bottle()
+		var ok := take_bottle()
+		if ok:
+			net_state_changed()
+		return ok
 	if item_name == "Wasserflasche":
 		if water_left <= 0:
 			return false
 		water_left -= 1
+		net_state_changed()
 		return true
 	return false
 

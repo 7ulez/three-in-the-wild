@@ -344,6 +344,8 @@ func interact_with_held(player: Node, held: Node) -> bool:
 		if held.extra.has("owner"):
 			d["owner"] = held.extra["owner"]
 		contents.append(d)
+		if Net.instance != null:
+			Net.instance.resync_placed(self)
 		player.release_held_for_storage()
 		Sfx.play("click", global_position)
 		player.toast("%s im Rucksack verstaut. (%d drin)" % [held.item_name, contents.size()], 2.0)
@@ -440,6 +442,8 @@ func _cooler_use(player: Node) -> void:
 	fish_in.remove_at(idx)
 	sel = 0
 	_refresh_fish()
+	if Net.instance != null:
+		Net.instance.resync_placed(self)
 	var it := Item.new().setup(d["name"], d["weight"], d["size"], d["color"])
 	get_parent().add_child(it)
 	it.global_position = global_position + Vector3(0, 1.0, 0)
@@ -455,6 +459,8 @@ func _store_fish(player: Node, held: Node) -> void:
 	if not open:
 		_toggle_open()
 	fish_in.append({"name": held.item_name, "weight": held.weight, "size": held.item_size, "color": held.item_color})
+	if Net.instance != null:
+		Net.instance.resync_placed(self)
 	player.release_held_for_storage()
 	Sfx.play("splash", global_position, -8.0)
 	_refresh_fish()
@@ -672,6 +678,8 @@ func _unpack(player: Node) -> void:
 	var d: Dictionary = contents[idx]
 	contents.remove_at(idx)
 	sel = 0
+	if Net.instance != null:
+		Net.instance.resync_placed(self)
 	var pivot: Node3D = parts.get("lid", null)
 	if pivot != null and not open:
 		open = true
@@ -705,6 +713,8 @@ func _take_ingredient(player: Node) -> void:
 	pack.remove_at(idx)
 	sel = 0
 	_refresh_pack()
+	if Net.instance != null:
+		Net.instance.resync_placed(self)
 	var pivot: Node3D = parts.get("lid", null)
 	if pivot != null and not open:
 		open = true
