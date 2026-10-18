@@ -620,11 +620,22 @@ func _update_goals() -> void:
 		if not g[1]:
 			all = false
 	goals_label.text = "\n".join(lines)
+	# Selbst geschaffte Ziele an die Gruppe melden (gelten dann fuer alle)
+	var loc: Array = Game.goals_local()
+	for i in loc.size():
+		if loc[i][1] and not Game.goal_shared.has(i):
+			Game.goal_shared[i] = Game.player_name
+			if Net.instance != null:
+				Net.instance.send_goal(i, Game.player_name)
 	var gl: Array = Game.goals()
 	if Game.goals_done_prev.size() == gl.size():
 		for i in gl.size():
 			if gl[i][1] and not Game.goals_done_prev[i]:
-				_goal_done(str(gl[i][0]))
+				var by: String = str(Game.goal_shared.get(i, ""))
+				var txt := str(gl[i][0])
+				if by != "" and by != Game.player_name:
+					txt += " (von %s)" % by
+				_goal_done(txt)
 	Game.goals_done_prev = gl.map(func(g): return g[1])
 	if hud != null:
 		hud.set_goals(gl)

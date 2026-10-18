@@ -10,6 +10,7 @@ var car_width: float = 1.7
 var loot: Array = []
 var loot_spawned: bool = false
 var trunk_pivot: Node3D
+var car_index: int = -1
 
 
 ## Unsichtbare Interaktionszone am Heck.
@@ -96,14 +97,33 @@ func _add_collision(width: float, length: float) -> void:
 
 
 func toggle_trunk() -> void:
-	trunk_open = not trunk_open
+	set_trunk(not trunk_open)
+	if Net.instance != null:
+		Net.instance.send_trunk(car_index, trunk_open)
+
+
+## Spaet beigetretene Spieler: Das Auto wurde schon ausgeladen, der Kofferraum bleibt leer.
+func restore_emptied(open: bool) -> void:
+	if not loot_spawned:
+		Game.cars_opened += 1
+	loot_spawned = true
+	trunk_open = open
+	if trunk_pivot != null:
+		trunk_pivot.rotation_degrees.x = -115.0 if open else 0.0
+
+
+func set_trunk(open: bool) -> void:
+	trunk_open = open
 	Sfx.play("trunk_open" if trunk_open else "trunk_close", global_transform * Vector3(0, 1.0, car_length / 2.0), 2.0)
-	var tw := create_tween()
-	tw.tween_property(trunk_pivot, "rotation_degrees:x", -115.0 if trunk_open else 0.0, 0.5)
+	if trunk_pivot != null:
+		var tw := create_tween()
+		tw.tween_property(trunk_pivot, "rotation_degrees:x", -115.0 if trunk_open else 0.0, 0.5)
 	if trunk_open and not loot_spawned:
 		loot_spawned = true
 		Game.cars_opened += 1
 		_spawn_loot()
+	if loot_spawned:
+		Game.cars_state[car_index] = trunk_open
 
 
 func _spawn_loot() -> void:

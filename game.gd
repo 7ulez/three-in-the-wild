@@ -33,6 +33,8 @@ static var rain_fire: bool = false
 static var rain_fire_t: float = 0.0
 static var joint_smoked: bool = false
 static var goals_done_prev: Array = []
+static var cars_state: Dictionary = {}       # Auto-Index -> Heckklappe offen (nur Autos, die schon ausgeladen wurden)
+static var goal_shared: Dictionary = {}     # Ziel-Index -> Name des Spielers, der es fuer alle geschafft hat
 static var all_done_shown: bool = false
 
 # Tablet/Handy: Bildschirm-Steuerung statt Maus und Tastatur
@@ -141,6 +143,8 @@ static func reset() -> void:
 	rain_fire_t = 0.0
 	joint_smoked = false
 	goals_done_prev = []
+	goal_shared = {}
+	cars_state = {}
 	all_done_shown = false
 
 
@@ -152,7 +156,21 @@ static func has_catch(species: String) -> bool:
 
 
 ## Alle Ziele als [Text, erledigt]
+## Gemeinsame Ziele: Was einer der Gruppe schafft, gilt fuer alle.
 static func goals() -> Array:
+	var gl: Array = goals_local()
+	for i in gl.size():
+		if goal_shared.has(i) and not gl[i][1]:
+			gl[i][1] = true
+			if i == 0:
+				gl[i][0] = "3 Autos ausladen (3/3)"
+			elif i == 10:
+				gl[i][0] = "Verstecke rund um den See finden (5/5)"
+	return gl
+
+
+## Nur das, was dieser Spieler selbst geschafft hat.
+static func goals_local() -> Array:
 	var tent_done := false
 	for t in tents:
 		if is_instance_valid(t) and t.finished:

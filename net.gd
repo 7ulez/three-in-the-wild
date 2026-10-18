@@ -273,8 +273,11 @@ func _snapshot() -> Dictionary:
 	for t in Game.tents:
 		if is_instance_valid(t) and t.finished:
 			tents.append({"p": t.global_position, "y": t.rotation.y})
+	var cars: Array = []
+	for k in Game.cars_state.keys():
+		cars.append({"i": int(k), "o": bool(Game.cars_state[k])})
 	return {"hour": Game.hour, "day": Game.day_count, "camp": Game.camp_name if Game.camp_claimed else "",
-		"placed": pl, "tents": tents}
+		"placed": pl, "tents": tents, "cars": cars, "goals": Game.goal_shared.duplicate()}
 
 
 @rpc("authority", "reliable")
@@ -291,6 +294,15 @@ func assign_slot(s: int, snap: Dictionary) -> void:
 		_create_placed(d["n"], d["w"], d["s"], d["c"], d["p"], d["y"], d["st"])
 	for t in snap["tents"]:
 		_create_tent(t["p"], t["y"])
+	# Autos, die schon ausgeladen wurden, bleiben leer; erledigte Ziele gelten auch fuer den Neuen
+	for cd in snap.get("cars", []):
+		for c in main.get_tree().get_nodes_in_group("cars"):
+			if c.car_index == int(cd["i"]):
+				c.restore_emptied(bool(cd["o"]))
+	var sg: Dictionary = snap.get("goals", {})
+	for k in sg.keys():
+		Game.goal_shared[int(k)] = sg[k]
+	Game.goals_done_prev = Game.goals().map(func(g): return g[1])
 	if main.player != null:
 		main.player.toast("Verbunden - du bist Spieler %d%s." % [s, " (Gast)" if s == 4 else ""], 4.0)
 
@@ -396,6 +408,29 @@ func send_weather(w: int) -> void:
 
 
 # ---------- Ereignisse senden ----------
+
+func send_trunk(i: int, open: bool) -> void:
+	rpc("remote_trunk", i, open)
+
+
+@rpc("any_peer", "reliable")
+func remote_trunk(i: int, open: bool) -> void:
+	if open or Game.cars_state.has(i):
+		Game.cars_state[i] = open
+	for c in main.get_tree().get_nodes_in_group("cars"):
+		if c.car_index == i:
+			c.set_trunk(open)
+
+
+func send_goal(i: int, who: String) -> void:
+	rpc("remote_goal", i, who)
+
+
+@rpc("any_peer", "reliable")
+func remote_goal(i: int, who: String) -> void:
+	if not Game.goal_shared.has(i):
+		Game.goal_shared[i] = who
+
 
 func send_camp(spot_name: String) -> void:
 	rpc("remote_camp", spot_name)

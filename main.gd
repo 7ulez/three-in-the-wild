@@ -353,8 +353,11 @@ func _build_cars() -> void:
 			],
 		},
 	]
-	for d in defs:
+	for ci in defs.size():
+		var d: Dictionary = defs[ci]
 		var car := Car.new()
+		car.car_index = ci
+		car.add_to_group("cars")
 		add_child(car)
 		car.position = Vector3(d["x"], 0, 0)
 		car.build(d["name"], d["color"], d["length"], d["width"], d["loot"], d["model"])
