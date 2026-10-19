@@ -735,6 +735,9 @@ func _build_pickups() -> void:
 # ---------- Nutria ----------
 
 func _nutria_logic(delta: float) -> void:
+	# Mehrspieler: nur der Welt-Verantwortliche laesst ein Nutria kommen, alle anderen sehen es als Puppe
+	if Net.instance != null and is_instance_valid(Net.instance) and not Net.instance.is_world_authority():
+		return
 	if player == null or not Game.camp_claimed:
 		return
 	if nutria_active != null and not is_instance_valid(nutria_active):

@@ -10,6 +10,57 @@ var animals: Array = []
 var fireflies: Array = []
 var _fish_t: float = 8.0
 var _t: float = 0.0
+var _next_uid: int = 0
+
+
+## Mehrspieler: Tiere werden nur beim Welt-Verantwortlichen simuliert, die anderen zeigen sie an.
+func is_puppet() -> bool:
+	return Net.instance != null and is_instance_valid(Net.instance) and not Net.instance.is_world_authority()
+
+
+## Naechster Spieler zu einem Punkt (ich oder Mitspieler); null, wenn keiner da ist.
+func nearest_player_pos(p: Vector3) -> Variant:
+	var best: Variant = null
+	var bd := 1e9
+	if player != null and is_instance_valid(player):
+		best = player.global_position
+		bd = Vector2(player.global_position.x - p.x, player.global_position.z - p.z).length()
+	if Net.instance != null and is_instance_valid(Net.instance):
+		for k in Net.instance.avatars.keys():
+			var av: Node3D = Net.instance.avatars[k]
+			if is_instance_valid(av):
+				var d := Vector2(av.global_position.x - p.x, av.global_position.z - p.z).length()
+				if d < bd:
+					bd = d
+					best = av.global_position
+	return best
+
+
+func export_net() -> Array:
+	var out: Array = []
+	for a in animals:
+		if is_instance_valid(a) and not a.dead:
+			out.append([a.uid, a.kind, a.global_position, a.rotation.y, a._cur, a.visible])
+	return out
+
+
+func import_net(list: Array) -> void:
+	var by_uid := {}
+	for a in animals:
+		if is_instance_valid(a) and not a.dead:
+			by_uid[a.uid] = a
+	for e in list:
+		var uid: int = int(e[0])
+		var a: Animal = by_uid.get(uid, null)
+		if a == null:
+			_add(String(e[1]), e[2], uid)
+			a = animals[animals.size() - 1]
+			a.global_position = e[2]
+		a.net_pos = e[2]
+		a.net_yaw = float(e[3])
+		a.net_anim = String(e[4])
+		a.net_vis = bool(e[5])
+		a.net_has = true
 
 
 func start(p_main: Node) -> void:
@@ -92,8 +143,18 @@ func _meadow_point(rng: RandomNumberGenerator) -> Vector3:
 	return Vector3(20, 0, 25)
 
 
-func _add(kind: String, pos: Vector3) -> void:
+func _add(kind: String, pos: Vector3, uid: int = -1) -> void:
+	if uid >= 0:
+		for o in animals:
+			if is_instance_valid(o) and not o.dead and o.uid == uid:
+				return
 	var a := Animal.new()
+	if uid < 0:
+		uid = _next_uid
+		_next_uid += 1
+	else:
+		_next_uid = maxi(_next_uid, uid + 1)
+	a.uid = uid
 	add_child(a)
 	a.setup(self, kind)
 	a.global_position = pos
@@ -135,13 +196,21 @@ func _process(delta: float) -> void:
 	_fish_t -= delta
 	if _fish_t <= 0.0:
 		_fish_t = randf_range(10.0, 28.0)
-		_fish_jump()
+		if not is_puppet():
+			_fish_jump()
 
 
 func _fish_jump() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var p := _lake_point(rng, 0.85)
+	var dir := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
+	if Net.instance != null and is_instance_valid(Net.instance):
+		Net.instance.send_fish_jump(p, dir)
+	fish_jump_at(p, dir)
+
+
+func fish_jump_at(p: Vector3, dir: Vector3) -> void:
 	var fish := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = Vector3(0.45, 0.13, 0.1)
@@ -149,7 +218,6 @@ func _fish_jump() -> void:
 	fish.material_override = Util.mat(Color(0.7, 0.72, 0.65))
 	add_child(fish)
 	fish.global_position = p
-	var dir := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
 	fish.look_at(fish.global_position + dir, Vector3.UP)
 	var tw := create_tween()
 	tw.tween_method(func(t: float) -> void:
@@ -166,6 +234,13 @@ func _fish_jump() -> void:
 
 class Animal extends Node3D:
 	var fauna: Fauna
+	var uid: int = 0
+	var net_pos: Vector3 = Vector3.ZERO
+	var net_yaw: float = 0.0
+	var net_anim: String = ""
+	var net_vis: bool = true
+	var net_has: bool = false
+	var _was_puppet: bool = false
 	var kind: String = ""
 	var target: Vector3 = Vector3.ZERO
 	var wait: float = 0.0
@@ -275,6 +350,7 @@ class Animal extends Node3D:
 		_blood(0.9 if kind == "bird" else 0.35)
 		var f := fauna
 		var k := kind
+		var u := uid
 		var spawn := home if home != Vector3.ZERO else global_position
 		get_tree().create_timer(25.0).timeout.connect(func() -> void:
 			if is_instance_valid(self):
@@ -282,7 +358,7 @@ class Animal extends Node3D:
 			if is_instance_valid(f):
 				f.get_tree().create_timer(20.0).timeout.connect(func() -> void:
 					if is_instance_valid(f):
-						f._add(k, spawn)))
+						f._add(k, spawn, u)))
 
 	func setup(f: Fauna, k: String) -> void:
 		fauna = f
@@ -426,12 +502,16 @@ class Animal extends Node3D:
 		ap.speed_scale = sc
 
 	func _pdist() -> float:
-		if fauna.player == null or not is_instance_valid(fauna.player):
+		var pp: Variant = fauna.nearest_player_pos(global_position)
+		if pp == null:
 			return 999.0
-		return Vector2(fauna.player.global_position.x - global_position.x, fauna.player.global_position.z - global_position.z).length()
+		return Vector2((pp as Vector3).x - global_position.x, (pp as Vector3).z - global_position.z).length()
 
 	func _away_from_player(dist: float) -> Vector3:
-		var d := global_position - fauna.player.global_position
+		var pp: Variant = fauna.nearest_player_pos(global_position)
+		if pp == null:
+			return global_position
+		var d := global_position - (pp as Vector3)
 		d.y = 0
 		return global_position + d.normalized() * dist
 
@@ -470,6 +550,25 @@ class Animal extends Node3D:
 		if dead:
 			return
 		_t += delta
+		if fauna.is_puppet():
+			_was_puppet = true
+			if net_has:
+				global_position = global_position.lerp(net_pos, minf(delta * 6.0, 1.0))
+				rotation.y = lerp_angle(rotation.y, net_yaw, minf(delta * 8.0, 1.0))
+				visible = net_vis
+				if net_anim != "":
+					_play(net_anim)
+				if kind == "bird" and wing_l != null:
+					wing_l.rotation.z = sin(_t * 12.0) * 0.6
+					wing_r.rotation.z = -sin(_t * 12.0) * 0.6
+			return
+		if _was_puppet:
+			# Ich bin jetzt fuer die Tiere zustaendig: von der aktuellen Stelle weitermachen
+			_was_puppet = false
+			target = global_position
+			wait = randf_range(0.5, 2.0)
+			if kind == "bird":
+				orbit_a = atan2(global_position.z - orbit_c.z, global_position.x - orbit_c.x)
 		_snd_cd -= delta
 		var night := Game.is_night()
 		var pd := _pdist()

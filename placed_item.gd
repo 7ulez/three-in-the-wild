@@ -151,6 +151,100 @@ func build(p_name: String, p_weight: float, p_size: Vector3, p_color: Color, sta
 		steam.position = Vector3(0, 0.5, 0)
 		add_child(steam)
 
+	_apply_live_state(state)
+
+
+# ---------- Netz: Zustand fuer alle Spieler gleich halten ----------
+
+## Zustand an alle Mitspieler senden (nach jeder Aenderung durch den eigenen Spieler).
+func _sync() -> void:
+	if Net.instance != null and is_instance_valid(Net.instance):
+		Net.instance.send_placed_state(self)
+
+
+## Kompletter Zustand von einem Mitspieler (oder beim Beitreten).
+func apply_state(st: Dictionary) -> void:
+	if st.has("beers") and parts.has("bottles"):
+		var bottles: Array = parts["bottles"]
+		while bottles.size() > int(st["beers"]):
+			var b: Node = bottles.pop_back()
+			b.queue_free()
+	if st.has("water"):
+		water_left = int(st["water"])
+	if st.has("wood"):
+		wood_left = int(st["wood"])
+	if item_name == "Rucksack" and st.has("contents"):
+		contents = (st["contents"] as Array).duplicate(true)
+		sel = 0
+	if item_name == "Kühlbox" and st.has("fish"):
+		fish_in = (st["fish"] as Array).duplicate(true)
+		sel = 0
+		_refresh_fish()
+	if item_name == "Kiste mit Proviant" and st.has("pack"):
+		pack = (st["pack"] as Array).duplicate()
+		sel = 0
+		_refresh_pack()
+	_apply_live_state(st)
+
+
+func _apply_live_state(st: Dictionary) -> void:
+	if st.has("open") and bool(st["open"]) != open:
+		_toggle_open()
+	if st.has("fire"):
+		var f: Dictionary = st["fire"]
+		tinder = int(f["t"])
+		sticks = int(f["s"])
+		logs_in = int(f["l"])
+		burn_left = float(f["bl"])
+		var was := burning
+		burning = bool(f["b"])
+		if burning and not was:
+			if _fire_snd == null:
+				_fire_snd = Sfx.loop_at(self, "fire", -4.0)
+			elif not _fire_snd.playing:
+				_fire_snd.play()
+		elif was and not burning and _fire_snd != null:
+			_fire_snd.stop()
+		_update_fire_visual()
+	if st.has("oven"):
+		var o: Dictionary = st["oven"]
+		added = (o["a"] as Array).duplicate()
+		wrong = int(o["w"])
+		cook_t = float(o["ct"])
+		burn = float(o["bu"])
+		done = bool(o["d"])
+		burnt = bool(o["bt"])
+		portions = int(o["p"])
+		flavor = float(o["f"])
+		quality = float(o["q"])
+		cook_char = String(o["cc"])
+		if food != null:
+			food.visible = not added.is_empty() or done
+		_update_food_color()
+	if st.has("rod"):
+		var r: Dictionary = st["rod"]
+		var prev := int(rod_st.get("st", Fisher.S.IDLE)) if rod_in else Fisher.S.IDLE
+		rod_in = bool(r["in"])
+		rod_owner = String(r["o"])
+		rod_color = r["c"]
+		rod_st = (r["st"] as Dictionary).duplicate(true)
+		var rn: Node3D = parts.get("rod", null)
+		if rn != null:
+			rn.visible = rod_in
+		var now := int(rod_st.get("st", Fisher.S.IDLE)) if rod_in else Fisher.S.IDLE
+		if rod_in and now != Fisher.S.IDLE:
+			_ensure_rod_visuals()
+			_rbob.visible = true
+		elif _rbob != null:
+			_rbob.visible = false
+			(_rline.mesh as ImmediateMesh).clear_surfaces()
+			_rled.visible = false
+			_rled_light.visible = false
+		if now == Fisher.S.BITE and prev != Fisher.S.BITE:
+			var pl := get_tree().get_first_node_in_group("local_player")
+			if pl != null and pl.global_position.distance_to(global_position) < 60.0:
+				pl.toast("BISS! An der Rute im Ständer%s hat etwas angebissen!" % (" von " + rod_owner if rod_owner != "" else ""), 4.0)
+
 
 func _make_smoke(col: Color, size: float, life: float) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
@@ -202,10 +296,12 @@ func take_drink() -> bool:
 			return false
 		var b: Node = bottles.pop_back()
 		b.queue_free()
+		_sync()
 		return true
 	if water_left <= 0:
 		return false
 	water_left -= 1
+	_sync()
 	return true
 
 
@@ -336,6 +432,13 @@ func get_held_prompt(held: Node) -> String:
 
 
 func interact_with_held(player: Node, held: Node) -> bool:
+	var r := _interact_with_held(player, held)
+	if r:
+		_sync()
+	return r
+
+
+func _interact_with_held(player: Node, held: Node) -> bool:
 	if item_name == "Rucksack" and held.item_name != "Rucksack":
 		if contents.size() >= 12:
 			player.toast("Der Rucksack ist voll.", 2.0)
@@ -344,8 +447,6 @@ func interact_with_held(player: Node, held: Node) -> bool:
 		if held.extra.has("owner"):
 			d["owner"] = held.extra["owner"]
 		contents.append(d)
-		if Net.instance != null:
-			Net.instance.resync_placed(self)
 		player.release_held_for_storage()
 		Sfx.play("click", global_position)
 		player.toast("%s im Rucksack verstaut. (%d drin)" % [held.item_name, contents.size()], 2.0)
@@ -372,6 +473,12 @@ func interact_with_held(player: Node, held: Node) -> bool:
 # ---------- Benutzen ----------
 
 func interact(player: Node) -> void:
+	_interact(player)
+	if item_name != "Campingstuhl":
+		_sync()
+
+
+func _interact(player: Node) -> void:
 	match item_name:
 		"Campingstuhl":
 			player.sit(self)
@@ -442,8 +549,6 @@ func _cooler_use(player: Node) -> void:
 	fish_in.remove_at(idx)
 	sel = 0
 	_refresh_fish()
-	if Net.instance != null:
-		Net.instance.resync_placed(self)
 	var it := Item.new().setup(d["name"], d["weight"], d["size"], d["color"])
 	get_parent().add_child(it)
 	it.global_position = global_position + Vector3(0, 1.0, 0)
@@ -459,8 +564,6 @@ func _store_fish(player: Node, held: Node) -> void:
 	if not open:
 		_toggle_open()
 	fish_in.append({"name": held.item_name, "weight": held.weight, "size": held.item_size, "color": held.item_color})
-	if Net.instance != null:
-		Net.instance.resync_placed(self)
 	player.release_held_for_storage()
 	Sfx.play("splash", global_position, -8.0)
 	_refresh_fish()
@@ -619,9 +722,10 @@ func _rod_process(delta: float) -> void:
 	var mode: int = int(rod_st["mode"])
 	var bpos := tgt
 	bpos.y = 0.05 + sin(_rt * 3.0) * 0.015
+	var auth := Net.instance == null or not is_instance_valid(Net.instance) or Net.instance.is_world_authority()
 	if st == Fisher.S.WAITING:
 		rod_st["wait_left"] = float(rod_st["wait_left"]) - delta
-		if float(rod_st["wait_left"]) <= 0.0:
+		if float(rod_st["wait_left"]) <= 0.0 and auth:
 			var kgs: Array = [["Karpfen", 2.0, 14.0], ["Brasse", 0.5, 2.5], ["Rotauge", 0.1, 0.5], ["Barsch", 0.2, 1.2]]
 			var pick: Array = kgs[0] if (mode == 0 and Game.is_night()) else kgs.pick_random()
 			rod_st["fish_name"] = pick[0]
@@ -631,6 +735,7 @@ func _rod_process(delta: float) -> void:
 			var pl := get_tree().get_first_node_in_group("local_player")
 			if pl != null:
 				pl.toast("BISS! An der Rute im Ständer%s hat etwas angebissen!" % (" von " + rod_owner if rod_owner != "" else ""), 4.0)
+			_sync()
 	elif st == Fisher.S.BITE:
 		rod_st["bite_left"] = float(rod_st["bite_left"]) - delta
 		bpos.y = -0.04 + sin(_rt * 18.0) * 0.03
@@ -639,9 +744,10 @@ func _rod_process(delta: float) -> void:
 			_beep_cd = 0.5
 			if _rbeep != null:
 				_rbeep.play()
-		if float(rod_st["bite_left"]) <= 0.0:
+		if float(rod_st["bite_left"]) <= 0.0 and auth:
 			rod_st["st"] = Fisher.S.WAITING
 			rod_st["wait_left"] = randf_range(15.0, 40.0)
+			_sync()
 	if _rbob != null:
 		_rbob.global_position = bpos
 		var tip := global_position + global_transform.basis * Vector3(0, 1.45, -1.19)
@@ -678,8 +784,6 @@ func _unpack(player: Node) -> void:
 	var d: Dictionary = contents[idx]
 	contents.remove_at(idx)
 	sel = 0
-	if Net.instance != null:
-		Net.instance.resync_placed(self)
 	var pivot: Node3D = parts.get("lid", null)
 	if pivot != null and not open:
 		open = true
@@ -713,8 +817,6 @@ func _take_ingredient(player: Node) -> void:
 	pack.remove_at(idx)
 	sel = 0
 	_refresh_pack()
-	if Net.instance != null:
-		Net.instance.resync_placed(self)
 	var pivot: Node3D = parts.get("lid", null)
 	if pivot != null and not open:
 		open = true
@@ -739,6 +841,7 @@ func steal_one() -> String:
 	pack.remove_at(idx)
 	sel = 0
 	_refresh_pack()
+	_sync()
 	return nm
 
 
@@ -790,6 +893,7 @@ func ignite(player: Node) -> void:
 	sticks = 0
 	Game.fire_lit_once = true
 	_update_fire_visual()
+	_sync()
 
 
 func extinguish(msg: String = "") -> void:
@@ -998,6 +1102,7 @@ func _stir_result(b: Dictionary, res: String) -> void:
 			Sfx.play("click", global_position, -4.0)
 			h.flash(Color(1.0, 0.25, 0.15, 0.35))
 	_update_food_color()
+	_sync()
 	if not b.is_empty():
 		var bc := Vector2(h.size.x / 2.0, h.size.y * 0.52) + Vector2(cos(float(b["a"])), sin(float(b["a"]))) * 120.0 * float(b["rad"])
 		h.burst(bc, Color(1.0, 0.5, 0.25) if res != "DANEBEN" and res != "ZU SPÄT" else Color(0.6, 0.6, 0.6), 10 if res == "PERFEKT" else 5, 200.0)
@@ -1014,6 +1119,7 @@ func _stir_fx(power: float) -> void:
 func _stir_end(finished: bool) -> void:
 	var pl := stirrer
 	stirrer = null
+	_sync()
 	stir_bubbles.clear()
 	var pivot: Node3D = parts.get("lid", null)
 	if pivot != null:
@@ -1137,6 +1243,15 @@ func get_state() -> Dictionary:
 		st["contents"] = contents.duplicate(true)
 	if item_name == "Kühlbox":
 		st["fish"] = fish_in.duplicate(true)
+	if item_name == "Gasgrill" or item_name == "Kühlbox":
+		st["open"] = open
+	if item_name == "Feuerschale":
+		st["fire"] = {"t": tinder, "s": sticks, "l": logs_in, "b": burning, "bl": burn_left}
+	if item_name == "Dutch Oven":
+		st["oven"] = {"a": added.duplicate(), "w": wrong, "ct": cook_t, "bu": burn, "d": done, "bt": burnt,
+			"p": portions, "f": flavor, "q": quality, "cc": cook_char}
+	if item_name == "Rutenständer":
+		st["rod"] = {"in": rod_in, "o": rod_owner, "c": rod_color, "st": rod_st.duplicate(true)}
 	return st
 
 

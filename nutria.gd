@@ -19,6 +19,11 @@ var _body: Node3D
 var flee_dir: Vector3 = Vector3.ZERO
 var _ap: AnimationPlayer = null
 var _cur_anim: String = ""
+# Netz: bei Mitspielern nur Anzeige (Puppe), simuliert wird beim Welt-Verantwortlichen
+var puppet: bool = false
+var net_pos: Vector3 = Vector3.ZERO
+var net_yaw: float = 0.0
+var net_anim: String = ""
 
 
 func setup(p_main: Node, pos: Vector3) -> void:
@@ -98,11 +103,36 @@ func _choose_target() -> void:
 	action = "leave"
 
 
+## Naechster Spieler (ich oder ein Mitspieler) - vor dem flieht das Nutria.
+func _nearest_player_pos() -> Vector3:
+	var best := Vector3(9999, 0, 9999)
+	var bd := 1e9
+	var player: Node3D = main.player if main != null else null
+	if player != null:
+		best = player.global_position
+		bd = best.distance_to(global_position)
+	if Net.instance != null and is_instance_valid(Net.instance):
+		for k in Net.instance.avatars.keys():
+			var av: Node3D = Net.instance.avatars[k]
+			if is_instance_valid(av):
+				var d := av.global_position.distance_to(global_position)
+				if d < bd:
+					bd = d
+					best = av.global_position
+	return best
+
+
 func _process(delta: float) -> void:
+	if puppet:
+		if net_pos != Vector3.ZERO:
+			global_position = global_position.lerp(net_pos, minf(delta * 10.0, 1.0))
+			rotation.y = lerp_angle(rotation.y, net_yaw, minf(delta * 10.0, 1.0))
+		if net_anim != "":
+			_play(net_anim)
+		return
 	life += delta
 	_anim += delta * 9.0
-	var player: Node3D = main.player if main != null else null
-	var ppos: Vector3 = player.global_position if player != null else Vector3(9999, 0, 9999)
+	var ppos: Vector3 = _nearest_player_pos()
 	var dir := Vector3.ZERO
 	var speed := 2.6
 	match state:
@@ -188,9 +218,11 @@ func _dry_dir(dir: Vector3, step: float) -> Vector3:
 	return Vector3.ZERO
 
 
-func _toast_near(ppos: Vector3, msg: String) -> void:
-	if main.player != null and global_position.distance_to(ppos) < 35.0:
+func _toast_near(_ppos: Vector3, msg: String) -> void:
+	if main.player != null and global_position.distance_to(main.player.global_position) < 35.0:
 		main.player.toast(msg, 3.0)
+	if Net.instance != null and is_instance_valid(Net.instance):
+		Net.instance.send_toast_near(global_position, msg)
 
 
 func _do_steal(ppos: Vector3) -> void:

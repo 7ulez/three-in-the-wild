@@ -107,6 +107,7 @@ func start(p_main: Node) -> void:
 		err = peer.create_server(Game.port)
 		status = "Host (Port %d)" % Game.port
 		slot = 1
+		_join_ms = Time.get_ticks_msec()
 	else:
 		var url: String = Game.host_ip
 		if Game.ws_url != "":
@@ -248,6 +249,9 @@ func _admit(id: int) -> void:
 
 func _on_peer_disconnected(id: int) -> void:
 	_release_items_of(id)
+	if nutria_puppet != null and is_instance_valid(nutria_puppet):
+		nutria_puppet.queue_free()
+	nutria_puppet = null
 	if avatars.has(id):
 		avatars[id].queue_free()
 		avatars.erase(id)
@@ -285,6 +289,7 @@ func _snapshot() -> Dictionary:
 @rpc("authority", "reliable")
 func assign_slot(s: int, snap: Dictionary) -> void:
 	slot = s
+	_join_ms = Time.get_ticks_msec()
 	if s == 4:
 		Game.player_name = "Gast"
 	status = "Platz %d%s" % [s, " (Gast)" if s == 4 else ""]
@@ -328,6 +333,7 @@ func _process(delta: float) -> void:
 		_timer = 0.0
 		var p: Player = main.player
 		rpc("sync_state", p.global_position, p.rotation.y, p.character_name, Game.player_name, p.sleeping or p.tent_lying != null, p.anim_flags())
+	_authority_tick(delta)
 	if is_host():
 		_skip_t += delta
 		if _skip_t > 0.5:
@@ -796,12 +802,136 @@ func _release_items_of(peer: int) -> void:
 					it.detach_to(main, at, d["q"])
 
 
-## Behaelter (Rucksack, Kuehlbox, Proviantkiste) hat sich veraendert: bei allen neu aufbauen.
-func resync_placed(p: PlacedItem) -> void:
-	if multiplayer.multiplayer_peer == null:
+## Aufgestellter Gegenstand hat sich veraendert (Feuer, Topf, Grill, Behaelter, Rute): allen melden.
+func send_placed_state(p: PlacedItem) -> void:
+	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
-	send_removed(p.global_position, p.item_name)
-	send_placed(p, p.get_state())
+	rpc("remote_placed_state", p.global_position, p.item_name, p.get_state())
+
+
+@rpc("any_peer", "reliable")
+func remote_placed_state(pos: Vector3, n: String, st: Dictionary) -> void:
+	for p in Game.placed:
+		if is_instance_valid(p) and p.item_name == n and p.global_position.distance_to(pos) < 0.3:
+			if p.stirrer != null:
+				st.erase("oven")     # ich ruehre gerade selbst: meinen Stand behalten
+			p.apply_state(st)
+			return
+
+
+# ---------- Welt-Verantwortung: einer simuliert Tiere, Nutria und Zufall fuer alle ----------
+
+var _join_ms: int = -1
+var _auth_t: float = 0.0
+var _fauna_t: float = 0.0
+var _nutria_t: float = 0.0
+var nutria_puppet: Nutria = null
+
+
+## Der Spieler mit der kleinsten Netz-ID simuliert die gemeinsame Welt (Tiere, Nutria, Bisse am Ständer).
+func is_world_authority() -> bool:
+	if multiplayer.multiplayer_peer == null:
+		return true
+	if Game.dedicated or _join_ms < 0:
+		return false
+	if not is_host() and Time.get_ticks_msec() - _join_ms < 6000:
+		return false
+	var me := multiplayer.get_unique_id()
+	for k in avatars.keys():
+		if int(k) < me:
+			return false
+	return true
+
+
+func _authority_tick(delta: float) -> void:
+	if not is_world_authority():
+		return
+	# Feuer, Topf und Ruten regelmaessig abgleichen (kleine Abweichungen der Zeit ausgleichen)
+	_auth_t += delta
+	if _auth_t > 4.0:
+		_auth_t = 0.0
+		for p in Game.placed:
+			if not is_instance_valid(p):
+				continue
+			if (p.item_name == "Feuerschale" and p.burning) or (p.item_name == "Dutch Oven" and not p.added.is_empty()) or (p.item_name == "Rutenständer" and p.rod_in) or (p.item_name == "Gasgrill" and p.open):
+				send_placed_state(p)
+	# Tiere
+	_fauna_t += delta
+	if _fauna_t > 0.2:
+		_fauna_t = 0.0
+		var fa: Fauna = main.get_node_or_null("Fauna")
+		if fa != null:
+			rpc("remote_fauna", fa.export_net())
+	# Nutria
+	_nutria_t += delta
+	if _nutria_t > 0.12:
+		_nutria_t = 0.0
+		var nv: Variant = main.get("nutria_active")
+		var on := nv != null and is_instance_valid(nv) and not (nv as Nutria).is_queued_for_deletion()
+		if on:
+			var nu := nv as Nutria
+			rpc("remote_nutria", true, nu.global_position, nu.rotation.y, nu._cur_anim)
+		elif _nutria_was_on:
+			rpc("remote_nutria", false, Vector3.ZERO, 0.0, "")
+		_nutria_was_on = on
+
+
+var _nutria_was_on: bool = false
+
+
+@rpc("any_peer", "unreliable_ordered")
+func remote_fauna(list: Array) -> void:
+	if Game.dedicated or main == null or is_world_authority():
+		return
+	var fa: Fauna = main.get_node_or_null("Fauna")
+	if fa != null:
+		fa.import_net(list)
+
+
+@rpc("any_peer", "unreliable_ordered")
+func remote_nutria(on: bool, pos: Vector3, yaw: float, anim: String) -> void:
+	if Game.dedicated or main == null or is_world_authority():
+		return
+	if not on:
+		if nutria_puppet != null and is_instance_valid(nutria_puppet):
+			nutria_puppet.queue_free()
+		nutria_puppet = null
+		return
+	if nutria_puppet == null or not is_instance_valid(nutria_puppet):
+		nutria_puppet = Nutria.new()
+		nutria_puppet.puppet = true
+		main.add_child(nutria_puppet)
+		nutria_puppet.setup(main, pos)
+		nutria_puppet.rotation.y = yaw
+	nutria_puppet.net_pos = pos
+	nutria_puppet.net_yaw = yaw
+	nutria_puppet.net_anim = anim
+
+
+func send_fish_jump(p: Vector3, dir: Vector3) -> void:
+	rpc("remote_fish_jump", p, dir)
+
+
+@rpc("any_peer", "reliable")
+func remote_fish_jump(p: Vector3, dir: Vector3) -> void:
+	if Game.dedicated or main == null:
+		return
+	var fa: Fauna = main.get_node_or_null("Fauna")
+	if fa != null:
+		fa.fish_jump_at(p, dir)
+
+
+## Meldung fuer alle, die in der Naehe sind (z.B. das Nutria klaut etwas).
+func send_toast_near(pos: Vector3, msg: String, radius: float = 35.0) -> void:
+	rpc("remote_toast_near", pos, msg, radius)
+
+
+@rpc("any_peer", "reliable")
+func remote_toast_near(pos: Vector3, msg: String, radius: float) -> void:
+	if Game.dedicated or main == null or main.player == null:
+		return
+	if main.player.global_position.distance_to(pos) < radius:
+		main.player.toast(msg, 3.0)
 
 
 # ---------- Verstecke ----------
