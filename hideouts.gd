@@ -239,13 +239,13 @@ func _hut(root: Node3D) -> void:
 	var wood := Color(0.42, 0.28, 0.16)
 	var dk := Color(0.33, 0.22, 0.12)
 	var lr := 0.15
-	_solid(root, Vector3(4.6, 0.12, 3.8), dk, Vector3(0, 0.06, 0)).set_meta("surface", "wood")           # Boden
+	_solid(root, Vector3(4.6, 0.12, 3.8), dk, Vector3(0, -0.02, 0)).set_meta("surface", "wood")          # Boden (Oberkante nur 4 cm: keine Schwelle, über die man nicht kommt)
 	# Kollisionswände (unsichtbar) - die Optik sind Blockhaus-Stämme
 	HideoutArt.hidden_wall(root, Vector3(4.4, 2.3, 0.18), Vector3(0, 1.2, 1.8))
 	HideoutArt.hidden_wall(root, Vector3(0.18, 2.3, 3.6), Vector3(-2.2, 1.2, 0))
 	HideoutArt.hidden_wall(root, Vector3(0.18, 2.3, 3.6), Vector3(2.2, 1.2, 0))
-	HideoutArt.hidden_wall(root, Vector3(1.6, 2.3, 0.18), Vector3(-1.4, 1.2, -1.8))
-	HideoutArt.hidden_wall(root, Vector3(1.6, 2.3, 0.18), Vector3(1.4, 1.2, -1.8))
+	HideoutArt.hidden_wall(root, Vector3(1.4, 2.3, 0.18), Vector3(-1.5, 1.2, -1.8))
+	HideoutArt.hidden_wall(root, Vector3(1.4, 2.3, 0.18), Vector3(1.5, 1.2, -1.8))
 	var n := 8
 	for k in range(n):
 		var y := 0.2 + float(k) * 0.285
@@ -254,10 +254,10 @@ func _hut(root: Node3D) -> void:
 		HideoutArt.beam(root, Vector3(-2.2 - 0.2 + ov, y, 1.8), Vector3(2.2 + 0.2 - ov, y, 1.8), lr, c)             # hinten
 		HideoutArt.beam(root, Vector3(-2.2, y, -1.8 - 0.2 + ov), Vector3(-2.2, y, 1.8 + 0.2 - ov), lr, c)           # links
 		HideoutArt.beam(root, Vector3(2.2, y, -1.8 - 0.2 + ov), Vector3(2.2, y, 1.8 + 0.2 - ov), lr, c)             # rechts
-		HideoutArt.beam(root, Vector3(-2.2 - 0.2 + ov, y, -1.8), Vector3(-0.62, y, -1.8), lr, c)                     # vorn links
-		HideoutArt.beam(root, Vector3(0.62, y, -1.8), Vector3(2.2 + 0.2 - ov, y, -1.8), lr, c)                      # vorn rechts
-		if y > 1.75:
-			HideoutArt.beam(root, Vector3(-0.62, y, -1.8), Vector3(0.62, y, -1.8), lr, c)                           # über der Tür
+		HideoutArt.beam(root, Vector3(-2.2 - 0.2 + ov, y, -1.8), Vector3(-0.82, y, -1.8), lr, c)                     # vorn links
+		HideoutArt.beam(root, Vector3(0.82, y, -1.8), Vector3(2.2 + 0.2 - ov, y, -1.8), lr, c)                      # vorn rechts
+		if y > 2.05:
+			HideoutArt.beam(root, Vector3(-0.82, y, -1.8), Vector3(0.82, y, -1.8), lr, c)                           # über der Tür
 	# Dach: zwei Schrägen mit Schindelreihen, Firstbalken, Moos
 	var roof_col := Color(0.3, 0.2, 0.15)
 	_solid(root, Vector3(3.0, 0.15, 4.6), roof_col, Vector3(-1.25, 2.85, 0), Vector3(0, 0, 28))
@@ -279,10 +279,10 @@ func _hut(root: Node3D) -> void:
 			var w := 4.0 - float(r) * 0.9
 			Util.add_box(root, Vector3(w, 0.2, 0.1), wood.darkened(0.1), Vector3(0, 2.4 + float(r) * 0.28, gz * 0.8))
 	# Tür (angelehnt) und Rahmen
-	HideoutArt.beam(root, Vector3(-0.66, 0, -1.9), Vector3(-0.66, 2.0, -1.9), 0.07, dk)
-	HideoutArt.beam(root, Vector3(0.66, 0, -1.9), Vector3(0.66, 2.0, -1.9), 0.07, dk)
-	HideoutArt.beam(root, Vector3(-0.7, 2.0, -1.9), Vector3(0.7, 2.0, -1.9), 0.07, dk)
-	var door := Util.add_box(root, Vector3(0.6, 1.95, 0.07), Color(0.36, 0.25, 0.14), Vector3(0.95, 1.0, -2.15))
+	HideoutArt.beam(root, Vector3(-0.86, 0, -1.9), Vector3(-0.86, 2.1, -1.9), 0.07, dk)
+	HideoutArt.beam(root, Vector3(0.86, 0, -1.9), Vector3(0.86, 2.1, -1.9), 0.07, dk)
+	HideoutArt.beam(root, Vector3(-0.9, 2.1, -1.9), Vector3(0.9, 2.1, -1.9), 0.07, dk)
+	var door := Util.add_box(root, Vector3(0.6, 1.95, 0.07), Color(0.36, 0.25, 0.14), Vector3(1.15, 1.0, -2.15))
 	door.rotation_degrees.y = 60.0
 	# Vordach mit Pfosten, Stufe
 	_solid(root, Vector3(2.8, 0.1, 1.5), roof_col, Vector3(0, 2.55, -2.65), Vector3(-12, 0, 0))
