@@ -708,7 +708,7 @@ func _update_help() -> void:
 	var net_txt := ""
 	if Net.instance != null:
 		net_txt = "  |  Netz: %s, %d Mitspieler" % [Net.instance.status, Net.instance.avatars.size()]
-	help_label.text = "%s  |  trägt: %s  |  Lager: %s  |  %s Tag %d  |  Promille: %.2f%s\nZunder %d · Äste %d · Holz %d · Steine %d  |  Bier %d · Wasser %d  |  Fänge: %d  |  Chili: %d\nWASD laufen · Shift rennen · Space springen · E benutzen · F trinken · R aufstellen · X abbauen · G werfen/Stein flitschen · C ducken · L Kopflampe\nP pinkeln (halten) · H großes Geschäft · Q Vape (Julian) · T Angelmethode · Z Zutat wechseln · V Ansicht · 1/2/3 Charakter · Esc Maus frei" % [character_name, carrying, camp, Game.clock_text(), Game.day_count, promille, net_txt, tinder, sticks, logs, stones, beers_drunk, water_drunk, Game.catches.size(), Game.chili_served]
+	help_label.text = "%s  |  trägt: %s  |  Lager: %s  |  %s Tag %d  |  Promille: %.2f%s\nZunder %d · Äste %d · Holz %d · Steine %d  |  Bier %d · Wasser %d  |  Fänge: %d  |  Chili: %d\nWASD laufen · Shift rennen · Space springen · E benutzen · F trinken · R aufstellen · X abbauen · G werfen/Stein flitschen · C ducken · L Kopflampe · M Karte\nP pinkeln (halten) · H großes Geschäft · Q Vape (Julian) · T Angelmethode · Z Zutat wechseln · V Ansicht · 1/2/3 Charakter · Esc Maus frei" % [character_name, carrying, camp, Game.clock_text(), Game.day_count, promille, net_txt, tinder, sticks, logs, stones, beers_drunk, water_drunk, Game.catches.size(), Game.chili_served]
 	if hud != null:
 		var others: Array = []
 		if Net.instance != null:
@@ -760,6 +760,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				hud.toggle_info()
 			KEY_TAB, KEY_O:
 				hud.toggle_goals()
+			KEY_M:
+				hud.toggle_map()
 			KEY_E:
 				_interact()
 			KEY_G:

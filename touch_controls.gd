@@ -27,6 +27,7 @@ var more_buttons: Array = [
 	{"label": "Angelart", "kind": "key", "key": KEY_T},
 	{"label": "Zutat", "kind": "key", "key": KEY_Z},
 	{"label": "Lampe", "kind": "key", "key": KEY_L},
+	{"label": "Karte", "kind": "key", "key": KEY_M},
 	{"label": "Ansicht", "kind": "key", "key": KEY_V},
 	{"label": "Pinkeln", "kind": "hold", "key": KEY_P},
 	{"label": "Geschäft", "kind": "key", "key": KEY_H},

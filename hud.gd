@@ -288,6 +288,20 @@ func _build_goals_full(goals: Array, done: int) -> void:
 	box.add_child(_lbl("Tab / O: schließen", 12, UI.TEXT_LOW, UI.f_mono))
 
 
+var _map: MapView = null
+
+
+func toggle_map() -> void:
+	if _map == null:
+		# eigene Ebene ganz oben, damit keine HUD-Fenster darueber liegen
+		var layer := CanvasLayer.new()
+		layer.layer = 60
+		add_child(layer)
+		_map = MapView.new()
+		layer.add_child(_map)
+	_map.toggle()
+
+
 func toggle_goals() -> void:
 	if _goals_full != null:
 		_goals_full.visible = not _goals_full.visible
