@@ -281,9 +281,13 @@ func _build_goals_full(goals: Array, done: int) -> void:
 		var cur := not is_done and first_open
 		if not is_done:
 			first_open = false
-		var gtext: String = strike(str(g[0])) if is_done else str(g[0])
-		var l := _lbl(("✓  " if is_done else ("▶  " if cur else "○  ")) + gtext, 15,
-			UI.INK if cur else (Color(UI.TEXT_LOW, 0.75) if is_done else UI.TEXT_LOW), UI.f_head if cur else UI.f_label)
+		var l := StrikeLabel.new()
+		l.text = ("✓  " if is_done else ("▶  " if cur else "○  ")) + str(g[0])
+		l.strike = is_done
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		l.add_theme_font_size_override("font_size", 15)
+		l.add_theme_color_override("font_color", UI.INK if cur else (Color(UI.TEXT_LOW, 0.75) if is_done else UI.TEXT_LOW))
+		l.add_theme_font_override("font", UI.f_head if cur else UI.f_label)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size = Vector2(420, 0)
 		box.add_child(l)
@@ -377,19 +381,21 @@ func toggle_goals() -> void:
 		_goals_full.visible = not _goals_full.visible
 
 
-## Erledigte Ziele durchgestrichen (Unicode-Kombinierzeichen, Label kann selbst nicht durchstreichen)
-static func strike(text: String) -> String:
-	var out := ""
-	for ch in text:
-		out += ch
-		if ch != " ":
-			out += "\u0336"
-	return out
+## Label mit durchgezogener Linie (fuer erledigte Ziele)
+class StrikeLabel extends Label:
+	var strike: bool = false
+
+	func _draw() -> void:
+		if not strike:
+			return
+		var f := get_theme_font("font")
+		var fs := get_theme_font_size("font_size")
+		var w := minf(f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x, size.x)
+		var y := size.y * 0.55
+		draw_line(Vector2(0, y), Vector2(w, y), Color(get_theme_color("font_color"), 0.9), 2.0)
 
 
 func _goal_row(text: String, done: bool, current: bool) -> void:
-	if done:
-		text = strike(text)
 	if current:
 		var p := _panel(Color("f8dcc0"), 10, 0.0, Vector4(10, 6, 10, 6))
 		(p.get_theme_stylebox("panel") as StyleBoxFlat).border_color = UI.FIRE
@@ -399,7 +405,12 @@ func _goal_row(text: String, done: bool, current: bool) -> void:
 		p.add_child(l)
 		_goals_box.add_child(p)
 		return
-	var l2 := _lbl(("✓ " if done else "○ ") + text, 13, UI.TEXT_LOW if not done else Color(UI.TEXT_LOW, 0.7))
+	var l2 := StrikeLabel.new()
+	l2.text = ("✓ " if done else "○ ") + text
+	l2.strike = done
+	l2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l2.add_theme_font_size_override("font_size", 13)
+	l2.add_theme_color_override("font_color", UI.TEXT_LOW if not done else Color(UI.TEXT_LOW, 0.7))
 	l2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l2.custom_minimum_size = Vector2(250, 0)
 	_goals_box.add_child(l2)
