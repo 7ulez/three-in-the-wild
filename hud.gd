@@ -340,13 +340,30 @@ func _dbg_update(delta: float) -> void:
 	var others := 0
 	if Net.instance != null and is_instance_valid(Net.instance):
 		others = Net.instance.avatars.size()
-	_dbg.text = "F3  pos %.1f / %.1f / %.1f  Boden:%s\nFPS %d  Objekte %d  Drawcalls %d\nNodes %d  Mitspieler %d  Items %d\nKamera y %.1f  far %.0f" % [
+	_dbg.text = "F3  pos %.1f / %.1f / %.1f  Boden:%s\nFPS %d  Objekte %d  Drawcalls %d\nNodes %d  Mitspieler %d  Items %d\nKamera y %.1f  far %.0f\nglow %s  fog %.4f  exp %.2f  amb %.2f  sonne %.2f\nflash %.2f  nebel %.2f  regen %.2f  wolken %.2f  blur %s  promille %.2f  scale3d %.2f" % [
 		pl.global_position.x, pl.global_position.y, pl.global_position.z, str(pl.is_on_floor()),
 		Engine.get_frames_per_second(),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 		get_tree().get_node_count(), others, Item.registry.size(),
-		cam.global_position.y if cam != null else -999.0, cam.far if cam != null else 0.0]
+		cam.global_position.y if cam != null else -999.0, cam.far if cam != null else 0.0,
+		str(_env().glow_enabled), _env().fog_density, _env().tonemap_exposure, _env().ambient_light_energy, _sun_e(),
+		Weather.flash, Weather.fog, Weather.rain, Weather.cloud, str(pl.blur_rect.visible), pl.promille, get_viewport().scaling_3d_scale]
+
+
+func _world() -> Node:
+	var pl := get_tree().get_first_node_in_group("local_player")
+	return pl.get_parent() if pl != null else self
+
+
+func _env() -> Environment:
+	var e: Environment = _world().get("env") as Environment
+	return e if e != null else Environment.new()
+
+
+func _sun_e() -> float:
+	var sn: Variant = _world().get("sun")
+	return (sn as DirectionalLight3D).light_energy if sn != null else -1.0
 
 
 func toggle_goals() -> void:

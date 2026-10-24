@@ -764,6 +764,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				hud.toggle_map()
 			KEY_F3:
 				hud.toggle_debug()
+			KEY_F4:
+				repair_view()
 			KEY_E:
 				_interact()
 			KEY_G:
@@ -961,7 +963,7 @@ func _process(delta: float) -> void:
 		camera.h_offset = 0.0
 		camera.v_offset = 0.0
 	camera.fov = 75.0 + sin(t * 0.5) * 8.0 * drunk + sin(t * 1.3) * 4.0 * trip_i - 15.0 * _aim_f
-	blur_rect.visible = drunk > 0.05
+	blur_rect.visible = drunk > 0.05 and not no_screen_fx
 	if blur_rect.visible:
 		blur_mat.set_shader_parameter("amount", minf(drunk * 0.8, 1.0))
 		blur_mat.set_shader_parameter("time_s", t)
@@ -1185,7 +1187,7 @@ func _update_trip(delta: float) -> void:
 		_trip_fx = TripFx.new()
 		add_child(_trip_fx)
 	if _trip_fx != null:
-		_trip_fx.set_intensity(trip_i)
+		_trip_fx.set_intensity(0.0 if no_screen_fx else trip_i)
 
 
 ## Luftgewehr: trifft Tiere (sie fallen um) und Mitspieler (verletzt sie).
@@ -1865,6 +1867,41 @@ func stand_up() -> void:
 # ---------- Neue Fähigkeiten ----------
 
 ## Setzt den Spieler um und nimmt den getragenen Gegenstand mit.
+var _repair_step: int = 0
+var no_screen_fx: bool = false
+
+
+## F4: Bildfehler beheben. Jeder Druck schaltet einen weiteren Verdaechtigen aus.
+func repair_view() -> void:
+	var m := get_parent()
+	var env: Environment = m.get("env") as Environment
+	_repair_step += 1
+	match _repair_step:
+		1:
+			if env != null:
+				env.glow_enabled = false
+			toast("F4 (1): Glühen aus.", 3.0)
+		2:
+			no_screen_fx = true
+			blur_rect.visible = false
+			if _trip_fx != null:
+				_trip_fx.rect.visible = false
+			toast("F4 (2): Unschärfe- und Rausch-Effekte aus.", 3.0)
+		3:
+			Weather.flash = 0.0
+			Weather.fog = 0.0
+			Weather.rain = 0.0
+			if env != null:
+				env.fog_enabled = false
+				env.adjustment_enabled = false
+				env.tonemap_exposure = 0.82
+			toast("F4 (3): Nebel, Farbkorrektur, Blitzlicht zurückgesetzt.", 3.0)
+		_:
+			_repair_step = 0
+			get_viewport().scaling_3d_scale = 1.0
+			toast("F4 (4): Bildauflösung zurückgesetzt. Nochmal F4 beginnt von vorn.", 3.0)
+
+
 var _safe_pos: Vector3 = Vector3(0, 1.0, 10)
 var _safe_t: float = 0.0
 

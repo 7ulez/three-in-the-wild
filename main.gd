@@ -168,7 +168,7 @@ func _setup_environment() -> void:
 	env.fog_light_color = Color(1.0, 0.85, 0.65)
 	env.fog_density = 0.002
 	env.fog_sky_affect = 0.15
-	env.glow_enabled = not Game.low
+	env.glow_enabled = not Game.low and not OS.has_feature("web")   # Bloom im Browser: kann das Bild verschmieren
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.05
 	env.tonemap_exposure = 0.82
