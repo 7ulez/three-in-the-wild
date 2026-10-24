@@ -2096,9 +2096,35 @@ func _rg_apply() -> void:
 			for l in w.find_children("*", "Light3D", true, false):
 				(l as Light3D).visible = false
 			guard_log = "Schritt 6: alle Lichter aus"
+		7:
+			for l in w.find_children("*", "Label3D", true, false):
+				(l as Label3D).visible = false
+			guard_log = "Schritt 7: alle Schilder/Namen aus"
+		8:
+			for pa in w.find_children("*", "CPUParticles3D", true, false):
+				(pa as CPUParticles3D).visible = false
+			guard_log = "Schritt 8: alle Partikel aus"
+		9:
+			for c in w.get_children():
+				if c is Item or c is PlacedItem:
+					(c as Node3D).visible = false
+			if Net.instance != null:
+				for k in Net.instance.avatars.keys():
+					var a2: Node3D = Net.instance.avatars[k]
+					if is_instance_valid(a2):
+						a2.visible = false
+			guard_log = "Schritt 9: Gegenstaende und Figuren aus"
+		10:
+			var vp := get_viewport()
+			vp.msaa_3d = Viewport.MSAA_DISABLED
+			vp.positional_shadow_atlas_size = 0
+			vp.use_debanding = false
+			vp.scaling_3d_scale = 0.75
+			guard_log = "Schritt 10: Anti-Aliasing/Schattenatlas/Aufloesung"
 		_:
 			guard_log = "Bildfehler bleibt trotz aller Schritte"
 			_rg_step = 0
+			toast("Bildfehler bleibt trotz aller Schritte (F3-Bild bitte schicken).", 6.0)
 			return
 	toast("Bildfehler erkannt - " + guard_log, 4.0)
 
