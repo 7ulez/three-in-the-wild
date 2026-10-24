@@ -65,6 +65,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_dbg_update(delta)
 	if _help != null:
 		_help_t -= delta
 		_help.visible = (_help_t > 0.0 or Input.is_physical_key_pressed(KEY_F1)) and not _touch
@@ -300,6 +301,52 @@ func toggle_map() -> void:
 		_map = MapView.new()
 		layer.add_child(_map)
 	_map.toggle()
+
+
+var _dbg: Label = null
+var _dbg_t: float = 0.0
+
+
+## F3: Diagnose bei Bildfehlern (Position, Bodenkontakt, Zeichenobjekte, Spieleranzahl).
+func toggle_debug() -> void:
+	if _dbg == null:
+		var layer := CanvasLayer.new()
+		layer.layer = 61
+		add_child(layer)
+		_dbg = Label.new()
+		_dbg.position = Vector2(12, 150)
+		_dbg.add_theme_font_size_override("font_size", 15)
+		_dbg.add_theme_color_override("font_color", Color(1, 1, 0.5))
+		_dbg.add_theme_constant_override("outline_size", 6)
+		_dbg.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+		_dbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_dbg.visible = false
+		layer.add_child(_dbg)
+	_dbg.visible = not _dbg.visible
+	_dbg_t = 0.0
+
+
+func _dbg_update(delta: float) -> void:
+	if _dbg == null or not _dbg.visible:
+		return
+	_dbg_t -= delta
+	if _dbg_t > 0.0:
+		return
+	_dbg_t = 0.4
+	var pl := get_tree().get_first_node_in_group("local_player") as Player
+	if pl == null:
+		return
+	var cam := get_viewport().get_camera_3d()
+	var others := 0
+	if Net.instance != null and is_instance_valid(Net.instance):
+		others = Net.instance.avatars.size()
+	_dbg.text = "F3  pos %.1f / %.1f / %.1f  Boden:%s\nFPS %d  Objekte %d  Drawcalls %d\nNodes %d  Mitspieler %d  Items %d\nKamera y %.1f  far %.0f" % [
+		pl.global_position.x, pl.global_position.y, pl.global_position.z, str(pl.is_on_floor()),
+		Engine.get_frames_per_second(),
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+		get_tree().get_node_count(), others, Item.registry.size(),
+		cam.global_position.y if cam != null else -999.0, cam.far if cam != null else 0.0]
 
 
 func toggle_goals() -> void:

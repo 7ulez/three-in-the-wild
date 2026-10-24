@@ -762,6 +762,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				hud.toggle_goals()
 			KEY_M:
 				hud.toggle_map()
+			KEY_F3:
+				hud.toggle_debug()
 			KEY_E:
 				_interact()
 			KEY_G:
