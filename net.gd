@@ -32,7 +32,8 @@ class RemoteAvatar:
 
 	func set_look(p_char: String, p_name: String) -> void:
 		if p_char == char_name:
-			if label != null:
+			# Nur bei Aenderung: jedes Setzen baut das Schild neu auf (kam bei jedem Positionspaket)
+			if label != null and label.text != p_name:
 				label.text = p_name
 			return
 		char_name = p_char
