@@ -144,7 +144,7 @@ func _process(delta: float) -> void:
 	if storm > 0.5 and _is_authority_or_client():
 		_bolt_t -= delta
 		if _bolt_t <= 0.0:
-			_bolt_t = randf_range(7.0, 18.0)
+			_bolt_t = randf_range(14.0, 30.0)
 			_lightning()
 
 
@@ -162,9 +162,9 @@ func _roll_next() -> void:
 			if Game.hour > 4.0 and Game.hour < 9.5:
 				w[K.FOG] = 0.3
 		K.CLOUDY:
-			w = [0.35, 0.0, 0.4, 0.25, 0.0]
+			w = [0.45, 0.0, 0.5, 0.05, 0.0]
 		K.RAIN:
-			w = [0.2, 0.3, 0.0, 0.3, 0.0]
+			w = [0.35, 0.4, 0.0, 0.08, 0.0]
 		K.STORM:
 			w = [0.0, 0.4, 0.6, 0.0, 0.0]
 		_:
@@ -204,7 +204,7 @@ func _duration(k: int) -> float:
 		K.RAIN:
 			return randf_range(120.0, 240.0)
 		K.STORM:
-			return randf_range(90.0, 180.0)
+			return randf_range(40.0, 80.0)
 	return randf_range(120.0, 200.0)
 
 
