@@ -913,6 +913,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = target.x
 		velocity.z = target.z
 	move_and_slide()
+	_rescue_check(delta)
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
 	Player.set_pants(body_visual, needs.pants if needs != null else 0)
@@ -1862,6 +1863,24 @@ func stand_up() -> void:
 # ---------- Neue Fähigkeiten ----------
 
 ## Setzt den Spieler um und nimmt den getragenen Gegenstand mit.
+var _safe_pos: Vector3 = Vector3(0, 1.0, 10)
+var _safe_t: float = 0.0
+
+
+## Notfall: durch den Boden gefallen (man sieht dann nur noch Himmel) -> zurueck zum letzten sicheren Ort.
+func _rescue_check(delta: float) -> void:
+	if is_on_floor() and global_position.y > -0.5 and is_finite(global_position.y):
+		_safe_t += delta
+		if _safe_t > 1.0:
+			_safe_t = 0.0
+			_safe_pos = global_position + Vector3(0, 0.3, 0)
+	if global_position.y < -1.2 or not is_finite(global_position.y) or not is_finite(global_position.x) or not is_finite(global_position.z):
+		teleport_to(_safe_pos)
+		_peak_y = _safe_pos.y
+		_airborne = false
+		toast("Du bist durch den Boden gefallen - zurück an den letzten sicheren Ort.", 4.0)
+
+
 func teleport_to(pos: Vector3) -> void:
 	global_position = pos
 	velocity = Vector3.ZERO
