@@ -2055,6 +2055,7 @@ func _material_guard(delta: float) -> void:
 		_mg_default.albedo_color = Color(0.6, 0.6, 0.6)
 	var w := get_parent()
 	var fixed := 0
+	var names: Array = []
 	for mi in w.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
 		if m.mesh == null:
@@ -2063,9 +2064,22 @@ func _material_guard(delta: float) -> void:
 			if m.get_active_material(i) == null:
 				m.set_surface_override_material(i, _mg_default)
 				fixed += 1
+				if names.size() < 4:
+					names.append("MI " + str(m.name) + " (" + str(m.get_parent().name) + ")")
+	for pa in w.find_children("*", "CPUParticles3D", true, false):
+		var p := pa as CPUParticles3D
+		if p.mesh != null and p.mesh.material == null:
+			p.mesh.material = _mg_default
+			fixed += 1
+			if names.size() < 4:
+				names.append("PA " + str(p.name) + " (" + str(p.get_parent().name) + ")")
 	if fixed > 0:
 		mat_fixes += fixed
-		print("[Material] ", fixed, " Netz-Flaechen ohne Material ersetzt")
+		mat_report = ", ".join(names)
+		print("[Material] ", fixed, " ohne Material ersetzt: ", mat_report)
+
+
+var mat_report: String = ""
 
 
 var _rg_t: float = 0.0
