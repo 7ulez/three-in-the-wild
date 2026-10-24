@@ -281,7 +281,8 @@ func _build_goals_full(goals: Array, done: int) -> void:
 		var cur := not is_done and first_open
 		if not is_done:
 			first_open = false
-		var l := _lbl(("✓  " if is_done else ("▶  " if cur else "○  ")) + str(g[0]), 15,
+		var gtext: String = strike(str(g[0])) if is_done else str(g[0])
+		var l := _lbl(("✓  " if is_done else ("▶  " if cur else "○  ")) + gtext, 15,
 			UI.INK if cur else (Color(UI.TEXT_LOW, 0.75) if is_done else UI.TEXT_LOW), UI.f_head if cur else UI.f_label)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size = Vector2(420, 0)
@@ -376,7 +377,19 @@ func toggle_goals() -> void:
 		_goals_full.visible = not _goals_full.visible
 
 
+## Erledigte Ziele durchgestrichen (Unicode-Kombinierzeichen, Label kann selbst nicht durchstreichen)
+static func strike(text: String) -> String:
+	var out := ""
+	for ch in text:
+		out += ch
+		if ch != " ":
+			out += "\u0336"
+	return out
+
+
 func _goal_row(text: String, done: bool, current: bool) -> void:
+	if done:
+		text = strike(text)
 	if current:
 		var p := _panel(Color("f8dcc0"), 10, 0.0, Vector4(10, 6, 10, 6))
 		(p.get_theme_stylebox("panel") as StyleBoxFlat).border_color = UI.FIRE
