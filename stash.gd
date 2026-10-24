@@ -3,8 +3,8 @@ extends StaticBody3D
 ## Ein Versteck mit Beute (Kiste, Baumhöhle, ...). Jedes Versteck zählt für das Ziel "Verstecke finden".
 
 ## Inhalt der 5 Verstecke (Reihenfolge = Reihenfolge, in der sie gebaut werden).
-## Die letzten zwei sind Platzhalter, bis die neuen Gegenstände feststehen.
-const LOOT: Array = ["Bierkiste", "Joint", "Luftgewehr", "Notration", "Verbandskasten"]
+## Das letzte Versteck enthält die Jack-Daniel's-Cola-Kiste (3 Dosen, eine Dose = sehr betrunken).
+const LOOT: Array = ["Bierkiste", "Joint", "Luftgewehr", "Notration", "Jack-Cola"]
 static var count: int = 0
 static var all: Array = []
 
@@ -98,6 +98,9 @@ func interact(player: Node) -> void:
 			if n != null:
 				n.eat(0.5)
 			msg = "Eine Notration Dosenbrot und Würstchen! Hunger gestillt."
+		"Jack-Cola":
+			_spawn_item(player, "Jack-Cola-Kiste", 4.0, Vector3(0.5, 0.3, 0.35), Color(0.12, 0.1, 0.09))
+			msg = "Eine Kiste Jack Daniel's Cola, 3 Dosen. Vorsicht: eine reicht für den ganzen Abend."
 		"Verbandskasten":
 			if n != null:
 				n.health = minf(n.health + 60.0, 100.0)
