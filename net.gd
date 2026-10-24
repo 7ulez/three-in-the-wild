@@ -914,17 +914,17 @@ func remote_nutria(on: bool, pos: Vector3, yaw: float, anim: String) -> void:
 	nutria_puppet.net_anim = anim
 
 
-func send_fish_jump(p: Vector3, dir: Vector3) -> void:
-	rpc("remote_fish_jump", p, dir)
+func send_fish_jump(p: Vector3, dir: Vector3, sp: int = 0) -> void:
+	rpc("remote_fish_jump", p, dir, sp)
 
 
 @rpc("any_peer", "reliable")
-func remote_fish_jump(p: Vector3, dir: Vector3) -> void:
+func remote_fish_jump(p: Vector3, dir: Vector3, sp: int = 0) -> void:
 	if Game.dedicated or main == null:
 		return
 	var fa: Fauna = main.get_node_or_null("Fauna")
 	if fa != null:
-		fa.fish_jump_at(p, dir)
+		fa.fish_jump_at(p, dir, sp)
 
 
 ## Meldung fuer alle, die in der Naehe sind (z.B. das Nutria klaut etwas).

@@ -205,17 +205,26 @@ func _fish_jump() -> void:
 	rng.randomize()
 	var p := _lake_point(rng, 0.85)
 	var dir := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
+	var sp := randi() % 7
 	if Net.instance != null and is_instance_valid(Net.instance):
-		Net.instance.send_fish_jump(p, dir)
-	fish_jump_at(p, dir)
+		Net.instance.send_fish_jump(p, dir, sp)
+	fish_jump_at(p, dir, sp)
 
 
-func fish_jump_at(p: Vector3, dir: Vector3) -> void:
-	var fish := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.45, 0.13, 0.1)
-	fish.mesh = bm
-	fish.material_override = Util.mat(Color(0.7, 0.72, 0.65))
+const JUMPERS: Array = ["karpfen", "barsch", "brasse", "rotauge", "hecht", "barsch", "rotauge"]
+
+
+func fish_jump_at(p: Vector3, dir: Vector3, sp: int = 0) -> void:
+	var fish := Node3D.new()
+	var inner := Node3D.new()
+	fish.add_child(inner)
+	var kind: String = JUMPERS[posmod(sp, JUMPERS.size())]
+	var glb := load("res://assets/items/%s.glb" % kind) as PackedScene
+	if glb != null:
+		var m := glb.instantiate() as Node3D
+		inner.add_child(m)
+		m.scale = Vector3.ONE * (0.45 + 0.08 * float(posmod(sp, 4)))
+		inner.rotation.y = PI / 2.0       # Kopf liegt im Modell bei +X, Blickrichtung ist -Z
 	add_child(fish)
 	fish.global_position = p
 	fish.look_at(fish.global_position + dir, Vector3.UP)
