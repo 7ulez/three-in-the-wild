@@ -37,6 +37,12 @@ static var stashes_opened: Dictionary = {}
 static var cars_state: Dictionary = {}       # Auto-Index -> Heckklappe offen (nur Autos, die schon ausgeladen wurden)
 static var goal_shared: Dictionary = {}     # Ziel-Index -> Name des Spielers, der es fuer alle geschafft hat
 static var all_done_shown: bool = false
+# Statistik fuer den Abspann: eigene Zaehler + die Werte aller Mitspieler (Name -> Dictionary)
+static var stat_beers: int = 0
+static var stat_pants: int = 0
+static var stat_poop: int = 0
+static var stat_vomit: int = 0
+static var stats_all: Dictionary = {}
 
 # Tablet/Handy: Bildschirm-Steuerung statt Maus und Tastatur
 static var touch: bool = false
@@ -149,6 +155,23 @@ static func reset() -> void:
 	cars_state = {}
 	stashes_opened = {}
 	all_done_shown = false
+	stat_beers = 0
+	stat_pants = 0
+	stat_poop = 0
+	stat_vomit = 0
+	stats_all = {}
+
+
+## Eigene Zahlen fuer den Abspann.
+static func my_stats() -> Dictionary:
+	var best_kg := 0.0
+	var best := ""
+	for c in catches:
+		if float(c["kg"]) > best_kg:
+			best_kg = float(c["kg"])
+			best = str(c["name"])
+	return {"beer": stat_beers, "pants": stat_pants, "poop": stat_poop, "vomit": stat_vomit,
+		"deaths": deaths, "fish": catches.size(), "best_kg": best_kg, "best": best}
 
 
 static func has_catch(species: String) -> bool:

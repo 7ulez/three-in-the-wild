@@ -134,6 +134,7 @@ func damage(amount: float, reason: String) -> void:
 
 ## Missgeschick in die Hose: Hose verfärbt sich, etwas Gesundheit weg.
 func accident(kind: int) -> void:
+	Game.stat_pants += 1
 	pants = maxi(pants, kind)
 	pants_t = 300.0
 	accident_t = 2.2
@@ -299,6 +300,7 @@ func try_big_business() -> void:
 
 func _finish_big() -> void:
 	squatting = false
+	Game.stat_poop += 1
 	bowel = 0.0
 	_urgent_time = 0.0
 	var pile := Poop.new()

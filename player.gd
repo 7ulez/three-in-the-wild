@@ -641,7 +641,7 @@ func _update_goals() -> void:
 		hud.set_goals(gl)
 	if all and not Game.all_done_shown:
 		Game.all_done_shown = true
-		toast("ALLE ZIELE GESCHAFFT! Ein perfekter Angelausflug. Du darfst weitercampen (und noch ein Bier trinken).", 10.0)
+		Finale.start(get_parent(), self)
 
 
 func _goal_done(text: String) -> void:
@@ -1005,6 +1005,7 @@ func _drink() -> void:
 	var msg := ""
 	if kind == "beer":
 		beers_drunk += 1
+		Game.stat_beers += 1
 		promille += 0.3
 		needs.drank_beer()
 		msg = _drink_message()
@@ -1031,6 +1032,7 @@ func start_vomit() -> void:
 	if vomit_t > 0.0 or seat != null or hammock != null or sleeping or trapped_t > 0.0 or (needs != null and needs.squatting):
 		return
 	vomit_t = 3.6
+	Game.stat_vomit += 1
 	_vomit_cd = 0.0
 	toast("Oh nein ... dir wird schlecht!", 3.0)
 	Sfx.play("retch", global_position, 2.0)

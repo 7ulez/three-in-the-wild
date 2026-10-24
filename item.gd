@@ -224,6 +224,8 @@ func setup(p_name: String, p_weight: float, size: Vector3, color: Color) -> Item
 	var model := ItemModels.add_visual(self, p_name, size, color)
 	if model.has("bottles"):
 		bottle_nodes = model["bottles"]
+	if p_name == "Bierkasten" and is_gift_color(color):
+		_add_gift_bow(size)
 
 	label = Label3D.new()
 	label.text = p_name
@@ -234,10 +236,39 @@ func setup(p_name: String, p_weight: float, size: Vector3, color: Color) -> Item
 	label.position = Vector3(0, size.y / 2.0 + 0.45, 0)
 	add_child(label)
 
+	if p_name == "Bierkasten" and is_gift_color(color):
+		label.text = "Geschenk-Bierkasten"
 	hold_extra = size.z * 0.5
 	if p_name == "Radio":
 		add_to_group("radio_item")
 	return self
+
+
+## Der Finale-Bierkasten hat eine ganz leicht andere Farbe (bei Mitspielern kommt nur die Farbe an).
+static func is_gift_color(c: Color) -> bool:
+	return absf(c.r - 0.9) < 0.01 and absf(c.g - 0.75) < 0.01 and absf(c.b - 0.21) < 0.004
+
+
+## Rote Geschenkschleife um die Flaschenhaelse.
+func _add_gift_bow(size: Vector3) -> void:
+	var red := Color(0.85, 0.1, 0.12)
+	var y := size.y / 2.0 + 0.05
+	var hx := size.x / 2.0 + 0.012
+	var hz := size.z / 2.0 + 0.012
+	Util.add_box(self, Vector3(size.x + 0.03, 0.04, 0.014), red, Vector3(0, y, hz))
+	Util.add_box(self, Vector3(size.x + 0.03, 0.04, 0.014), red, Vector3(0, y, -hz))
+	Util.add_box(self, Vector3(0.014, 0.04, size.z + 0.03), red, Vector3(hx, y, 0))
+	Util.add_box(self, Vector3(0.014, 0.04, size.z + 0.03), red, Vector3(-hx, y, 0))
+	# Schleife vorne: zwei Schlaufen, Knoten, zwei Enden
+	var loop_l := Util.add_box(self, Vector3(0.13, 0.07, 0.02), red, Vector3(-0.07, y + 0.02, hz + 0.02))
+	loop_l.rotation_degrees.z = 28.0
+	var loop_r := Util.add_box(self, Vector3(0.13, 0.07, 0.02), red, Vector3(0.07, y + 0.02, hz + 0.02))
+	loop_r.rotation_degrees.z = -28.0
+	Util.add_box(self, Vector3(0.05, 0.05, 0.03), Color(0.65, 0.05, 0.08), Vector3(0, y, hz + 0.025))
+	var tail_l := Util.add_box(self, Vector3(0.035, 0.12, 0.012), red, Vector3(-0.035, y - 0.08, hz + 0.02))
+	tail_l.rotation_degrees.z = 15.0
+	var tail_r := Util.add_box(self, Vector3(0.035, 0.12, 0.012), red, Vector3(0.035, y - 0.08, hz + 0.02))
+	tail_r.rotation_degrees.z = -15.0
 
 
 ## Beim Bierkasten: wie viele Flaschen sind noch drin?

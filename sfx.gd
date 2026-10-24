@@ -5,7 +5,7 @@ extends Node
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
-const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2, "reload": 1, "chest_open": 1, "thunder": 2}
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 2, "reload": 1, "chest_open": 1, "thunder": 2, "boom": 2}
 const LOWRATE: Array = ["rain", "thunder", "wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit"]
 var _warm: Array = []
 var _warm_t: float = 2.0
@@ -474,6 +474,14 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			s = _add(s, _sine(0.3, 120.0, 60.0, 10.0, 0.5, 0.01), 0.0)
 			s = _add(s, _env(_nf(_white(0.3), 1, 1100.0, 1.0), 0.002, 14.0, 0.8), 1.2)
 			s = _add(s, _bubble(300.0, 0.4), 1.3)
+			return _wav(s, 0.85)
+		"boom":
+			# Feuerwerk: dumpfer Schlag, Rauschen, danach Knistern
+			var s := _sine(0.7, randf_range(85.0, 110.0), 38.0, 6.0, 0.9, 0.002, 0.2)
+			s = _add(s, _env(_nf(_white(0.5), 0, 900.0, 0.8), 0.001, 7.0, 1.0))
+			s = _add(s, _env(_nf(_white(0.9), 1, 2500.0, 0.8), 0.02, 3.0, 0.35), 0.04)
+			for k in range(26):
+				s = _add(s, _env(_nf(_white(0.01), 1, randf_range(3500.0, 8000.0), 2.0), 0.0003, 220.0, randf_range(0.2, 0.7)), randf_range(0.25, 1.1))
 			return _wav(s, 0.85)
 		"whoosh":
 			var s := _filt(_sweep(0.65, 500.0, 2400.0, 2.0), 0, 3200.0, 0.7)

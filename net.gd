@@ -283,7 +283,8 @@ func _snapshot() -> Dictionary:
 		cars.append({"i": int(k), "o": bool(Game.cars_state[k])})
 	return {"hour": Game.hour, "day": Game.day_count, "camp": Game.camp_name if Game.camp_claimed else "",
 		"placed": pl, "tents": tents, "cars": cars, "goals": Game.goal_shared.duplicate(),
-		"items": item_db.values(), "stashes": Game.stashes_opened.keys()}
+		"items": item_db.values(), "stashes": Game.stashes_opened.keys(),
+		"stats": Game.stats_all.duplicate(true), "finale": Game.all_done_shown}
 
 
 @rpc("authority", "reliable")
@@ -311,6 +312,11 @@ func assign_slot(s: int, snap: Dictionary) -> void:
 	for d in snap.get("items", []):
 		item_db[int(d["id"])] = d
 		_item_create(d)
+	var st: Dictionary = snap.get("stats", {})
+	for k in st.keys():
+		Game.stats_all[str(k)] = st[k]
+	if bool(snap.get("finale", false)):
+		Game.all_done_shown = true
 	var sg: Dictionary = snap.get("goals", {})
 	for k in sg.keys():
 		Game.goal_shared[int(k)] = sg[k]
@@ -932,6 +938,49 @@ func remote_toast_near(pos: Vector3, msg: String, radius: float) -> void:
 		return
 	if main.player.global_position.distance_to(pos) < radius:
 		main.player.toast(msg, 3.0)
+
+
+# ---------- Finale / Statistik ----------
+
+func send_stats(who: String, d: Dictionary) -> void:
+	Game.stats_all[who] = d
+	rpc("remote_stats", who, d)
+
+
+@rpc("any_peer", "reliable")
+func remote_stats(who: String, d: Dictionary) -> void:
+	Game.stats_all[who] = d
+
+
+## Das Finale hat begonnen (Server merkt es sich fuer spaeter Dazukommende).
+func send_finale_flag() -> void:
+	rpc("remote_finale_flag")
+
+
+@rpc("any_peer", "reliable")
+func remote_finale_flag() -> void:
+	Game.all_done_shown = true
+
+
+## Fuers Feuerwerk: Abend machen. Die Uhr gehoert dem Host/Server.
+func request_evening() -> void:
+	if is_host():
+		_set_evening()
+	else:
+		rpc("remote_evening")
+
+
+@rpc("any_peer", "reliable")
+func remote_evening() -> void:
+	if is_host():
+		_set_evening()
+
+
+func _set_evening() -> void:
+	if Game.hour >= 20.5 or Game.hour < 5.0:
+		return
+	Game.hour = 21.0
+	rpc("sync_time", Game.hour, Game.day_count, Weather.kind)
 
 
 # ---------- Verstecke ----------
