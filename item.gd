@@ -241,6 +241,9 @@ func setup(p_name: String, p_weight: float, size: Vector3, color: Color) -> Item
 	hold_extra = size.z * 0.5
 	if p_name == "Radio":
 		add_to_group("radio_item")
+	if p_name == "Jack-Cola-Kiste":
+		water_left = 3
+		label.text = "Jack Daniel's Cola (3 Dosen)"
 	return self
 
 
@@ -291,6 +294,8 @@ func drink_kind() -> String:
 		return "beer"
 	if item_name == "Wasserflasche":
 		return "water"
+	if item_name == "Jack-Cola-Kiste":
+		return "jack"
 	return ""
 
 
@@ -306,7 +311,7 @@ func take_drink() -> bool:
 		if ok:
 			net_state_changed()
 		return ok
-	if item_name == "Wasserflasche":
+	if item_name == "Wasserflasche" or item_name == "Jack-Cola-Kiste":
 		if water_left <= 0:
 			return false
 		water_left -= 1
@@ -334,6 +339,8 @@ func get_prompt() -> String:
 		return "E: leeren Bierkasten aufheben (%d kg)" % int(weight)
 	if item_name == "Wasserflasche":
 		return "E: Wasserflasche aufheben (%d kg)   F: Wasser trinken (%d Schluck)" % [int(weight), water_left]
+	if item_name == "Jack-Cola-Kiste":
+		return "E: Kiste aufheben (%d kg)   F: Dose trinken (%d übrig)" % [int(weight), water_left]
 	if item_name == "Radio":
 		return "E: Radio aufheben   F: an/aus   Z: Sender  +/- Lautstärke  [%s]" % (Radio.station_name() if Radio.on else "aus")
 	return "E: %s aufheben (%d kg)" % [display_name(), int(weight)]

@@ -1011,7 +1011,17 @@ func _drink() -> void:
 	drink_t = 1.25
 	drink_kind = 1 if kind == "beer" else 2
 	var msg := ""
-	if kind == "beer":
+	if kind == "jack":
+		# Jack Daniel's Cola: sofort extrem betrunken - ausser Steffen, der verträgt das
+		if character_name == "Steffen":
+			msg = "Steffen schüttelt nur den Kopf: 'Schmeckt nach Cola.'"
+			needs.drank_water()
+		else:
+			promille += 2.4
+			needs.drank_beer()
+			msg = "WAS war das? Der Boden kippt weg!"
+			Sfx.play("whoosh", global_position, -2.0, 0.6)
+	elif kind == "beer":
 		beers_drunk += 1
 		Game.stat_beers += 1
 		promille += 0.3
@@ -1023,6 +1033,8 @@ func _drink() -> void:
 		promille = maxf(promille - 0.12, 0.0)
 		msg = "Ahh, frisches Wasser." if promille < 0.3 else "Wasser hilft. Ein bisschen."
 	Sfx.play("gulp" if kind == "water" else "bottle", Vector3.INF, -2.0)
+	if kind == "jack" and character_name != "Steffen" and promille > 1.4:
+		get_tree().create_timer(1.2).timeout.connect(start_vomit)
 	if kind == "beer" and promille > 1.4 and randf() < clampf((promille - 1.4) * 0.6, 0.0, 1.0):
 		get_tree().create_timer(1.7).timeout.connect(start_vomit)
 	if kind == "beer" and randf() < 0.3:

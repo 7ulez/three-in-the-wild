@@ -594,7 +594,7 @@ func item_desc(it: Item) -> Dictionary:
 		"h": 0, "b": -1, "wa": -1}
 	if it.item_name == "Bierkasten":
 		d["b"] = it.beers_left()
-	if it.item_name == "Wasserflasche":
+	if it.item_name == "Wasserflasche" or it.item_name == "Jack-Cola-Kiste":
 		d["wa"] = it.water_left
 	return d
 
@@ -681,7 +681,7 @@ func item_release(it: Item) -> void:
 		item_db[it.net_id]["x"] = it.extra.duplicate(true)
 		if it.item_name == "Bierkasten":
 			item_db[it.net_id]["b"] = it.beers_left()
-		if it.item_name == "Wasserflasche":
+		if it.item_name == "Wasserflasche" or it.item_name == "Jack-Cola-Kiste":
 			item_db[it.net_id]["wa"] = it.water_left
 	it._rest_sent = false
 	rpc("remote_item_release", it.net_id, it.global_position, q, item_desc(it))

@@ -203,11 +203,12 @@ func _build_ground() -> void:
 	add_child(ground)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
-	bs.size = Vector3(1400, 1, 1400)
+	# 20 m dick (Oberkante bleibt bei y=0): bei ruckeliger Bildrate fiel man sonst durch die 1-m-Platte
+	bs.size = Vector3(1400, 20, 1400)
 	cs.shape = bs
-	cs.position = Vector3(0, -0.5, 0)
+	cs.position = Vector3(0, -10.0, 0)
 	ground.add_child(cs)
-	var gm := Util.add_box(ground, Vector3(1400, 1, 1400), Color(0.36, 0.55, 0.22), Vector3(0, -0.5, 0))
+	var gm := Util.add_box(ground, Vector3(1400, 20, 1400), Color(0.36, 0.55, 0.22), Vector3(0, -10.0, 0))
 	gm.material_override = Scenery.ground_material()
 	gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Kiesfläche als Parkplatz
@@ -328,6 +329,7 @@ func _build_cars() -> void:
 				_loot("Kühlbox", 10.0, Vector3(0.6, 0.4, 0.4), Color(0.2, 0.45, 0.85)),
 				_loot("Gasgrill", 18.0, Vector3(0.7, 0.9, 0.5), Color(0.3, 0.3, 0.33)),
 				_loot("Kiste mit Proviant", 7.0, Vector3(0.5, 0.27, 0.34), Color(0.75, 0.2, 0.15)),
+				_loot("Jack-Cola-Kiste", 4.0, Vector3(0.5, 0.3, 0.35), Color(0.12, 0.1, 0.09)),
 				_backpack_loot(Color(0.25, 0.42, 0.22), [
 					_loot("Angelrute", 3.0, Vector3(1.4, 0.1, 0.1), rod_cols[1], "Steffen"),
 					_loot("Rutenständer", 2.0, Vector3(0.4, 1.0, 0.3), Color(0.45, 0.3, 0.16)),
