@@ -2042,7 +2042,7 @@ func _render_guard(delta: float) -> void:
 	_rg_t = 0.0
 	var obj: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
 	var dc: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
-	var bad: bool = obj > 300 and dc < int(obj * 0.3)
+	var bad: bool = obj > 300 and dc < int(obj * 0.3) and absf(camera.global_transform.basis.z.y) < 0.5 and _view_is_empty()
 	if bad:
 		_rg_good = 0
 		_rg_bad += 1
@@ -2058,6 +2058,27 @@ func _render_guard(delta: float) -> void:
 				toast("Bildfehler automatisch behoben (Schritt %d)." % _rg_step, 4.0)
 				print("[Waechter] ", guard_log)
 				_rg_step = 0
+
+
+## Echter Bildtest: im unteren Bilddrittel ist nichts als ein glatter Verlauf (jede Zeile ueberall gleich).
+func _view_is_empty() -> bool:
+	var tex := get_viewport().get_texture()
+	if tex == null:
+		return false
+	var img := tex.get_image()
+	if img == null or img.is_empty():
+		return false
+	var w := img.get_width()
+	var h := img.get_height()
+	for k in range(6):
+		var y := int(h * (0.62 + 0.05 * k))
+		var a := img.get_pixel(int(w * 0.40), y)
+		var b := img.get_pixel(int(w * 0.50), y)
+		var c := img.get_pixel(int(w * 0.60), y)
+		var d := absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) + absf(c.r - b.r) + absf(c.g - b.g) + absf(c.b - b.b)
+		if d > 0.03:
+			return false
+	return true
 
 
 func _rg_apply() -> void:
