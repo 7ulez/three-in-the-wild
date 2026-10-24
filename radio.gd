@@ -156,7 +156,10 @@ func _process(delta: float) -> void:
 	for r in _radios():
 		var it := r as Item
 		if it.label != null:
-			it.label.text = "Radio ♪ %s" % station_name() if on else "Radio"
+			# Nur bei Aenderung setzen: Label3D baut bei jedem Setzen die Schrift neu (im Browser fiel dadurch das Bild aus)
+			var want := "Radio ♪ %s" % station_name() if on else "Radio"
+			if it.label.text != want:
+				it.label.text = want
 	if _web and on and _t > 1.0:
 		_t = 0.0
 		var st := str(JavaScriptBridge.eval("window.__radio ? window.__radio.state : ''", true))

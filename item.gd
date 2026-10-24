@@ -128,7 +128,7 @@ func net_state_changed() -> void:
 
 func apply_net_state(x: Dictionary, beers: int, water: int) -> void:
 	extra = x.duplicate(true)
-	if extra.has("owner") and label != null:
+	if extra.has("owner") and label != null and label.text != display_name():
 		label.text = display_name()
 	if item_name == "Bierkasten" and beers >= 0:
 		while beers_left() > beers:
