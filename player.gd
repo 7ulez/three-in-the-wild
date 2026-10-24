@@ -919,6 +919,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_rescue_check(delta)
 	_render_guard(delta)
+	_light_manager(delta)
 	_scan_step()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
@@ -1971,6 +1972,56 @@ func _rescue_check(delta: float) -> void:
 		_peak_y = _safe_pos.y
 		_airborne = false
 		toast("Du bist durch den Boden gefallen - zurück an den letzten sicheren Ort.", 4.0)
+
+
+var _lm_t: float = 0.0
+var _lm_list_t: float = 99.0
+var _lm_lights: Array = []
+const MAX_LIGHTS: int = 6
+
+
+## Zu viele gleichzeitig aktive Lichter lassen im Browser das ganze Bild verschwinden (nur Himmel).
+## Lichter ohne Helligkeit werden abgeschaltet, ansonsten bleiben nur die naechsten MAX_LIGHTS an.
+func _light_manager(delta: float) -> void:
+	if Game.dedicated:
+		return
+	_lm_t += delta
+	if _lm_t < 0.4:
+		return
+	_lm_t = 0.0
+	_lm_list_t += 0.4
+	if _lm_list_t > 4.0:
+		_lm_list_t = 0.0
+		_lm_lights = []
+		for l in get_parent().find_children("*", "Light3D", true, false):
+			if not (l is DirectionalLight3D) and l != lamp:
+				_lm_lights.append(l)
+	var cands: Array = []
+	var cp := camera.global_position
+	for l in _lm_lights:
+		if not is_instance_valid(l):
+			continue
+		var li := l as Light3D
+		var mine: bool = li.has_meta("lm_off")
+		if li.visible == false and not mine:
+			continue          # vom Besitzer ausgeschaltet
+		if li.light_energy < 0.03:
+			if li.visible:
+				li.visible = false
+				li.set_meta("lm_off", true)
+			continue
+		cands.append(li)
+	cands.sort_custom(func(a: Light3D, b: Light3D) -> bool:
+		return a.global_position.distance_squared_to(cp) < b.global_position.distance_squared_to(cp))
+	for i in range(cands.size()):
+		var li2 := cands[i] as Light3D
+		if i < MAX_LIGHTS:
+			if li2.has_meta("lm_off"):
+				li2.visible = true
+				li2.remove_meta("lm_off")
+		elif li2.visible:
+			li2.visible = false
+			li2.set_meta("lm_off", true)
 
 
 var _rg_t: float = 0.0
