@@ -223,6 +223,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _left_click() -> void:
 	match state:
 		S.IDLE:
+			if Game.fish_ban_day == Game.day_count:
+				player.toast("Angelverbot bis morgen früh - der Fischereiaufseher hat es so entschieden.", 4.0)
+				return
 			if Game.beer_debt:
 				player.toast("Erst die neue Kiste Bier vom Parkplatz ins Camp tragen und abstellen - dann darfst du wieder angeln.", 4.0)
 				return

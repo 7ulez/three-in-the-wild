@@ -24,6 +24,7 @@ static var chili_served: int = 0
 static var cars_opened: int = 0
 static var slept: bool = false
 static var deaths: int = 0
+static var fish_ban_day: int = -1          # Angelverbot (Fischereiaufseher): gilt an diesem Spieltag
 static var beer_debt: bool = false      # nach dem Tod: erst Bier ins Camp, dann wieder angeln
 static var summit: bool = false
 static var summit_sunrise: bool = false
@@ -132,6 +133,7 @@ static func reset() -> void:
 	placed.clear()
 	hour = 15.5
 	day_count = 1
+	fish_ban_day = -1
 	Weather.reset()
 	catches.clear()
 	fish_penalty_until = 0.0

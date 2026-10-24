@@ -6,6 +6,7 @@ const PIER_X: Array = [-12.0, 0.0, 12.0]
 ## Alles rund um den See hängt an diesem Knoten und liegt 15 m weiter vorne.
 var lake_root: Node3D
 var sun: DirectionalLight3D
+var inspector: Inspector = null
 var weather: Weather
 var radio: Radio
 var moon: DirectionalLight3D
@@ -96,6 +97,11 @@ func _process(delta: float) -> void:
 			Game.day_count += 1
 		return
 	_nutria_logic(delta)
+	if inspector == null:
+		inspector = Inspector.new()
+		inspector.main = self
+		add_child(inspector)
+	inspector.tick(delta)
 	# Wie Minecraft: ca. 10 Minuten Tag, 7 Minuten Nacht (Zeit läuft nachts schneller)
 	var is_day := Game.hour >= 6.0 and Game.hour < 18.0
 	var rate: float = 1.2 if is_day else 1.7
