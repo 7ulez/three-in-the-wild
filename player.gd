@@ -2069,6 +2069,7 @@ func _render_guard(delta: float) -> void:
 				guard_log = "Bild kam zurueck nach Schritt %d (Obj %d, DC %d)" % [_rg_step, obj, dc]
 				toast("Bildfehler automatisch behoben (Schritt %d)." % _rg_step, 4.0)
 				print("[Waechter] ", guard_log)
+				_rg_restore()
 				_rg_step = 0
 
 
@@ -2093,6 +2094,25 @@ func _view_is_empty() -> bool:
 	return true
 
 
+## Jede Aenderung des Waechters wird gemerkt und beim Zurueckkommen des Bildes (oder wenn nichts hilft) wieder rueckgaengig gemacht.
+var _rg_undo: Array = []
+
+
+func _rg_set(obj: Object, prop: String, val: Variant) -> void:
+	if obj == null or not is_instance_valid(obj):
+		return
+	_rg_undo.append([obj, prop, obj.get(prop)])
+	obj.set(prop, val)
+
+
+func _rg_restore() -> void:
+	for e in _rg_undo:
+		var o: Object = e[0]
+		if is_instance_valid(o):
+			o.set(e[1], e[2])
+	_rg_undo.clear()
+
+
 func _rg_apply() -> void:
 	_rg_step += 1
 	var w := get_parent()
@@ -2102,60 +2122,31 @@ func _rg_apply() -> void:
 	match _rg_step:
 		1:
 			for l in w.find_children("*", "Light3D", true, false):
-				(l as Light3D).shadow_enabled = false
+				_rg_set(l, "shadow_enabled", false)
 			guard_log = "Schritt 1: Schatten aus"
 		2:
-			if Net.instance != null:
-				for k in Net.instance.avatars.keys():
-					var a: Node3D = Net.instance.avatars[k]
-					if is_instance_valid(a):
-						a.visible = false
-			guard_log = "Schritt 2: Mitspieler-Figuren aus"
+			_rg_set(camera, "far", 1500.0)
+			guard_log = "Schritt 2: Sichtweite 1500"
 		3:
-			for l in w.find_children("*", "Light3D", true, false):
-				if not (l is DirectionalLight3D):
-					(l as Light3D).visible = false
-			guard_log = "Schritt 3: Lampen/Lichter aus"
+			for mi in w.find_children("*", "MeshInstance3D", true, false):
+				_rg_set(mi, "cast_shadow", GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+			guard_log = "Schritt 3: Schattenwurf aus"
 		4:
-			for mi in w.find_children("*", "GeometryInstance3D", true, false):
-				(mi as GeometryInstance3D).visibility_range_end = 0.0
-				(mi as GeometryInstance3D).visibility_range_begin = 0.0
-			guard_log = "Schritt 4: Sichtweiten-Grenzen aus"
-		5:
-			camera.near = 0.1
-			camera.far = 1500.0
-			guard_log = "Schritt 5: Kamera near/far neu"
-		6:
-			for l in w.find_children("*", "Light3D", true, false):
-				(l as Light3D).visible = false
-			guard_log = "Schritt 6: alle Lichter aus"
-		7:
 			for l in w.find_children("*", "Label3D", true, false):
-				(l as Label3D).visible = false
-			guard_log = "Schritt 7: alle Schilder/Namen aus"
-		8:
+				_rg_set(l, "visible", false)
+			guard_log = "Schritt 4: Schilder aus"
+		5:
 			for pa in w.find_children("*", "CPUParticles3D", true, false):
-				(pa as CPUParticles3D).visible = false
-			guard_log = "Schritt 8: alle Partikel aus"
-		9:
-			for c in w.get_children():
-				if c is Item or c is PlacedItem:
-					(c as Node3D).visible = false
-			if Net.instance != null:
-				for k in Net.instance.avatars.keys():
-					var a2: Node3D = Net.instance.avatars[k]
-					if is_instance_valid(a2):
-						a2.visible = false
-			guard_log = "Schritt 9: Gegenstaende und Figuren aus"
-		10:
+				_rg_set(pa, "visible", false)
+			guard_log = "Schritt 5: Partikel aus"
+		6:
 			var vp := get_viewport()
-			vp.msaa_3d = Viewport.MSAA_DISABLED
-			vp.positional_shadow_atlas_size = 0
-			vp.use_debanding = false
-			vp.scaling_3d_scale = 0.75
-			guard_log = "Schritt 10: Anti-Aliasing/Schattenatlas/Aufloesung"
+			_rg_set(vp, "msaa_3d", Viewport.MSAA_DISABLED)
+			_rg_set(vp, "use_debanding", false)
+			guard_log = "Schritt 6: Anti-Aliasing aus"
 		_:
-			guard_log = "Bildfehler bleibt trotz aller Schritte"
+			guard_log = "Bildfehler bleibt trotz aller Schritte - alles zurueckgesetzt"
+			_rg_restore()
 			_rg_step = 0
 			toast("Bildfehler bleibt trotz aller Schritte (F3-Bild bitte schicken).", 6.0)
 			return
