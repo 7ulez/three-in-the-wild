@@ -918,6 +918,7 @@ func _physics_process(delta: float) -> void:
 		velocity.z = target.z
 	move_and_slide()
 	_rescue_check(delta)
+	_scan_step()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
 	Player.set_pants(body_visual, needs.pants if needs != null else 0)
@@ -1904,6 +1905,57 @@ func repair_view() -> void:
 
 var _safe_pos: Vector3 = Vector3(0, 1.0, 10)
 var _safe_t: float = 0.0
+var _scan_t: float = 0.0
+var bad_report: String = ""
+
+
+var _scan_i: int = 0
+
+
+## Prueft pro Bild nur ein paar Knoten, damit es nicht ruckelt.
+func _scan_step() -> void:
+	var kids := get_parent().get_children()
+	if kids.is_empty():
+		return
+	if _scan_i >= kids.size():
+		_scan_i = 0
+	var stop := mini(_scan_i + 40, kids.size())
+	for i in range(_scan_i, stop):
+		var c := kids[i]
+		if c is Node3D:
+			_check_one(c as Node3D)
+		_bad_transform_scan(c, 1)
+	_scan_i = stop
+
+
+## Sucht Knoten mit ungueltiger Lage (NaN/unendlich/riesig). Die verderben beim Zeichnen die ganze Szene.
+func _bad_transform_scan(n: Node, depth: int = 0) -> void:
+	for c in n.get_children():
+		if c is Node3D:
+			_check_one(c as Node3D)
+		if depth < 12:
+			_bad_transform_scan(c, depth + 1)
+
+
+func _check_one(c: Node3D) -> void:
+	var t := c.transform
+	var o := t.origin
+	var bad := not (is_finite(o.x) and is_finite(o.y) and is_finite(o.z))
+	if not bad:
+		bad = absf(o.x) > 1.0e5 or absf(o.y) > 1.0e5 or absf(o.z) > 1.0e5
+	if not bad:
+		var b := t.basis
+		for v in [b.x, b.y, b.z]:
+			if not (is_finite(v.x) and is_finite(v.y) and is_finite(v.z)) or absf(v.x) + absf(v.y) + absf(v.z) > 1.0e5:
+				bad = true
+	if not bad:
+		return
+	bad_report = "%s (%s) %s" % [c.name, c.get_class(), str(o)]
+	push_warning("Ungueltige Lage: " + bad_report)
+	if c is RigidBody3D:
+		(c as RigidBody3D).linear_velocity = Vector3.ZERO
+		(c as RigidBody3D).angular_velocity = Vector3.ZERO
+	c.transform = Transform3D(Basis.IDENTITY, Vector3(0, -50, 10))
 
 
 ## Notfall: durch den Boden gefallen (man sieht dann nur noch Himmel) -> zurueck zum letzten sicheren Ort.
