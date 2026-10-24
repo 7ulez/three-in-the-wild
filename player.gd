@@ -919,6 +919,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_rescue_check(delta)
 	_render_guard(delta)
+	_material_guard(delta)
 	_light_manager(delta)
 	_scan_step()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
@@ -2034,6 +2035,37 @@ func _light_manager(delta: float) -> void:
 		elif li2.visible:
 			li2.visible = false
 			li2.set_meta("lm_off", true)
+
+
+var _mg_t: float = 0.0
+var mat_fixes: int = 0
+var _mg_default: StandardMaterial3D = null
+
+
+## Browser-Fehler "Parameter material is null": Netze ohne gueltiges Material bekommen ein graues Ersatzmaterial.
+func _material_guard(delta: float) -> void:
+	if Game.dedicated:
+		return
+	_mg_t += delta
+	if _mg_t < 3.0:
+		return
+	_mg_t = 0.0
+	if _mg_default == null:
+		_mg_default = StandardMaterial3D.new()
+		_mg_default.albedo_color = Color(0.6, 0.6, 0.6)
+	var w := get_parent()
+	var fixed := 0
+	for mi in w.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh == null:
+			continue
+		for i in m.mesh.get_surface_count():
+			if m.get_active_material(i) == null:
+				m.set_surface_override_material(i, _mg_default)
+				fixed += 1
+	if fixed > 0:
+		mat_fixes += fixed
+		print("[Material] ", fixed, " Netz-Flaechen ohne Material ersetzt")
 
 
 var _rg_t: float = 0.0
