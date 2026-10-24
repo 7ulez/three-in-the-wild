@@ -52,6 +52,8 @@ class RemoteAvatar:
 
 	func _process(delta: float) -> void:
 		global_position = global_position.lerp(target_pos, minf(delta * 12.0, 1.0))
+		if Game.dedicated:
+			return
 		if delta > 0.0:
 			var sp := Vector2(global_position.x - _last_pos.x, global_position.z - _last_pos.z).length() / delta
 			Player.animate_body(self, minf(sp, 9.0), (anim & 1) != 0, (anim & 2) != 0, (anim >> 2) & 3, (anim & 16) != 0, (anim & 32) != 0, (anim & 64) != 0, 1 if (anim & 256) != 0 else (2 if (anim & 512) != 0 else 0), (anim & 128) != 0)
@@ -670,7 +672,6 @@ func remote_item_grab(id: int) -> void:
 func item_release(it: Item) -> void:
 	if it.net_id == 0:
 		return
-	print_stack()
 	item_announce(it)
 	var q := it.global_transform.basis.get_rotation_quaternion()
 	if item_db.has(it.net_id):

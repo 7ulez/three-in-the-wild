@@ -345,7 +345,7 @@ func _dbg_update(delta: float) -> void:
 			var a: Node3D = Net.instance.avatars[k]
 			if is_instance_valid(a):
 				av_txt += " [%.0f/%.1f/%.0f%s]" % [a.global_position.x, a.global_position.y, a.global_position.z, "" if a.visible else " unsichtbar"]
-	_dbg.text = "F3  pos %.1f / %.1f / %.1f  Boden:%s\nFPS %d  Objekte %d  Drawcalls %d\nNodes %d  Mitspieler %d  Items %d\nKamera y %.1f  far %.0f\nglow %s  fog %.4f  exp %.2f  amb %.2f  sonne %.2f\nflash %.2f  nebel %.2f  regen %.2f  wolken %.2f  blur %s  promille %.2f  scale3d %.2f\nAvatare:%s\nUNGUELTIG: %s" % [
+	_dbg.text = "F3  pos %.1f / %.1f / %.1f  Boden:%s\nFPS %d  Objekte %d  Drawcalls %d\nNodes %d  Mitspieler %d  Items %d\nKamera y %.1f  far %.0f\nglow %s  fog %.4f  exp %.2f  amb %.2f  sonne %.2f\nflash %.2f  nebel %.2f  regen %.2f  wolken %.2f  blur %s  promille %.2f  scale3d %.2f\nAvatare:%s\nUNGUELTIG: %s\nWaechter: %s" % [
 		pl.global_position.x, pl.global_position.y, pl.global_position.z, str(pl.is_on_floor()),
 		Engine.get_frames_per_second(),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
@@ -353,7 +353,7 @@ func _dbg_update(delta: float) -> void:
 		get_tree().get_node_count(), others, Item.registry.size(),
 		cam.global_position.y if cam != null else -999.0, cam.far if cam != null else 0.0,
 		str(_env().glow_enabled), _env().fog_density, _env().tonemap_exposure, _env().ambient_light_energy, _sun_e(),
-		Weather.flash, Weather.fog, Weather.rain, Weather.cloud, str(pl.blur_rect.visible), pl.promille, get_viewport().scaling_3d_scale, av_txt, pl.bad_report]
+		Weather.flash, Weather.fog, Weather.rain, Weather.cloud, str(pl.blur_rect.visible), pl.promille, get_viewport().scaling_3d_scale, av_txt, pl.bad_report, pl.guard_log]
 
 
 func _world() -> Node:

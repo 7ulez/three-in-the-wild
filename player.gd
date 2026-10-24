@@ -918,6 +918,7 @@ func _physics_process(delta: float) -> void:
 		velocity.z = target.z
 	move_and_slide()
 	_rescue_check(delta)
+	_render_guard(delta)
 	_scan_step()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
@@ -1970,6 +1971,85 @@ func _rescue_check(delta: float) -> void:
 		_peak_y = _safe_pos.y
 		_airborne = false
 		toast("Du bist durch den Boden gefallen - zurück an den letzten sicheren Ort.", 4.0)
+
+
+var _rg_t: float = 0.0
+var _rg_bad: int = 0
+var _rg_good: int = 0
+var _rg_step: int = 0
+var guard_log: String = ""
+
+
+## Waechter gegen das "nur Himmel"-Bild: viele Objekte, aber kaum Zeichenaufrufe. Probiert nacheinander Abhilfen
+## und merkt sich, welche geholfen hat (steht im F3-Fenster und im Hinweis).
+func _render_guard(delta: float) -> void:
+	if Game.dedicated:
+		return
+	_rg_t += delta
+	if _rg_t < 1.0:
+		return
+	_rg_t = 0.0
+	var obj: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
+	var dc: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	var bad: bool = obj > 300 and dc < int(obj * 0.3)
+	if bad:
+		_rg_good = 0
+		_rg_bad += 1
+		if _rg_bad >= 2:
+			_rg_bad = 0
+			_rg_apply()
+	else:
+		_rg_bad = 0
+		if _rg_step > 0:
+			_rg_good += 1
+			if _rg_good == 3:
+				guard_log = "Bild kam zurueck nach Schritt %d (Obj %d, DC %d)" % [_rg_step, obj, dc]
+				toast("Bildfehler automatisch behoben (Schritt %d)." % _rg_step, 4.0)
+				print("[Waechter] ", guard_log)
+				_rg_step = 0
+
+
+func _rg_apply() -> void:
+	_rg_step += 1
+	var w := get_parent()
+	var obj: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
+	var dc: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	print("[Waechter] Bildfehler erkannt (Obj %d, DC %d), Schritt %d" % [obj, dc, _rg_step])
+	match _rg_step:
+		1:
+			for l in w.find_children("*", "Light3D", true, false):
+				(l as Light3D).shadow_enabled = false
+			guard_log = "Schritt 1: Schatten aus"
+		2:
+			if Net.instance != null:
+				for k in Net.instance.avatars.keys():
+					var a: Node3D = Net.instance.avatars[k]
+					if is_instance_valid(a):
+						a.visible = false
+			guard_log = "Schritt 2: Mitspieler-Figuren aus"
+		3:
+			for l in w.find_children("*", "Light3D", true, false):
+				if not (l is DirectionalLight3D):
+					(l as Light3D).visible = false
+			guard_log = "Schritt 3: Lampen/Lichter aus"
+		4:
+			for mi in w.find_children("*", "GeometryInstance3D", true, false):
+				(mi as GeometryInstance3D).visibility_range_end = 0.0
+				(mi as GeometryInstance3D).visibility_range_begin = 0.0
+			guard_log = "Schritt 4: Sichtweiten-Grenzen aus"
+		5:
+			camera.near = 0.1
+			camera.far = 1500.0
+			guard_log = "Schritt 5: Kamera near/far neu"
+		6:
+			for l in w.find_children("*", "Light3D", true, false):
+				(l as Light3D).visible = false
+			guard_log = "Schritt 6: alle Lichter aus"
+		_:
+			guard_log = "Bildfehler bleibt trotz aller Schritte"
+			_rg_step = 0
+			return
+	toast("Bildfehler erkannt - " + guard_log, 4.0)
 
 
 func teleport_to(pos: Vector3) -> void:
