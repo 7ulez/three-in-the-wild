@@ -1209,7 +1209,7 @@ func _drink() -> void:
 		needs.drank_water()
 		promille = maxf(promille - 0.12, 0.0)
 		msg = "Ahh, frisches Wasser." if promille < 0.3 else "Wasser hilft. Ein bisschen."
-	Sfx.play("gulp" if kind == "water" else "bottle", Vector3.INF, -2.0)
+	Sfx.play("gulp" if kind == "water" else ("jack_open" if kind == "jack" else "bottle"), Vector3.INF, -2.0)
 	if kind == "jack" and character_name != "Steffen" and promille > 1.4:
 		get_tree().create_timer(1.2).timeout.connect(start_vomit)
 	if kind == "beer" and promille > 1.4 and randf() < clampf((promille - 1.4) * 0.6, 0.0, 1.0):
@@ -1641,7 +1641,10 @@ func pick_up(item: Item) -> void:
 		item.take_local()
 	if Net.instance != null:
 		Net.instance.item_grab(item)
-	Sfx.play("pop", Vector3.INF, -6.0)
+	if item.item_name == "Joint":
+		Sfx.play("joint_pick_up", Vector3.INF, -4.0)
+	else:
+		Sfx.play("pop", Vector3.INF, -6.0)
 	item.gravity_scale = 0.0
 	item.add_collision_exception_with(self)
 	ray.add_exception(item)
