@@ -357,6 +357,7 @@ func build(p_main: Node) -> void:
 	main = p_main
 	_build_mountain()
 	_build_caves()
+	_build_secret_entrances()
 	_build_path_decor()
 	_build_boulders()
 	_build_summit()
@@ -389,9 +390,15 @@ func _build_caves() -> void:
 		var flm := ShaderMaterial.new()
 		flm.shader = Shader.new()
 		flm.shader.code = FLOOR_SHADER
+		# Bodenplatte nur im Berginneren (die Tunnel ragen nach aussen ueber den Hang hinaus)
+		var fb := box
+		if (c[1] as Vector3).x > 20.0:
+			fb = AABB(Vector3(74.0, box.position.y, box.position.z), Vector3(box.end.x - 74.0, box.size.y, box.size.z))
+		elif (c[1] as Vector3).z > 20.0:
+			fb = AABB(Vector3(box.position.x, box.position.y, -101.5), Vector3(box.size.x, box.size.y, -81.0 + 101.5))
 		var flb := BoxMesh.new()
-		flb.size = Vector3(box.size.x, 0.06, box.size.z)
-		var fli := _add_mesh(flb, flm, Vector3(box.get_center().x, 0.03, box.get_center().z))
+		flb.size = Vector3(fb.size.x, 0.06, fb.size.z)
+		var fli := _add_mesh(flb, flm, Vector3(fb.get_center().x, 0.03, fb.get_center().z))
 		fli.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	# Kristalle (leuchten) in der Höhle
@@ -577,24 +584,24 @@ func _build_cave_decor() -> void:
 		var h2 := rng.randf_range(0.5, 1.5)
 		_add_mesh(_cone_mesh(r2, h2), stone, Vector3(px2, h2 * 0.5, pz2), Vector3(0, rng.randf() * 90.0, 0))
 	for i in range(14):
-		var tx := rng.randf_range(76.0, 88.0)
+		var tx := rng.randf_range(77.0, 88.0)
 		var h3 := rng.randf_range(0.3, 0.9)
 		_add_mesh(_cone_mesh(rng.randf_range(0.08, 0.2), h3), stone_d, Vector3(tx, 3.5 - h3 * 0.5 + 0.02, -74.0 + rng.randf_range(-1.6, 1.6)), Vector3(180, 0, 0))
 	for i in range(10):
-		var tz := rng.randf_range(-106.0, -83.0)
+		var tz := rng.randf_range(-99.0, -83.0)
 		var h4 := rng.randf_range(0.3, 0.9)
 		_add_mesh(_cone_mesh(rng.randf_range(0.08, 0.2), h4), stone_d, Vector3(95.0 + rng.randf_range(-1.5, 1.5), 3.5 - h4 * 0.5 + 0.02, tz), Vector3(180, 0, 0))
 
 	# --- Stützbalken (alter Minenstollen) ---
-	for fx in [77.0, 81.0, 85.0]:
+	for fx in [78.0, 82.0, 86.0]:
 		_support_frame(Vector3(fx, 0, -74.0), false, wood, wood_l)
-	for fz in [-86.0, -90.0, -94.0, -98.0, -102.0]:
+	for fz in [-86.0, -90.0, -94.0, -97.5]:
 		_support_frame(Vector3(95.0, 0, fz), true, wood, wood_l)
 
 	# --- Gleise + Lore im Weststollen ---
 	for gz in [-73.35, -74.65]:
-		_add_mesh(BoxMesh.new(), iron, Vector3(82.0, 0.11, gz)).scale = Vector3(26.0, 0.05, 0.07)
-	var sx := 70.0
+		_add_mesh(BoxMesh.new(), iron, Vector3(85.0, 0.11, gz)).scale = Vector3(18.0, 0.05, 0.07)
+	var sx := 76.5
 	while sx < 94.0:
 		var sl := BoxMesh.new()
 		sl.size = Vector3(0.16, 0.06, 1.9)
@@ -654,7 +661,7 @@ func _build_cave_decor() -> void:
 			_add_mesh(cap, gm, spt + off + Vector3(0, sh, 0))
 
 	# --- Fackeln (nur leuchtende Flamme, kein Licht) ---
-	var torch_spots: Array = [Vector3(74.5, 1.9, -75.6), Vector3(74.5, 1.9, -72.4), Vector3(88.3, 2.0, -70.0), Vector3(88.3, 2.0, -78.0),
+	var torch_spots: Array = [Vector3(79.2, 1.9, -75.6), Vector3(79.2, 1.9, -72.4), Vector3(88.3, 2.0, -70.0), Vector3(88.3, 2.0, -78.0),
 		Vector3(101.7, 2.0, -70.0), Vector3(101.7, 2.0, -78.0), Vector3(93.3, 1.9, -84.0), Vector3(96.7, 1.9, -84.0), Vector3(108.7, 1.8, -75.5), Vector3(108.7, 1.8, -72.5)]
 	for tsp in torch_spots:
 		_torch(tsp as Vector3, wood, iron)
@@ -831,6 +838,81 @@ func _torch(pos: Vector3, wood: Material, iron: Material) -> void:
 	_add_mesh(core, _glow_mat(Color(1.0, 0.9, 0.5), 3.0), pos + Vector3(0, 0.33, 0))
 
 
+## Geheimeingänge: beide Tunnelmünder sind mit Fels, Gestrüpp und Brocken zugewachsen.
+## Nur eine niedrige Lücke am Boden bleibt (1,25 m hoch): man muss sich ducken (C) und durchkriechen.
+func _build_secret_entrances() -> void:
+	# Westeingang (Tunnel läuft in X-Richtung, Mund bei x ~ 74)
+	_secret_plug(Vector3(74.7, 0.0, -74.0), false)
+	# Nordeingang (Tunnel läuft in Z-Richtung, Mund bei z ~ -102)
+	_secret_plug(Vector3(95.0, 0.0, -101.0), true)
+
+
+func _secret_plug(pos: Vector3, along_z: bool) -> void:
+	var gap := 1.25
+	var body := StaticBody3D.new()
+	body.position = pos + Vector3(0, (gap + 3.8) * 0.5, 0)
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(4.2, 3.8 - gap, 1.7) if along_z else Vector3(1.7, 3.8 - gap, 4.2)
+	bs.size = Vector3(bs.size.x, bs.size.y, bs.size.z)
+	cs.shape = bs
+	body.add_child(cs)
+	body.set_meta("surface", "massif")
+	add_child(body)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 909 + (1 if along_z else 0)
+	# Felsen-Verschluss über der Lücke
+	var outward := Vector3(0, 0, -1) if along_z else Vector3(-1, 0, 0)
+	var side := Vector3(1, 0, 0) if along_z else Vector3(0, 0, 1)
+	var base := pos + outward * 0.5
+	for i in range(9):
+		var u := rng.randf_range(-1.9, 1.9)
+		var v := rng.randf_range(gap + 0.35, 3.5)
+		var rad := rng.randf_range(0.8, 1.3)
+		var cpos := base + side * u + Vector3(0, v, 0) + outward * rng.randf_range(-0.2, 0.5)
+		_rock(cpos, Vector3(rad, rad * 0.8, rad), rng.randi(), 0.4, false)
+	# Brocken und Moos beiderseits der Lücke (nicht darin)
+	for sgn in [-1.0, 1.0]:
+		var r2 := rng.randf_range(0.7, 1.0)
+		_rock(base + side * (1.7 * float(sgn)) + outward * 0.9 + Vector3(0, r2 * 0.4, 0), Vector3(r2, r2 * 0.7, r2), rng.randi(), 0.38, true)
+	# Gestrüpp vor dem Spalt (Büsche ohne Kollision, man kriecht hindurch)
+	for i in range(8):
+		var bp := base + outward * rng.randf_range(0.6, 1.6) + side * rng.randf_range(-2.0, 2.0)
+		var br := rng.randf_range(0.35, 0.65)
+		var gcol := Color(0.2, 0.42, 0.18).lerp(Color(0.3, 0.5, 0.2), rng.randf())
+		var bsp := Util.add_sphere(self, br, gcol, Vector3(bp.x, br * 0.8, bp.z))
+		bsp.scale = Vector3(1.0, 0.8, 1.0)
+	# Hinweis-Zone
+	var zone := SecretZone.new()
+	var zcs := CollisionShape3D.new()
+	var zbs := BoxShape3D.new()
+	zbs.size = Vector3(4.6, 2.0, 5.5) if along_z else Vector3(5.5, 2.0, 4.6)
+	zcs.shape = zbs
+	zone.add_child(zcs)
+	zone.position = pos + outward * 1.2 + Vector3(0, 1.0, 0)
+	zone.collision_mask = 0xFFFFF
+	add_child(zone)
+	zone.body_entered.connect(zone.on_enter)
+
+
+class SecretZone:
+	extends Area3D
+	var _last: float = -100.0
+
+	func on_enter(body: Node) -> void:
+		if not (body is Player):
+			return
+		var now := Time.get_ticks_msec() / 1000.0
+		if now - _last < 25.0:
+			return
+		_last = now
+		var p := body as Player
+		if p.crouching:
+			p.toast("Du kriechst durch einen versteckten Spalt...", 3.0)
+		else:
+			p.toast("Zwischen den Felsen ist unten eine niedrige Lücke. Ducken (C) und durchkriechen?", 4.5)
+
+
 ## Mitte des begehbaren Pfads (Fläche zwischen Schnittwand und Hangkante).
 func _build_path_decor() -> void:
 	path_pts.clear()
@@ -943,13 +1025,6 @@ func _build_signs() -> void:
 		{"text": "Gipfelpfad: steil, Absturzgefahr!", "yaw": 0.0, "y": 2.2},
 		{"text": "Aussichtspunkt 29 m", "yaw": 0.0, "y": 1.7},
 		{"text": "Parkplatz", "yaw": 180.0, "y": 1.2},
-	])
-	var sp2 := Signpost.new()
-	add_child(sp2)
-	sp2.position = Vector3(65, 0, -70)
-	sp2.build([
-		{"text": "Höhle - Kopflampe (L)!", "yaw": 0.0, "y": 2.1},
-		{"text": "Vorsicht Loch", "yaw": 0.0, "y": 1.6},
 	])
 
 
