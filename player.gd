@@ -249,6 +249,31 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 				Util.add_cylinder(bt, 0.0135, 0.012, Color(0.85, 0.7, 0.2), Vector3(0, 0.236, 0.0))
 				Util.add_cylinder(bt, 0.031, 0.05, Color(0.93, 0.88, 0.7), Vector3(0, 0.06, 0.0))
 				parent.set_meta("bottle", bt)
+			if sk != null and sk.find_bone("Hips") >= 0:
+				# Po mit Ritze: nur sichtbar, solange die Hose beim Gross-Geschaeft unten ist
+				var hatt := BoneAttachment3D.new()
+				hatt.bone_name = "Hips"
+				sk.add_child(hatt)
+				var skinm := StandardMaterial3D.new()
+				skinm.albedo_color = Color(0.93, 0.76, 0.65)
+				skinm.roughness = 0.6
+				var butt := Node3D.new()
+				butt.name = "Po"
+				butt.visible = false
+				hatt.add_child(butt)
+				for sx in [-1.0, 1.0]:
+					var ch := MeshInstance3D.new()
+					var bs := SphereMesh.new()
+					bs.radius = 0.11
+					bs.height = 0.22
+					bs.radial_segments = 14
+					bs.rings = 8
+					bs.material = skinm
+					ch.mesh = bs
+					ch.position = Vector3(sx * 0.085, -0.02, -0.12)
+					ch.scale = Vector3(1.0, 1.05, 0.85)
+					butt.add_child(ch)
+				parent.set_meta("butt", butt)
 			var hd := inst.find_child("HoseDown", true, false) as Node3D
 			var hs := inst.find_child("Hose", true, false) as Node3D
 			if hd != null and hs != null:
@@ -414,7 +439,10 @@ static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air
 				tw.tween_interval(0.25)
 				tw.tween_callback(func() -> void:
 					hose.visible = false
-					hose_down.visible = true)
+					hose_down.visible = true
+					var bu := parent.get_meta("butt", null) as Node3D
+					if bu != null:
+						bu.visible = true)
 		ap.speed_scale = 1.0
 		return
 	if parent.get_meta("squatting", false):
@@ -422,6 +450,9 @@ static func animate_body(parent: Node3D, speed: float, crouch: bool = false, air
 		if hose != null and hose_down != null:
 			hose.visible = true
 			hose_down.visible = false
+		var bu2 := parent.get_meta("butt", null) as Node3D
+		if bu2 != null:
+			bu2.visible = false
 	if air and ap.has_animation("Jump"):
 		if not parent.get_meta("jumping", false):
 			parent.set_meta("jumping", true)
