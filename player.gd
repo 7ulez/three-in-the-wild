@@ -2248,29 +2248,34 @@ func _rg_apply() -> void:
 	print("[Waechter] Bildfehler erkannt (Obj %d, DC %d), Schritt %d" % [obj, dc, _rg_step])
 	match _rg_step:
 		1:
+			# Mitspieler weg = Bild wieder da: ihre Figuren werden verworfen und gleich frisch aufgebaut
+			if Net.instance != null:
+				Net.instance.rebuild_avatars()
+			guard_log = "Schritt 1: Mitspieler-Figuren neu aufgebaut"
+		2:
 			for l in w.find_children("*", "Light3D", true, false):
 				_rg_set(l, "shadow_enabled", false)
-			guard_log = "Schritt 1: Schatten aus"
-		2:
-			_rg_set(camera, "far", 1500.0)
-			guard_log = "Schritt 2: Sichtweite 1500"
+			guard_log = "Schritt 2: Schatten aus"
 		3:
+			_rg_set(camera, "far", 1500.0)
+			guard_log = "Schritt 3: Sichtweite 1500"
+		4:
 			for mi in w.find_children("*", "MeshInstance3D", true, false):
 				_rg_set(mi, "cast_shadow", GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
-			guard_log = "Schritt 3: Schattenwurf aus"
-		4:
+			guard_log = "Schritt 4: Schattenwurf aus"
+		5:
 			for l in w.find_children("*", "Label3D", true, false):
 				_rg_set(l, "visible", false)
-			guard_log = "Schritt 4: Schilder aus"
-		5:
+			guard_log = "Schritt 5: Schilder aus"
+		6:
 			for pa in w.find_children("*", "CPUParticles3D", true, false):
 				_rg_set(pa, "visible", false)
-			guard_log = "Schritt 5: Partikel aus"
-		6:
+			guard_log = "Schritt 6: Partikel aus"
+		7:
 			var vp := get_viewport()
 			_rg_set(vp, "msaa_3d", Viewport.MSAA_DISABLED)
 			_rg_set(vp, "use_debanding", false)
-			guard_log = "Schritt 6: Anti-Aliasing aus"
+			guard_log = "Schritt 7: Anti-Aliasing aus"
 		_:
 			guard_log = "Bildfehler bleibt trotz aller Schritte - alles zurueckgesetzt"
 			_rg_restore()

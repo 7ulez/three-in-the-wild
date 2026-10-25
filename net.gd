@@ -68,7 +68,7 @@ class RemoteAvatar:
 		_ghost_t = 0.5
 
 	func puff_vape() -> void:
-		if _vape == null:
+		if _vape == null or not is_instance_valid(_vape):
 			_vape = Needs.make_vape_particles()
 			add_child(_vape)
 		_vape.restart()
@@ -105,6 +105,8 @@ class RemoteAvatar:
 			_ghost_t -= delta
 			if _ghost_t <= 0.0:
 				ghost.visible = false
+		if not global_position.is_finite():
+			global_position = target_pos if target_pos.is_finite() else Vector3.ZERO
 		global_position = global_position.lerp(target_pos, minf(delta * 12.0, 1.0))
 		if Game.dedicated:
 			return
@@ -115,17 +117,18 @@ class RemoteAvatar:
 		Player.set_pants(self, 1 if (anim & 4096) != 0 else (2 if (anim & 8192) != 0 else 0))
 		var vom_now := (anim & 1024) != 0
 		Player.vomit_pose(self, vom_now, delta)
-		if _vom == null:
-			_vom = Fx.vomit_stream()
-			add_child(_vom)
 		if vom_now != _vom_on:
 			_vom_on = vom_now
 			if vom_now:
+				if _vom == null or not is_instance_valid(_vom):
+					_vom = Fx.vomit_stream()
+					add_child(_vom)
 				Sfx.play("retch", global_position, 2.0)
 				get_tree().create_timer(1.0).timeout.connect(func() -> void:
 					if _vom_on:
 						Sfx.play("vomit", global_position, 4.0))
-		_vom.emitting = vom_now
+			if _vom != null and is_instance_valid(_vom):
+				_vom.emitting = vom_now
 		if vom_now:
 			_vom_cd -= delta
 			if _vom_cd <= 0.0:
@@ -140,12 +143,13 @@ class RemoteAvatar:
 				puff_vape()
 		# Pinkeln der anderen: Strahl + nasse Stelle
 		var pee_now := (anim & 128) != 0
-		if _pee == null:
-			_pee = Fx.pee_stream()
-			add_child(_pee)
 		if pee_now != _pee_on:
 			_pee_on = pee_now
-			_pee.emitting = pee_now
+			if pee_now and (_pee == null or not is_instance_valid(_pee)):
+				_pee = Fx.pee_stream()
+				add_child(_pee)
+			if _pee != null and is_instance_valid(_pee):
+				_pee.emitting = pee_now
 			if pee_now:
 				Sfx.play("trickle", global_position)
 		if pee_now:
@@ -327,7 +331,29 @@ func _get_avatar(id: int) -> RemoteAvatar:
 	var a := RemoteAvatar.new()
 	main.add_child(a)
 	avatars[id] = a
+	# Neu aufgebaute Figur: Gegenstaende, die dieser Spieler gerade traegt, wieder in die Hand geben
+	for nid in item_db.keys():
+		if int(item_db[nid].get("h", 0)) == id:
+			var it: Item = Item.find(int(nid))
+			if it != null and is_instance_valid(it):
+				it.attach_to(a)
 	return a
+
+
+## Wächter: alle Mitspieler-Figuren verwerfen und beim naechsten Positionspaket frisch aufbauen.
+## (Wenn ein Spieler das Spiel verlaesst, ist der Bildfehler weg - das ahmt das nach.)
+func rebuild_avatars() -> void:
+	if is_host():
+		return
+	for id in avatars.keys():
+		var a: RemoteAvatar = avatars[id]
+		if a == null or not is_instance_valid(a):
+			continue
+		for c in a.get_children():
+			if c is Item:
+				(c as Item).detach_to(main, (c as Item).global_position, (c as Item).global_transform.basis.get_rotation_quaternion())
+		a.queue_free()
+	avatars.clear()
 
 
 func _snapshot() -> Dictionary:
@@ -452,6 +478,8 @@ func remote_night_skipped() -> void:
 
 @rpc("any_peer", "unreliable_ordered")
 func sync_state(pos: Vector3, yaw: float, char_name: String, p_name: String, sleeping: bool, anim: int = 0) -> void:
+	if not pos.is_finite() or not is_finite(yaw) or pos.length() > 5000.0:
+		return
 	var id := multiplayer.get_remote_sender_id()
 	if is_host() and not (avatars.has(id) and avatars[id].has_meta("slot")):
 		return
