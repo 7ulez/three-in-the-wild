@@ -1362,6 +1362,12 @@ func _smoke() -> void:
 	trip_t = minf(trip_t + 10.0, 24.0)
 	var lines := ["Pfffff... das zieht.", "Die Farben werden... lauter.", "Alles leuchtet. Wow.", "Die Bäume atmen."]
 	toast(lines[left % lines.size()] if left >= 0 else lines[0], 3.0)
+	if character_name == "Julian" and needs != null:
+		# Julian verträgt keinen Joint: ihm wird kalt, ein ganzer Joint kostet 20 % Gesundheit
+		needs.health = maxf(needs.health - 20.0 / 4.0, 1.0)
+		shake = 1.5
+		var cold := ["Brrr... Julian wird kalt.", "Julian fröstelt. Das verträgt er nicht.", "Ihm läuft ein Schauer über den Rücken. Kalt."]
+		get_tree().create_timer(1.6).timeout.connect(func() -> void: toast(cold[left % cold.size()] + " (-5 Gesundheit)", 2.5))
 	if left <= 0:
 		var it := held
 		_drop()

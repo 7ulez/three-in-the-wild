@@ -15,7 +15,7 @@ const ORDER := ["Marian", "Steffen", "Julian"]
 const PERKS := {
 	"Marian": ["+20 % Hechte", "Feuer brennt länger", "Feuerstahl schwerer"],
 	"Steffen": ["Kocht schneller", "Rührt besser", "Verträgt Jack-Cola"],
-	"Julian": ["Hat eine Vape (Q)"],
+	"Julian": ["Hat eine Vape (Q)", "Joint: ihm wird kalt"],
 }
 const PERK_H := 72.0
 
