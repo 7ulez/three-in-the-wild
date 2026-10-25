@@ -42,5 +42,6 @@ func _initialize() -> void:
 		m = _smooth_rock(m)
 		ResourceSaver.save(m, Massif.MESH_FILE)
 		var sh := m.create_trimesh_shape()
+		sh.backface_collision = true   # auch von innen solide: man kann nicht in den Fels durchrutschen
 		ResourceSaver.save(sh, Massif.SHAPE_FILE)
 	quit()

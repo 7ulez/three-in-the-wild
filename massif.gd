@@ -158,10 +158,10 @@ class Chest:
 			create_tween().tween_property(glow, "light_energy", 2.2, 0.8)
 		if gold != null:
 			gold.visible = true
-		player.toast("SCHATZ! Ein goldener Glücksköder - die Fische beißen jetzt schneller! Und eine alte Schatzkarte: Auf der Karte (M) ist ein X eingezeichnet.", 8.0)
+		player.toast("In der Truhe liegt nur ein altes Papier: Auf der Karte (M) gibt es jetzt einen neuen Eintrag - ein X.", 8.0)
 		Game.map_found = true
 		if player.has_method("get_minihud"):
-			player.get_minihud().card("SCHATZKARTE!", "Schau auf die Karte (M) - da ist ein X", Color(0.95, 0.8, 0.3), 5.0)
+			player.get_minihud().card("NEUER KARTENEINTRAG!", "Schau auf die Karte (M) - da ist ein X", Color(0.95, 0.8, 0.3), 5.0)
 		Sfx.play("chest_open", global_position, 0.0)
 		Sfx.play("pop", Vector3.INF, -2.0, 1.2)
 
@@ -345,7 +345,7 @@ static func cave_cuts() -> Array:
 	return [
 		[Vector3(76, 1.75, -74), Vector3(28, 3.5, 3.8)],        # Westtunnel (offen zum Hang)
 		[Vector3(95, 2.5, -74), Vector3(14, 5, 14)],             # Kammer
-		[Vector3(95, 1.75, -94.5), Vector3(3.8, 3.5, 27)],       # Nordtunnel (offen zum Hang)
+		[Vector3(95, 1.75, -88.0), Vector3(3.8, 3.5, 14)],       # Nordstollen (Sackgasse, im Fels zu)
 		[Vector3(105.5, 1.5, -74), Vector3(7, 3, 4)],            # Schatznische
 	]
 
@@ -404,7 +404,7 @@ func _build_caves() -> void:
 	# Kristalle (leuchten) in der Höhle
 	var crystal_cols: Array = [Color(0.3, 0.9, 1.0), Color(0.8, 0.4, 1.0), Color(0.4, 1.0, 0.6)]
 	var spots: Array = [Vector3(78, 0, -75.5), Vector3(85, 0, -72.3), Vector3(89.5, 0, -78), Vector3(101, 0, -80),
-		Vector3(91, 0, -68), Vector3(95.8, 0, -84), Vector3(94, 0, -94), Vector3(96.5, 0, -99), Vector3(107, 0, -75.5)]
+		Vector3(91, 0, -68), Vector3(95.8, 0, -84), Vector3(94, 0, -92.5), Vector3(107, 0, -75.5)]
 	for i in range(spots.size()):
 		var sp: Vector3 = spots[i]
 		var col: Color = crystal_cols[i % crystal_cols.size()]
@@ -473,79 +473,16 @@ func _build_treasure() -> void:
 		Util.add_box(lid, Vector3(0.82, 0.14, 0.52), Color(0.42, 0.27, 0.12), Vector3(0, 0.07, -0.25))
 		Util.add_box(vis, Vector3(0.1, 0.12, 0.04), Color(0.85, 0.7, 0.2), Vector3(0, 0.3, -0.26))
 	chest.lid = lid
-	# Goldhaufen in der Truhe (erst nach dem Öffnen sichtbar)
+	# Nur ein Zettel liegt in der Truhe (erst nach dem Öffnen sichtbar): ein Hinweis auf einen Kartenvermerk
 	var gold := Node3D.new()
 	gold.visible = false
 	vis.add_child(gold)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 77
-	var gm := StandardMaterial3D.new()
-	gm.albedo_color = Color(1.0, 0.8, 0.2)
-	gm.metallic = 0.4
-	gm.roughness = 0.35
-	gm.emission_enabled = true
-	gm.emission = Color(1.0, 0.7, 0.1)
-	gm.emission_energy_multiplier = 0.5
-	var coin_m := CylinderMesh.new()
-	coin_m.top_radius = 0.045
-	coin_m.bottom_radius = 0.045
-	coin_m.height = 0.012
-	coin_m.radial_segments = 8
-	var coin_xf: Array = []
-	for i in range(26):
-		var rr := rng.randf() * 0.26
-		var an := rng.randf() * TAU
-		var cb := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-25, 25)), 0, deg_to_rad(rng.randf_range(-25, 25))))
-		coin_xf.append(Transform3D(cb, Vector3(cos(an) * rr, 0.33 + 0.06 * (1.0 - rr / 0.26) + rng.randf() * 0.02, sin(an) * rr * 0.7)))
-	_multi(gold, coin_m, gm, coin_xf)
-	# Goldhaufen (flacher Hügel) und die aufgerollte Schatzkarte obenauf
-	var mound := MeshInstance3D.new()
-	var mound_m := SphereMesh.new()
-	mound_m.radius = 0.3
-	mound_m.height = 0.6
-	mound_m.radial_segments = 10
-	mound_m.rings = 5
-	mound.mesh = mound_m
-	mound.material_override = gm
-	mound.scale = Vector3(1.15, 0.28, 0.8)
-	mound.position = Vector3(0, 0.3, 0)
-	gold.add_child(mound)
-	var scroll := MeshInstance3D.new()
-	var scroll_m := CylinderMesh.new()
-	scroll_m.top_radius = 0.045
-	scroll_m.bottom_radius = 0.045
-	scroll_m.height = 0.34
-	scroll_m.radial_segments = 8
-	scroll.mesh = scroll_m
-	var pm := StandardMaterial3D.new()
-	pm.albedo_color = Color(0.93, 0.85, 0.62)
-	pm.roughness = 1.0
-	scroll.material_override = pm
-	scroll.rotation_degrees = Vector3(0, 20, 90)
-	scroll.position = Vector3(0.02, 0.43, 0.05)
-	gold.add_child(scroll)
-	var band := MeshInstance3D.new()
-	var band_m := CylinderMesh.new()
-	band_m.top_radius = 0.05
-	band_m.bottom_radius = 0.05
-	band_m.height = 0.05
-	band_m.radial_segments = 8
-	band.mesh = band_m
-	var bm := StandardMaterial3D.new()
-	bm.albedo_color = Color(0.7, 0.12, 0.1)
-	bm.roughness = 0.9
-	band.material_override = bm
-	band.rotation_degrees = Vector3(0, 20, 90)
-	band.position = Vector3(0.02, 0.43, 0.05)
-	gold.add_child(band)
+	var paper := Util.add_box(gold, Vector3(0.34, 0.012, 0.25), Color(0.94, 0.88, 0.68), Vector3(0.0, 0.335, 0.0))
+	paper.rotation_degrees = Vector3(0, 12, 0)
+	for sgn in [-1.0, 1.0]:
+		var xm := Util.add_box(paper, Vector3(0.2, 0.004, 0.025), Color(0.72, 0.1, 0.08), Vector3(0, 0.008, 0))
+		xm.rotation_degrees = Vector3(0, 40.0 * float(sgn), 0)
 	chest.gold = gold
-	var gl := OmniLight3D.new()
-	gl.light_color = Color(1.0, 0.8, 0.35)
-	gl.light_energy = 0.0
-	gl.omni_range = 5.0
-	gl.position = Vector3(0, 0.9, 0)
-	chest.add_child(gl)
-	chest.glow = gl
 	chest.position = Vector3(107.2, 0.14, -74.0)
 	chest.rotation.y = PI / 2.0
 	add_child(chest)
@@ -649,14 +586,14 @@ func _build_cave_decor() -> void:
 		var h3 := rng.randf_range(0.3, 0.9)
 		_add_mesh(_cone_mesh(rng.randf_range(0.08, 0.2), h3), stone_d, Vector3(tx, 3.5 - h3 * 0.5 + 0.02, -74.0 + rng.randf_range(-1.6, 1.6)), Vector3(180, 0, 0))
 	for i in range(10):
-		var tz := rng.randf_range(-99.0, -83.0)
+		var tz := rng.randf_range(-94.0, -83.0)
 		var h4 := rng.randf_range(0.3, 0.9)
 		_add_mesh(_cone_mesh(rng.randf_range(0.08, 0.2), h4), stone_d, Vector3(95.0 + rng.randf_range(-1.5, 1.5), 3.5 - h4 * 0.5 + 0.02, tz), Vector3(180, 0, 0))
 
 	# --- Stützbalken (alter Minenstollen) ---
 	for fx in [78.0, 82.0, 86.0]:
 		_support_frame(Vector3(fx, 0, -74.0), false, wood, wood_l)
-	for fz in [-86.0, -90.0, -94.0, -97.5]:
+	for fz in [-86.0, -89.5, -93.0]:
 		_support_frame(Vector3(95.0, 0, fz), true, wood, wood_l)
 
 	# --- Gleise + Lore im Weststollen ---
@@ -699,7 +636,7 @@ func _build_cave_decor() -> void:
 	# --- Leuchtpilze ---
 	var shroom_cols: Array = [Color(0.3, 1.0, 0.7), Color(0.4, 0.7, 1.0), Color(0.9, 0.5, 1.0)]
 	var shroom_spots: Array = [Vector3(90.0, 0, -79.2), Vector3(100.8, 0, -78.5), Vector3(89.2, 0, -69.0), Vector3(94.3, 0, -85.5),
-		Vector3(95.8, 0, -97.0), Vector3(79.0, 0, -72.4), Vector3(84.0, 0, -75.6), Vector3(101.3, 0, -69.4)]
+		Vector3(95.8, 0, -93.5), Vector3(79.0, 0, -72.4), Vector3(84.0, 0, -75.6), Vector3(101.3, 0, -69.4)]
 	var cap_xf: Array = [[], [], []]
 	var stem_mat := StandardMaterial3D.new()
 	stem_mat.albedo_color = Color(0.85, 0.85, 0.8)
@@ -914,8 +851,6 @@ func _torch(pos: Vector3, wood: Material, iron: Material) -> void:
 func _build_secret_entrances() -> void:
 	# Westeingang (Tunnel läuft in X-Richtung, Mund bei x ~ 74)
 	_secret_plug(Vector3(74.7, 0.0, -74.0), false)
-	# Nordeingang (Tunnel läuft in Z-Richtung, Mund bei z ~ -102)
-	_secret_plug(Vector3(95.0, 0.0, -101.0), true)
 
 
 func _secret_plug(pos: Vector3, along_z: bool) -> void:
@@ -1073,13 +1008,40 @@ static func _near_angle(a: float, b: float, w: float) -> bool:
 
 
 func _build_summit() -> void:
-	# Aussichtsbank, Fahne am Gipfel
+	# Aussichtsbank (zum Hinsetzen), Fahnenmast mit Deutschlandfahne (hissbar)
 	var y := TOP_Y
-	Util.add_box(self, Vector3(1.6, 0.1, 0.5), Color(0.5, 0.34, 0.2), Vector3(C.x + 2.6, y + 0.45, C.z + 2.8))
-	Util.add_box(self, Vector3(0.1, 0.45, 0.4), Color(0.4, 0.27, 0.15), Vector3(C.x + 1.9, y + 0.22, C.z + 2.8))
-	Util.add_box(self, Vector3(0.1, 0.45, 0.4), Color(0.4, 0.27, 0.15), Vector3(C.x + 3.3, y + 0.22, C.z + 2.8))
-	Util.add_cylinder(self, 0.05, 3.0, Color(0.8, 0.8, 0.8), Vector3(C.x - 1.0, y + 1.5, C.z - 1.0))
-	Util.add_box(self, Vector3(1.0, 0.6, 0.03), Color(0.9, 0.2, 0.15), Vector3(C.x - 0.5, y + 2.6, C.z - 1.0))
+	var bench := SummitBench.new()
+	bench.position = Vector3(C.x + 2.6, y, C.z + 2.8)
+	var bcs := CollisionShape3D.new()
+	var bbs := BoxShape3D.new()
+	bbs.size = Vector3(1.6, 0.6, 0.5)
+	bcs.shape = bbs
+	bcs.position.y = 0.3
+	bench.add_child(bcs)
+	add_child(bench)
+	Util.add_box(bench, Vector3(1.6, 0.1, 0.5), Color(0.5, 0.34, 0.2), Vector3(0, 0.45, 0))
+	Util.add_box(bench, Vector3(1.6, 0.4, 0.08), Color(0.45, 0.3, 0.17), Vector3(0, 0.75, 0.24))
+	Util.add_box(bench, Vector3(0.1, 0.45, 0.4), Color(0.4, 0.27, 0.15), Vector3(-0.7, 0.22, 0))
+	Util.add_box(bench, Vector3(0.1, 0.45, 0.4), Color(0.4, 0.27, 0.15), Vector3(0.7, 0.22, 0))
+	var pole := Flagpole.new()
+	pole.position = Vector3(C.x - 1.0, y, C.z - 1.0)
+	var pcs := CollisionShape3D.new()
+	var pbs := CylinderShape3D.new()
+	pbs.radius = 0.25
+	pbs.height = 3.0
+	pcs.shape = pbs
+	pcs.position.y = 1.5
+	pole.add_child(pcs)
+	add_child(pole)
+	Util.add_cylinder(pole, 0.05, 3.0, Color(0.8, 0.8, 0.8), Vector3(0, 1.5, 0))
+	Util.add_sphere(pole, 0.08, Color(0.9, 0.75, 0.2), Vector3(0, 3.02, 0))
+	var flag := Node3D.new()
+	pole.add_child(flag)
+	var stripe_cols: Array = [Color(0.05, 0.05, 0.05), Color(0.82, 0.08, 0.08), Color(1.0, 0.8, 0.0)]
+	for i in range(3):
+		Util.add_box(flag, Vector3(1.05, 0.2, 0.03), stripe_cols[i] as Color, Vector3(0.55, 0.2 - 0.2 * float(i), 0))
+	pole.flag = flag
+	flag.position = Vector3(0, 0.45, 0)
 	# Steinhaufen (Gipfelmarke)
 	for i in range(9):
 		var a := TAU * float(i) / 9.0
@@ -1169,9 +1131,34 @@ func _on_pit(body: Node) -> void:
 		p.teleport_to(cave_entry)
 
 
-func _process(_delta: float) -> void:
+var _rock_t: float = 0.0
+
+
+## Sicherheitsnetz: Wer (z. B. beim Springen am Tunneleingang) tief in den massiven Fels geraten ist,
+## kommt zurück an den Eingang statt im Berg festzustecken.
+func _deep_in_rock(p: Vector3) -> bool:
+	if p.y > TOP_Y - 0.5:
+		return false
+	var d := Vector2(p.x - C.x, p.z - C.z)
+	var th := atan2(d.y, d.x)
+	if d.length() > surf_r(th, maxf(p.y, 0.0)) - 3.0:
+		return false
+	for b in main.cave_boxes:
+		if (b as AABB).grow(0.3).has_point(p + Vector3(0, 0.9, 0)):
+			return false
+	return true
+
+
+func _process(delta: float) -> void:
 	if main == null or main.player == null:
 		return
+	_rock_t -= delta
+	if _rock_t <= 0.0:
+		_rock_t = 0.25
+		var pp: Vector3 = main.player.global_position
+		if main.player.seat == null and _deep_in_rock(pp):
+			main.player.teleport_to(Vector3(68.0, 0.1, -74.0))
+			main.player.toast("Hoppla - der Fels war im Weg. Zurück am Eingang.", 3.0)
 	if summit_reached and not Game.summit_sunrise:
 		var sp: Vector3 = main.player.global_position
 		if sp.y > TOP_Y - 1.5 and Vector2(sp.x - C.x, sp.z - C.z).length() < 11.0 and Game.hour >= 5.0 and Game.hour < 7.5:
@@ -1200,3 +1187,45 @@ class CaveDecor extends Node3D:
 		var pl: Variant = main.get("player") if main != null else null
 		if pl is Node3D:
 			visible = (pl as Node3D).global_position.distance_to(Vector3(95.0, 0.0, -74.0)) < 90.0
+
+
+## Aussichtsbank am Gipfel: E zum Hinsetzen.
+class SummitBench:
+	extends PlacedItem
+
+	func get_prompt() -> String:
+		return "E: hinsetzen und die Aussicht genießen" if seated_by == null else "Die Bank ist besetzt"
+
+	func interact(player: Node) -> void:
+		player.sit(self)
+
+	func interact_with_held(player: Node, _held: Node) -> bool:
+		player.toast("Hände voll - erst ablegen.", 2.0)
+		return true
+
+
+## Fahnenmast am Gipfel: E hisst bzw. holt die Deutschlandfahne ein.
+class Flagpole:
+	extends StaticBody3D
+	var flag: Node3D = null
+	var hoisted: bool = false
+	var _t: float = 0.0
+
+	func get_prompt() -> String:
+		return "E: Deutschlandfahne einholen" if hoisted else "E: Deutschlandfahne hissen"
+
+	func interact_with_held(player: Node, _held: Node) -> bool:
+		interact(player)
+		return true
+
+	func interact(player: Node) -> void:
+		hoisted = not hoisted
+		var ty: float = 2.55 if hoisted else 0.45
+		create_tween().tween_property(flag, "position:y", ty, 2.4 if hoisted else 1.6).set_trans(Tween.TRANS_SINE)
+		if hoisted:
+			player.toast("Die Fahne weht! Schwarz-Rot-Gold über dem Gipfel.", 3.0)
+
+	func _process(delta: float) -> void:
+		_t += delta
+		if flag != null:
+			flag.rotation.y = sin(_t * 2.3) * 0.14 * clampf((flag.position.y - 0.45) / 2.0, 0.2, 1.0)
