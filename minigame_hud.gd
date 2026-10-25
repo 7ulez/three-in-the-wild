@@ -342,7 +342,7 @@ func _draw_range() -> void:
 	var best: int = d.get("best", 0)
 	var info: String = d.get("info", "")
 	var md: String = d.get("mode", "")
-	var title: String = {"gun": "LUFTGEWEHR", "axe": "AXT-ZIELWERFEN", "spear": "SPEERWURF"}.get(md, "")
+	var title: String = {"gun": "LUFTGEWEHR", "axe": "AXT-ZIELWERFEN", "spear": "SPEERWURF", "bow": "BOGENSCHIESSEN"}.get(md, "")
 	# Kopf: Punkte
 	_panel(Rect2(cx - 190, 112, 380, 92))
 	_text(Vector2(cx, 138), title, 18, UI.PAPER)
