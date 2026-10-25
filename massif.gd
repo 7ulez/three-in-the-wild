@@ -25,6 +25,7 @@ const SHAPE_FILE := "res://assets/mountain_shape.res"
 
 const ROCK_SHADER: String = """
 shader_type spatial;
+render_mode shadows_disabled;
 varying vec3 wp;
 varying vec3 wn;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -44,7 +45,7 @@ void fragment() {
 	col = mix(col, vec3(0.60, 0.53, 0.44), step(0.8, band));
 	col *= 0.85 + 0.3 * n;
 	float crack = smoothstep(0.04, 0.0, abs(vn(vec2(q.x * 1.3, q.y * 0.12) + 7.0) - 0.5));
-	col *= 1.0 - crack * 0.28;
+	col *= 1.0 - crack * 0.0;
 	float moss = smoothstep(3.0, 0.0, wp.y + n * 2.0);
 	col = mix(col, vec3(0.28, 0.40, 0.20), moss * 0.6);
 	float snow = smoothstep(21.0, 25.0, wp.y + n * 3.0) * smoothstep(0.2, 0.7, wn.y + n * 0.3);
@@ -56,6 +57,7 @@ void fragment() {
 
 const GRAVEL_SHADER: String = """
 shader_type spatial;
+render_mode shadows_disabled;
 varying vec3 wp;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p) {
@@ -72,6 +74,58 @@ void fragment() {
 }
 """
 
+const FLOOR_SHADER: String = """
+shader_type spatial;
+render_mode shadows_disabled;
+varying vec3 wp;
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) {
+	vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	vec2 p = wp.xz;
+	float cell = h(floor(p * 3.0));
+	float n = vn(p * 0.7) * 0.6 + vn(p * 2.3) * 0.4;
+	vec3 col = mix(vec3(0.28, 0.25, 0.22), vec3(0.38, 0.34, 0.3), cell * 0.25 + n * 0.75);
+	float crack = smoothstep(0.05, 0.0, abs(fract(p.x * 0.6 + n * 0.8) - 0.5) - 0.44);
+	col *= 1.0 - crack * 0.5;
+	float damp = smoothstep(0.55, 0.8, vn(p * 0.35 + 5.0));
+	col = mix(col, vec3(0.16, 0.24, 0.2), damp * 0.5);
+	ALBEDO = col;
+	EMISSION = col * 0.08;
+	ROUGHNESS = 0.95;
+}
+"""
+
+const CAVE_SHADER: String = """
+shader_type spatial;
+render_mode shadows_disabled;
+varying vec3 wp;
+float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vn(vec2 p) {
+	vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void vertex() { wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; }
+void fragment() {
+	vec2 q = vec2(wp.x + wp.z, wp.y);
+	float n = vn(q * vec2(0.9, 1.4)) * 0.6 + vn(q * vec2(3.1, 5.0)) * 0.4;
+	float strata = step(0.5, fract(wp.y * 1.3 + n * 1.2));
+	vec3 col = mix(vec3(0.37, 0.32, 0.29), vec3(0.31, 0.27, 0.25), strata * 0.8);
+	float streak = smoothstep(0.55, 0.9, vn(vec2((wp.x + wp.z) * 2.6, wp.y * 0.15)));
+	col = mix(col, vec3(0.50, 0.46, 0.40), streak * 0.4);
+	float moss = smoothstep(1.3, 0.0, wp.y + n) * 0.55;
+	col = mix(col, vec3(0.20, 0.32, 0.22), moss);
+	float vein = smoothstep(0.02, 0.0, abs(vn(q * vec2(0.5, 0.35) + 3.0) - 0.5)) * smoothstep(0.5, 0.7, vn(q * 0.2 + 9.0));
+	col *= 0.8 + 0.4 * n;
+	ALBEDO = col + vec3(0.1, 0.3, 0.4) * vein * 0.4;
+	EMISSION = col * 0.12 + vec3(0.1, 0.3, 0.4) * vein * 0.35;
+	ROUGHNESS = 0.9;
+}
+"""
+
 var main: Node
 var summit_reached: bool = false
 var pit_area: Area3D
@@ -83,20 +137,32 @@ class Chest:
 	extends StaticBody3D
 	var opened: bool = false
 	var lid: Node3D
+	var glow: OmniLight3D = null
+	var gold: Node3D = null
 
 	func get_prompt() -> String:
 		return "E: Schatzkiste öffnen" if not opened else "Die Kiste ist leer"
+
+	func interact_with_held(player: Node, _item: Node) -> bool:
+		# Auch mit etwas in der Hand soll die Kiste aufgehen
+		interact(player)
+		return true
 
 	func interact(player: Node) -> void:
 		if opened:
 			return
 		opened = true
 		Game.treasure_found = true
-		create_tween().tween_property(lid, "rotation_degrees:x", 110.0, 0.6)
+		create_tween().tween_property(lid, "rotation_degrees:x", 112.0, 0.85).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		if glow != null:
+			create_tween().tween_property(glow, "light_energy", 2.2, 0.8)
+		if gold != null:
+			gold.visible = true
 		player.toast("SCHATZ! Ein goldener Glücksköder - die Fische beißen jetzt schneller! Und eine alte Schatzkarte: Auf der Karte (M) ist ein X eingezeichnet.", 8.0)
 		Game.map_found = true
 		if player.has_method("get_minihud"):
 			player.get_minihud().card("SCHATZKARTE!", "Schau auf die Karte (M) - da ist ein X", Color(0.95, 0.8, 0.3), 5.0)
+		Sfx.play("chest_open", global_position, 0.0)
 		Sfx.play("pop", Vector3.INF, -2.0, 1.2)
 
 
@@ -250,9 +316,9 @@ static func make_csg() -> CSGCombiner3D:
 	var gravel := ShaderMaterial.new()
 	gravel.shader = Shader.new()
 	gravel.shader.code = GRAVEL_SHADER
-	var dark := StandardMaterial3D.new()
-	dark.albedo_color = Color(0.3, 0.27, 0.25)
-	dark.roughness = 0.95
+	var dark := ShaderMaterial.new()
+	dark.shader = Shader.new()
+	dark.shader.code = CAVE_SHADER
 
 	var comb := CSGCombiner3D.new()
 	var body := CSGMesh3D.new()
@@ -320,7 +386,13 @@ func _build_caves() -> void:
 		var half: Vector3 = (c[1] as Vector3) / 2.0
 		var box := AABB((c[0] as Vector3) - half, c[1])
 		main.cave_boxes.append(box)
-		Util.add_box(self, Vector3(box.size.x, 0.06, box.size.z), Color(0.22, 0.2, 0.19), Vector3(box.get_center().x, 0.03, box.get_center().z))
+		var flm := ShaderMaterial.new()
+		flm.shader = Shader.new()
+		flm.shader.code = FLOOR_SHADER
+		var flb := BoxMesh.new()
+		flb.size = Vector3(box.size.x, 0.06, box.size.z)
+		var fli := _add_mesh(flb, flm, Vector3(box.get_center().x, 0.03, box.get_center().z))
+		fli.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	# Kristalle (leuchten) in der Höhle
 	var crystal_cols: Array = [Color(0.3, 0.9, 1.0), Color(0.8, 0.4, 1.0), Color(0.4, 1.0, 0.6)]
@@ -366,24 +438,397 @@ func _build_caves() -> void:
 	add_child(pit_area)
 	pit_area.body_entered.connect(_on_pit)
 
-	# Schatzkiste
+	_build_treasure()
+	_build_cave_decor()
+
+
+## Die schöne Truhe (wie in den Verstecken) auf einem Steinsockel in der Nische, mit Goldschatz.
+func _build_treasure() -> void:
 	var chest := Chest.new()
+	chest.collision_layer = 1
 	var ccs := CollisionShape3D.new()
 	var cbs := BoxShape3D.new()
-	cbs.size = Vector3(0.9, 0.6, 0.6)
+	cbs.size = Vector3(1.4, 0.9, 1.0)
 	ccs.shape = cbs
-	ccs.position.y = 0.3
+	ccs.position.y = 0.45
 	chest.add_child(ccs)
-	Util.add_box(chest, Vector3(0.9, 0.4, 0.6), Color(0.45, 0.28, 0.12), Vector3(0, 0.2, 0))
+	var vis := Node3D.new()
+	vis.scale = Vector3.ONE * 1.4
+	chest.add_child(vis)
+	var body_ok := ItemModels._glb(vis, "truhe_korpus") != null
 	var lid := Node3D.new()
-	lid.position = Vector3(0, 0.4, 0.3)
-	chest.add_child(lid)
-	Util.add_box(lid, Vector3(0.94, 0.15, 0.64), Color(0.5, 0.32, 0.14), Vector3(0, 0.075, -0.3))
-	Util.add_box(lid, Vector3(0.12, 0.1, 0.04), Color(0.95, 0.8, 0.2), Vector3(0, 0.0, -0.62))
+	lid.position = Vector3(0, 0.32, 0.25)
+	vis.add_child(lid)
+	if body_ok and ItemModels._glb(lid, "truhe_deckel") != null:
+		pass
+	else:
+		Util.add_box(vis, Vector3(0.8, 0.35, 0.5), Color(0.5, 0.33, 0.16), Vector3(0, 0.18, 0))
+		Util.add_box(lid, Vector3(0.82, 0.14, 0.52), Color(0.42, 0.27, 0.12), Vector3(0, 0.07, -0.25))
+		Util.add_box(vis, Vector3(0.1, 0.12, 0.04), Color(0.85, 0.7, 0.2), Vector3(0, 0.3, -0.26))
 	chest.lid = lid
-	chest.position = Vector3(107.2, 0.0, -74.0)
+	# Goldhaufen in der Truhe (erst nach dem Öffnen sichtbar)
+	var gold := Node3D.new()
+	gold.visible = false
+	vis.add_child(gold)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 77
+	var gm := StandardMaterial3D.new()
+	gm.albedo_color = Color(1.0, 0.8, 0.2)
+	gm.metallic = 0.4
+	gm.roughness = 0.35
+	gm.emission_enabled = true
+	gm.emission = Color(1.0, 0.7, 0.1)
+	gm.emission_energy_multiplier = 0.5
+	for i in range(26):
+		var coin := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.045
+		cm.bottom_radius = 0.045
+		cm.height = 0.012
+		cm.radial_segments = 8
+		coin.mesh = cm
+		coin.material_override = gm
+		var rr := rng.randf() * 0.26
+		var an := rng.randf() * TAU
+		coin.position = Vector3(cos(an) * rr, 0.26 + 0.07 * (1.0 - rr / 0.26) + rng.randf() * 0.02, sin(an) * rr * 0.7)
+		coin.rotation_degrees = Vector3(rng.randf_range(-25, 25), 0, rng.randf_range(-25, 25))
+		gold.add_child(coin)
+	chest.gold = gold
+	var gl := OmniLight3D.new()
+	gl.light_color = Color(1.0, 0.8, 0.35)
+	gl.light_energy = 0.0
+	gl.omni_range = 5.0
+	gl.position = Vector3(0, 0.9, 0)
+	chest.add_child(gl)
+	chest.glow = gl
+	chest.position = Vector3(107.2, 0.14, -74.0)
 	chest.rotation.y = PI / 2.0
 	add_child(chest)
+	# Sockel
+	Util.add_box(self, Vector3(1.9, 0.14, 1.5), Color(0.42, 0.4, 0.38), Vector3(107.2, 0.07, -74.0))
+	Util.add_box(self, Vector3(2.2, 0.05, 1.8), Color(0.3, 0.28, 0.27), Vector3(107.2, 0.025, -74.0))
+
+
+func _glow_mat(col: Color, energy: float = 1.6) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.emission_enabled = true
+	m.emission = col
+	m.emission_energy_multiplier = energy
+	return m
+
+
+func _add_mesh(mesh: Mesh, mat: Material, pos: Vector3, rot_deg: Vector3 = Vector3.ZERO) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.position = pos
+	mi.rotation_degrees = rot_deg
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	return mi
+
+
+func _cone_mesh(r: float, h: float, seg: int = 6) -> CylinderMesh:
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.0
+	cm.bottom_radius = r
+	cm.height = h
+	cm.radial_segments = seg
+	cm.rings = 1
+	return cm
+
+
+## Die Höhle schön machen: Boden, Tropfsteine, Stützbalken, Gleise mit Lore, Teich,
+## Leuchtpilze, Fackeln, Schatznische mit Gold, Edelsteinen und Knochen.
+func _build_cave_decor() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2026
+	var stone := StandardMaterial3D.new()
+	stone.albedo_color = Color(0.58, 0.54, 0.5)
+	stone.roughness = 1.0
+	var stone_d := StandardMaterial3D.new()
+	stone_d.albedo_color = Color(0.42, 0.39, 0.37)
+	stone_d.roughness = 1.0
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.4, 0.27, 0.15)
+	wood.roughness = 1.0
+	var wood_l := StandardMaterial3D.new()
+	wood_l.albedo_color = Color(0.5, 0.35, 0.2)
+	wood_l.roughness = 1.0
+	var iron := StandardMaterial3D.new()
+	iron.albedo_color = Color(0.3, 0.3, 0.33)
+	iron.metallic = 0.3
+	iron.roughness = 0.6
+
+	# --- Tropfsteine: Stalaktiten von der Decke, Stalagmiten vom Boden ---
+	for i in range(34):
+		var px := rng.randf_range(89.0, 101.0)
+		var pz := rng.randf_range(-80.0, -68.0)
+		var r := rng.randf_range(0.14, 0.42)
+		var hh := rng.randf_range(0.7, 2.0)
+		_add_mesh(_cone_mesh(r, hh), stone if i % 2 == 0 else stone_d, Vector3(px, 5.0 - hh * 0.5 + 0.02, pz), Vector3(180, rng.randf() * 90.0, 0))
+	for i in range(12):
+		var px2 := rng.randf_range(89.0, 101.0)
+		var pz2 := rng.randf_range(-80.0, -68.0)
+		if Vector2(px2 - 96.5, pz2 + 74.0).length() < 3.6 or (absf(pz2 + 74.0) < 2.6 and px2 < 91.0):
+			continue
+		var r2 := rng.randf_range(0.18, 0.4)
+		var h2 := rng.randf_range(0.5, 1.5)
+		_add_mesh(_cone_mesh(r2, h2), stone, Vector3(px2, h2 * 0.5, pz2), Vector3(0, rng.randf() * 90.0, 0))
+	for i in range(14):
+		var tx := rng.randf_range(76.0, 88.0)
+		var h3 := rng.randf_range(0.3, 0.9)
+		_add_mesh(_cone_mesh(rng.randf_range(0.08, 0.2), h3), stone_d, Vector3(tx, 3.5 - h3 * 0.5 + 0.02, -74.0 + rng.randf_range(-1.6, 1.6)), Vector3(180, 0, 0))
+	for i in range(10):
+		var tz := rng.randf_range(-106.0, -83.0)
+		var h4 := rng.randf_range(0.3, 0.9)
+		_add_mesh(_cone_mesh(rng.randf_range(0.08, 0.2), h4), stone_d, Vector3(95.0 + rng.randf_range(-1.5, 1.5), 3.5 - h4 * 0.5 + 0.02, tz), Vector3(180, 0, 0))
+
+	# --- Stützbalken (alter Minenstollen) ---
+	for fx in [77.0, 81.0, 85.0]:
+		_support_frame(Vector3(fx, 0, -74.0), false, wood, wood_l)
+	for fz in [-86.0, -90.0, -94.0, -98.0, -102.0]:
+		_support_frame(Vector3(95.0, 0, fz), true, wood, wood_l)
+
+	# --- Gleise + Lore im Weststollen ---
+	for gz in [-73.35, -74.65]:
+		_add_mesh(BoxMesh.new(), iron, Vector3(82.0, 0.11, gz)).scale = Vector3(26.0, 0.05, 0.07)
+	var sx := 70.0
+	while sx < 94.0:
+		var sl := BoxMesh.new()
+		sl.size = Vector3(0.16, 0.06, 1.9)
+		_add_mesh(sl, wood_l, Vector3(sx, 0.05, -74.0))
+		sx += 0.9
+	_build_cart(Vector3(80.0, 0.0, -74.0), wood, iron)
+
+	# --- Teich in der Kammer ---
+	var wm := StandardMaterial3D.new()
+	wm.albedo_color = Color(0.15, 0.45, 0.62, 0.75)
+	wm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	wm.metallic = 0.4
+	wm.roughness = 0.08
+	wm.emission_enabled = true
+	wm.emission = Color(0.05, 0.25, 0.35)
+	wm.emission_energy_multiplier = 0.6
+	var pool := CylinderMesh.new()
+	pool.top_radius = 1.9
+	pool.bottom_radius = 1.9
+	pool.height = 0.03
+	pool.radial_segments = 14
+	var pm := _add_mesh(pool, wm, Vector3(99.4, 0.07, -69.2))
+	pm.scale = Vector3(1.0, 1.0, 0.7)
+	for i in range(12):
+		var a := TAU * float(i) / 12.0
+		var rs := rng.randf_range(0.18, 0.34)
+		var sph := SphereMesh.new()
+		sph.radius = rs
+		sph.height = rs * 1.4
+		sph.radial_segments = 6
+		sph.rings = 3
+		_add_mesh(sph, stone, Vector3(99.4 + cos(a) * 2.0, 0.08, -69.2 + sin(a) * 1.45))
+
+	# --- Leuchtpilze ---
+	var shroom_cols: Array = [Color(0.3, 1.0, 0.7), Color(0.4, 0.7, 1.0), Color(0.9, 0.5, 1.0)]
+	var shroom_spots: Array = [Vector3(90.0, 0, -79.2), Vector3(100.8, 0, -78.5), Vector3(89.2, 0, -69.0), Vector3(94.3, 0, -85.5),
+		Vector3(95.8, 0, -97.0), Vector3(79.0, 0, -72.4), Vector3(84.0, 0, -75.6), Vector3(101.3, 0, -69.4)]
+	for i in range(shroom_spots.size()):
+		var spt: Vector3 = shroom_spots[i]
+		var gm: StandardMaterial3D = _glow_mat(shroom_cols[i % 3], 1.8)
+		var stem := StandardMaterial3D.new()
+		stem.albedo_color = Color(0.85, 0.85, 0.8)
+		for k in range(4):
+			var off := Vector3(rng.randf_range(-0.3, 0.3), 0, rng.randf_range(-0.3, 0.3))
+			var sh := rng.randf_range(0.12, 0.34)
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = 0.02
+			cyl.bottom_radius = 0.03
+			cyl.height = sh
+			cyl.radial_segments = 5
+			_add_mesh(cyl, stem, spt + off + Vector3(0, sh * 0.5, 0))
+			var cap := SphereMesh.new()
+			cap.radius = rng.randf_range(0.07, 0.14)
+			cap.height = cap.radius * 1.2
+			cap.radial_segments = 6
+			cap.rings = 3
+			_add_mesh(cap, gm, spt + off + Vector3(0, sh, 0))
+
+	# --- Fackeln (nur leuchtende Flamme, kein Licht) ---
+	var torch_spots: Array = [Vector3(74.5, 1.9, -75.6), Vector3(74.5, 1.9, -72.4), Vector3(88.3, 2.0, -70.0), Vector3(88.3, 2.0, -78.0),
+		Vector3(101.7, 2.0, -70.0), Vector3(101.7, 2.0, -78.0), Vector3(93.3, 1.9, -84.0), Vector3(96.7, 1.9, -84.0), Vector3(108.7, 1.8, -75.5), Vector3(108.7, 1.8, -72.5)]
+	for tsp in torch_spots:
+		_torch(tsp as Vector3, wood, iron)
+	var nl := OmniLight3D.new()
+	nl.light_color = Color(1.0, 0.7, 0.35)
+	nl.light_energy = 1.4
+	nl.omni_range = 6.5
+	nl.position = Vector3(106.0, 2.3, -74.0)
+	add_child(nl)
+
+	# --- Schatznische: Münzen, Edelsteine, Knochen, Wächter-Schädel ---
+	var gmat := StandardMaterial3D.new()
+	gmat.albedo_color = Color(1.0, 0.8, 0.2)
+	gmat.metallic = 0.4
+	gmat.roughness = 0.35
+	gmat.emission_enabled = true
+	gmat.emission = Color(1.0, 0.7, 0.1)
+	gmat.emission_energy_multiplier = 0.5
+	for i in range(28):
+		var cm2 := CylinderMesh.new()
+		cm2.top_radius = 0.08
+		cm2.bottom_radius = 0.08
+		cm2.height = 0.02
+		cm2.radial_segments = 8
+		var a2 := rng.randf() * TAU
+		var rr := rng.randf_range(0.9, 2.1)
+		_add_mesh(cm2, gmat, Vector3(107.2 + cos(a2) * rr * 0.9 - 0.3, 0.025, -74.0 + sin(a2) * rr * 0.55), Vector3(rng.randf_range(-12, 12), 0, rng.randf_range(-12, 12)))
+	var gem_cols: Array = [Color(1.0, 0.2, 0.3), Color(0.2, 0.6, 1.0), Color(0.3, 1.0, 0.5), Color(0.9, 0.3, 1.0)]
+	for i in range(6):
+		var gem := PrismMesh.new()
+		gem.size = Vector3(0.14, 0.2, 0.14)
+		var ga := rng.randf() * TAU
+		var gr := rng.randf_range(1.0, 1.8)
+		_add_mesh(gem, _glow_mat(gem_cols[i % 4], 1.8), Vector3(106.6 + cos(ga) * gr * 0.7, 0.1, -74.0 + sin(ga) * gr * 0.5), Vector3(rng.randf_range(-20, 20), rng.randf() * 360.0, rng.randf_range(-20, 20)))
+	# Schädel + Knochen am Nischeneingang
+	var bone := StandardMaterial3D.new()
+	bone.albedo_color = Color(0.88, 0.85, 0.75)
+	bone.roughness = 0.9
+	var skull := SphereMesh.new()
+	skull.radius = 0.15
+	skull.height = 0.28
+	skull.radial_segments = 8
+	skull.rings = 4
+	_add_mesh(skull, bone, Vector3(103.6, 0.14, -75.1), Vector3(0, 30, 0))
+	var jaw := BoxMesh.new()
+	jaw.size = Vector3(0.14, 0.05, 0.1)
+	_add_mesh(jaw, bone, Vector3(103.5, 0.05, -75.0), Vector3(0, 30, 0))
+	var eye := StandardMaterial3D.new()
+	eye.albedo_color = Color(0.05, 0.04, 0.04)
+	for ez in [-0.06, 0.06]:
+		var es := SphereMesh.new()
+		es.radius = 0.04
+		es.height = 0.07
+		es.radial_segments = 6
+		es.rings = 3
+		_add_mesh(es, eye, Vector3(103.47, 0.17, -75.1 + ez), Vector3(0, 30, 0))
+	for i in range(6):
+		var bb := BoxMesh.new()
+		bb.size = Vector3(0.5, 0.05, 0.05)
+		_add_mesh(bb, bone, Vector3(103.7 + rng.randf_range(-0.5, 0.5), 0.03, -75.5 + rng.randf_range(-0.5, 0.4)), Vector3(0, rng.randf() * 180.0, 0))
+	# Rippen: Bogen aus Zylindern wäre zu viel - ein paar schräge Knochen genügen
+
+	# --- Bodenschotter ---
+	var pebble_t: Array = []
+	var pebble_c: Array = []
+	var cuts: Array = cave_cuts()
+	for i in range(240):
+		var c: Array = cuts[rng.randi() % cuts.size()]
+		var cc: Vector3 = c[0]
+		var sz: Vector3 = c[1]
+		var pp := Vector3(cc.x + rng.randf_range(-0.48, 0.48) * sz.x, 0.0, cc.z + rng.randf_range(-0.48, 0.48) * sz.z)
+		if Vector2(pp.x - 96.5, pp.z + 74.0).length() < 2.5:
+			continue
+		var ps := rng.randf_range(0.05, 0.16)
+		pp.y = ps * 0.2
+		pebble_t.append(Transform3D(Basis.from_euler(Vector3(rng.randf() * 3.0, rng.randf() * 6.0, 0)).scaled(Vector3(ps, ps * 0.6, ps)), pp))
+		var g := rng.randf_range(0.28, 0.5)
+		pebble_c.append(Color(g, g * 0.95, g * 0.9))
+	_add_stones(pebble_t, pebble_c)
+
+
+func _support_frame(pos: Vector3, along_z: bool, wood: Material, wood_l: Material) -> void:
+	# Zwei Pfosten + Querbalken + Schrägstreben. along_z = Stollen läuft in Z-Richtung
+	var half := 1.72
+	var h := 3.3
+	for sgn in [-1.0, 1.0]:
+		var post := BoxMesh.new()
+		post.size = Vector3(0.22, h, 0.22)
+		var pp := pos + (Vector3(sgn * half, h * 0.5, 0) if along_z else Vector3(0, h * 0.5, sgn * half))
+		_add_mesh(post, wood, pp)
+		var brace := BoxMesh.new()
+		brace.size = Vector3(0.14, 0.9, 0.14)
+		var bp := pos + (Vector3(sgn * (half - 0.35), h - 0.45, 0) if along_z else Vector3(0, h - 0.45, sgn * (half - 0.35)))
+		var br := _add_mesh(brace, wood_l, bp)
+		if along_z:
+			br.rotation_degrees.z = -sgn * 45.0
+		else:
+			br.rotation_degrees.x = sgn * 45.0
+	var beam := BoxMesh.new()
+	beam.size = Vector3(0.24, 0.24, half * 2.0 + 0.5) if not along_z else Vector3(half * 2.0 + 0.5, 0.24, 0.24)
+	_add_mesh(beam, wood, pos + Vector3(0, h + 0.05, 0))
+
+
+func _build_cart(pos: Vector3, wood: Material, iron: Material) -> void:
+	var cart := Node3D.new()
+	cart.position = pos
+	add_child(cart)
+	var floor_b := BoxMesh.new()
+	floor_b.size = Vector3(1.3, 0.08, 1.0)
+	var parts: Array = [
+		[floor_b, Vector3(0, 0.42, 0)],
+	]
+	var sw := BoxMesh.new()
+	sw.size = Vector3(1.3, 0.5, 0.08)
+	var ew := BoxMesh.new()
+	ew.size = Vector3(0.08, 0.5, 1.0)
+	parts.append([sw, Vector3(0, 0.7, 0.5)])
+	parts.append([sw, Vector3(0, 0.7, -0.5)])
+	parts.append([ew, Vector3(0.65, 0.7, 0)])
+	parts.append([ew, Vector3(-0.65, 0.7, 0)])
+	for pr in parts:
+		var mi := MeshInstance3D.new()
+		mi.mesh = pr[0]
+		mi.material_override = wood
+		mi.position = pr[1]
+		cart.add_child(mi)
+	for wx in [-0.4, 0.4]:
+		for wz in [-0.62, 0.62]:
+			var wh := CylinderMesh.new()
+			wh.top_radius = 0.17
+			wh.bottom_radius = 0.17
+			wh.height = 0.06
+			wh.radial_segments = 8
+			var wi := MeshInstance3D.new()
+			wi.mesh = wh
+			wi.material_override = iron
+			wi.position = Vector3(wx, 0.2, wz)
+			wi.rotation_degrees.x = 90.0
+			cart.add_child(wi)
+	# Ladung: Erzbrocken (glitzernd)
+	var ore := _glow_mat(Color(0.9, 0.75, 0.3), 0.7)
+	for i in range(7):
+		var os := SphereMesh.new()
+		os.radius = 0.16
+		os.height = 0.26
+		os.radial_segments = 5
+		os.rings = 3
+		var oi := MeshInstance3D.new()
+		oi.mesh = os
+		oi.material_override = ore if i % 2 == 0 else iron
+		oi.position = Vector3(-0.4 + 0.14 * float(i), 0.62 + 0.04 * float(i % 3), -0.2 + 0.13 * float(i % 4))
+		cart.add_child(oi)
+	cart.rotation_degrees.y = 8.0
+
+
+func _torch(pos: Vector3, wood: Material, iron: Material) -> void:
+	var stick := BoxMesh.new()
+	stick.size = Vector3(0.07, 0.55, 0.07)
+	_add_mesh(stick, wood, pos + Vector3(0, -0.05, 0))
+	var holder := BoxMesh.new()
+	holder.size = Vector3(0.14, 0.06, 0.14)
+	_add_mesh(holder, iron, pos + Vector3(0, 0.1, 0))
+	var fl := SphereMesh.new()
+	fl.radius = 0.1
+	fl.height = 0.32
+	fl.radial_segments = 6
+	fl.rings = 3
+	_add_mesh(fl, _glow_mat(Color(1.0, 0.55, 0.15), 2.4), pos + Vector3(0, 0.34, 0))
+	var core := SphereMesh.new()
+	core.radius = 0.055
+	core.height = 0.2
+	core.radial_segments = 6
+	core.rings = 3
+	_add_mesh(core, _glow_mat(Color(1.0, 0.9, 0.5), 3.0), pos + Vector3(0, 0.33, 0))
 
 
 ## Mitte des begehbaren Pfads (Fläche zwischen Schnittwand und Hangkante).
