@@ -250,6 +250,14 @@ func cast(p: Vector3) -> void:
 	bobber.visible = true
 	bobber.global_position = p
 	wait_scale = wait_scale
+	var cd := _depth_at(p)
+	get_tree().create_timer(3.1).timeout.connect(func() -> void:
+		if state != S.WAITING and state != S.RETRIEVE:
+			return
+		if cd < 0.3:
+			player.toast("Flaches Wasser am Ufer: hier beissen nur kleine Fische. Weiter raus werfen!", 3.5)
+		elif cd > 0.75:
+			player.toast("Tiefes Wasser: hier koennen die Brocken beissen.", 3.0))
 	if mode == 2:
 		state = S.RETRIEVE
 		retrieve_t = 0.0
@@ -261,6 +269,15 @@ func cast(p: Vector3) -> void:
 			player.toast("Grundblei liegt. Der Bissanzeiger ist scharf.", 3.0)
 		else:
 			player.toast("Pose treibt. Warte auf den Biss.", 3.0)
+
+
+## Wassertiefe-Faktor an einer Weltposition: 0 = direkt am Ufer (flach), 1 = ab ~9 m vom Ufer (tief).
+func _depth_at(world_p: Vector3) -> float:
+	var main := player.get_parent()
+	if main.get("lake_root") == null:
+		return 1.0
+	var lp: Vector3 = world_p - (main.lake_root as Node3D).global_position
+	return clampf(LakeShape.shore_dist(Vector2(lp.x, lp.z)) / 9.0, 0.0, 1.0)
 
 
 func _roll_wait() -> float:
@@ -297,10 +314,23 @@ func reel_in(msg: String) -> void:
 
 
 func _pick_species() -> String:
+	var sp := _pick_species_raw()
+	var d := _depth_at(bobber.global_position)
+	# Am Ufer (flach) beissen keine Brocken: grosse Arten werden durch kleine ersetzt
+	if d < 0.35:
+		if sp == "Karpfen" and randf() < 0.75:
+			return "Brasse" if randf() < 0.6 else "Rotauge"
+		if sp == "Hecht" and randf() < 0.7:
+			return "Barsch"
+	return sp
+
+
+func _pick_species_raw() -> String:
 	var r := randf()
 	var night := Game.is_night()
 	# Ganz selten: der Riesenwels (nachts am Grund etwas wahrscheinlicher, nicht beim Spinnfischen)
-	if mode != 2 and randf() < (0.012 if (night and mode == 0) else 0.004):
+	var depth := _depth_at(bobber.global_position)
+	if mode != 2 and depth > 0.55 and randf() < (0.012 if (night and mode == 0) else 0.004):
 		return "Riesenwels"
 	match mode:
 		0:
@@ -334,7 +364,10 @@ func _start_bite() -> void:
 	fish_name = _pick_species()
 	var d: Dictionary = FISH[fish_name]
 	var kg_range: Array = d["kg"]
-	fish_kg = snappedf(randf_range(kg_range[0], kg_range[1]) * randf_range(0.6, 1.0), 0.1)
+	# Je naeher am Ufer, desto kleiner die Fische (tief = volle Groessenspanne)
+	var dm := smoothstep(0.1, 0.9, _depth_at(bobber.global_position))
+	var kg_hi := lerpf(float(kg_range[0]), float(kg_range[1]), lerpf(0.12, 1.0, dm))
+	fish_kg = maxf(snappedf(randf_range(float(kg_range[0]), kg_hi) * randf_range(0.6, 1.0), 0.1), 0.1)
 	state = S.BITE
 	bite_el = 0.0
 	bite_left = 4.0 if mode == 0 else 2.0

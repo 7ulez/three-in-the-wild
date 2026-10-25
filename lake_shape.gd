@@ -21,6 +21,19 @@ static func contains(p: Vector2) -> bool:
 	return Geometry2D.is_point_in_polygon(p, points)
 
 
+## Abstand eines Punkts (lokale x/z) zum Ufer in Metern (am Rand ~0, in der Seemitte am groessten).
+static func shore_dist(p: Vector2) -> float:
+	if points.is_empty():
+		build()
+	var best := 1.0e9
+	for i in range(points.size()):
+		var a: Vector2 = points[i]
+		var b: Vector2 = points[(i + 1) % points.size()]
+		var c := Geometry2D.get_closest_point_to_segment(p, a, b)
+		best = minf(best, p.distance_to(c))
+	return best
+
+
 static func scaled(factor: float) -> PackedVector2Array:
 	var out := PackedVector2Array()
 	for p in points:
