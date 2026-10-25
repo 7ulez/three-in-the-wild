@@ -407,7 +407,7 @@ func _process(delta: float) -> void:
 					state = S.FIGHT
 					distance = maxf(cast_dist * (1.0 - retrieve_t / 12.0), 6.0)
 					tension = 0.4
-					player.toast("RUMMS! Hecht oder Barsch hängt am Kunstköder! Einholen!", 3.0)
+					player.toast("RUMMS! Etwas Schweres hängt am Kunstköder! Einholen!", 3.0)
 				elif retrieve_t >= 12.0:
 					reel_in("Nichts gebissen. Nochmal auswerfen.")
 		S.BITE:
@@ -537,13 +537,13 @@ func _fight(delta: float) -> void:
 	_update_leap(delta)
 	if tension >= 1.0:
 		Sfx.play("fail", Vector3.INF, -4.0)
-		hud.card("SCHNUR GERISSEN!", "Der %s ist weg." % fish_name, UI.DANGER, 2.5)
+		hud.card("SCHNUR GERISSEN!", "Der Fisch ist weg.", UI.DANGER, 2.5)
 		hud.flash(Color(1, 0.2, 0.15, 0.8))
 		player.shake = 4.0
 		reel_in("")
 	elif distance > cast_dist + 10.0:
 		Sfx.play("fail", Vector3.INF, -4.0)
-		hud.card("LOSGERISSEN!", "Der %s hat sich befreit." % fish_name, UI.DANGER, 2.5)
+		hud.card("LOSGERISSEN!", "Der Fisch hat sich befreit.", UI.DANGER, 2.5)
 		reel_in("")
 	elif distance <= 1.5:
 		_catch()
@@ -558,7 +558,7 @@ func _start_leap() -> void:
 	var cm := clampf(24.0 * pow(fish_kg, 0.36) * 2.0, 12.0, 130.0) / 100.0
 	_leap = Node3D.new()
 	get_tree().current_scene.add_child(_leap)
-	ItemModels.add_visual(_leap, "%s %.1f kg" % [fish_name, fish_kg], Vector3(cm, cm * 0.28, cm * 0.2), d["color"])
+	ItemModels.add_visual(_leap, "Fisch 1.0 kg", Vector3(cm, cm * 0.28, cm * 0.2), Color(0.45, 0.47, 0.42))
 	_leap.global_position = bobber.global_position
 	Sfx.play("fish_jump", bobber.global_position)
 	Fx.splash(get_tree().current_scene, Vector3(bobber.global_position.x, 0.05, bobber.global_position.z), 1.2)
@@ -688,5 +688,5 @@ func _update_hud() -> void:
 			hud.kind = "fight"
 			hud.d = {"tension": tension, "stamina": stamina, "dist01": clampf((distance - 1.5) / maxf(cast_dist + 8.5, 1.0), 0.0, 1.0),
 				"dist": distance, "pull": pull if running else 0, "jump": jump_t, "reeling": _reeling(),
-				"counter": _counter_axis(), "name": fish_name, "kg": fish_kg}
+				"counter": _counter_axis()}
 	status.text = Game.touchify(t)

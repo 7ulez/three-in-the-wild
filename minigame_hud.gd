@@ -173,9 +173,6 @@ func _draw_fight() -> void:
 	var pull: int = d.get("pull", 0)
 	var jump: float = d.get("jump", 0.0)
 	var reeling: bool = d.get("reeling", false)
-	var counter: int = d.get("counter", 0)
-	var fname: String = d.get("name", "")
-	var kg: float = d.get("kg", 0.0)
 
 	# Tacho
 	var gc := Vector2(cx, base)
@@ -199,7 +196,7 @@ func _draw_fight() -> void:
 		_text(gc + Vector2(0, 28), "Optimal - kurbeln!", 18, Color(0.5, 1, 0.55))
 
 	# Fisch: Name, Ausdauer
-	_text(Vector2(cx, base - 148), "%s  %.1f kg" % [fname, kg], 24, UI.PAPER)
+	_text(Vector2(cx, base - 148), "Unbekannter Fisch", 24, UI.PAPER)
 	var sw := 220.0
 	var sx := cx - sw / 2.0
 	var sy := base + 52.0
@@ -225,27 +222,6 @@ func _draw_fight() -> void:
 	draw_circle(fpos + Vector2(-9, -2), 1.6, Color.BLACK)
 	_text(Vector2(tx0, ty + 26), "du", 14, UI.PAPER, HORIZONTAL_ALIGNMENT_LEFT, 1.0)
 	_text(Vector2(tx1, ty + 26), "%.0f m" % d.get("dist", 0.0), 14, UI.PAPER, HORIZONTAL_ALIGNMENT_RIGHT, 1.0)
-
-	# Zugrichtung
-	if pull != 0:
-		var flash_on := int(_t * 8.0) % 2 == 0
-		var side := 1.0 if pull > 0 else -1.0
-		var ax := cx + side * 300.0
-		var ay := base - 20.0
-		var col := UI.DANGER if flash_on else Color(1, 0.65, 0.2)
-		for i in range(3):
-			var o := side * (float(i) * 26.0 + fmod(_t * 90.0, 26.0))
-			var p0 := Vector2(ax + o, ay)
-			var arrow := PackedVector2Array([p0 + Vector2(side * 18, 0), p0 + Vector2(-side * 6, -22), p0 + Vector2(-side * 6, 22)])
-			var cc := col
-			cc.a = 1.0 - float(i) * 0.3
-			draw_colored_polygon(arrow, cc)
-		_text(Vector2(ax, ay - 40), "Fisch zieht %s!" % ("RECHTS" if pull > 0 else "LINKS"), 22, col)
-		var need_key := "<" if pull > 0 else ">"      # Rute entgegen neigen (Blick drehen)
-		_keycap(Vector2(ax, ay + 50), need_key, counter == -pull)
-		_text(Vector2(ax, ay + 98), "Rute entgegen neigen (Maus) = Bonus", 15, UI.PAPER)
-	else:
-		_text(Vector2(cx - 300, base - 20), "Maus: Rute gegen den Zug neigen = Bonus", 16, Color(1, 1, 1, 0.55))
 
 	# Sprung
 	if jump > 0.0:

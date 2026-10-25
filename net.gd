@@ -67,6 +67,14 @@ class RemoteAvatar:
 		ghost.visible = true
 		_ghost_t = 0.5
 
+	func puff_vape() -> void:
+		if _vape == null:
+			_vape = Needs.make_vape_particles()
+			add_child(_vape)
+		_vape.restart()
+		_vape.emitting = true
+		Sfx.play("joint", global_position, -6.0, 1.0)
+
 	func _exit_tree() -> void:
 		if ghost != null and is_instance_valid(ghost):
 			ghost.queue_free()
@@ -677,6 +685,22 @@ func remote_peg(tent_pos: Vector3, idx: int, hits: int) -> void:
 		create_tween().tween_property(peg.visual, "position:y", 0.17 - 0.1 * hits, 0.12)
 	if peg.is_driven() and t.peg_driven_count() >= 4:
 		_finish_site(t)
+
+
+## Vape-Wolke: einmalige, zuverlaessige Nachricht (zusaetzlich zum Vape-Flag im Zustand)
+func send_vape() -> void:
+	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
+	rpc("remote_vape")
+
+
+@rpc("any_peer", "reliable")
+func remote_vape() -> void:
+	if Game.dedicated:
+		return
+	var av := _get_avatar(multiplayer.get_remote_sender_id())
+	if av != null:
+		av.puff_vape()
 
 
 func _find_tent_site(pos: Vector3) -> Tent:
