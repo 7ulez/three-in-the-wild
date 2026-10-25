@@ -30,6 +30,45 @@ class RemoteAvatar:
 	var _vom_on: bool = false
 	var _vom_cd: float = 0.0
 
+	var ghost: Node3D = null
+	var _ghost_name: String = ""
+	var _ghost_t: float = 0.0
+
+	## Blaupause des Mitspielers: gleiche Form wie bei mir, halbdurchsichtig. Verschwindet, wenn keine Nachricht mehr kommt.
+	func show_ghost(n: String, pos: Vector3, yaw: float, size: Vector3, on: bool) -> void:
+		if not on:
+			if ghost != null:
+				ghost.visible = false
+			return
+		if ghost == null:
+			ghost = Node3D.new()
+			get_parent().add_child(ghost)
+		if _ghost_name != n:
+			_ghost_name = n
+			for c in ghost.get_children():
+				c.queue_free()
+			var holder := Node3D.new()
+			holder.position.y = size.y / 2.0
+			ghost.add_child(holder)
+			ItemModels.add_placed_visual(holder, n, size, Color(0.6, 0.9, 0.6))
+			var gm := StandardMaterial3D.new()
+			gm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			gm.albedo_color = Color(0.3, 1.0, 0.3, 0.45)
+			for k in holder.find_children("*", "", true, false):
+				if k is Light3D or k is CPUParticles3D or k is GPUParticles3D:
+					k.queue_free()
+				elif k is MeshInstance3D:
+					(k as MeshInstance3D).material_override = gm
+					(k as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ghost.global_position = pos
+		ghost.rotation.y = yaw
+		ghost.visible = true
+		_ghost_t = 0.5
+
+	func _exit_tree() -> void:
+		if ghost != null and is_instance_valid(ghost):
+			ghost.queue_free()
+
 	func set_look(p_char: String, p_name: String) -> void:
 		if p_char == char_name:
 			# Nur bei Aenderung: jedes Setzen baut das Schild neu auf (kam bei jedem Positionspaket)
@@ -52,6 +91,10 @@ class RemoteAvatar:
 	var _last_pos: Vector3 = Vector3.ZERO
 
 	func _process(delta: float) -> void:
+		if ghost != null and ghost.visible:
+			_ghost_t -= delta
+			if _ghost_t <= 0.0:
+				ghost.visible = false
 		global_position = global_position.lerp(target_pos, minf(delta * 12.0, 1.0))
 		if Game.dedicated:
 			return
@@ -463,6 +506,22 @@ func send_camp(spot_name: String) -> void:
 
 func send_tent(pos: Vector3, yaw: float) -> void:
 	rpc("remote_tent", pos, yaw)
+
+
+## Blaupause eines Gegenstands, der gerade aufgestellt wird (fuer alle Mitspieler sichtbar).
+func send_ghost(n: String, pos: Vector3, yaw: float, size: Vector3, on: bool) -> void:
+	if multiplayer.multiplayer_peer == null or multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
+		return
+	rpc("remote_ghost", n, pos, yaw, size, on)
+
+
+@rpc("any_peer", "unreliable")
+func remote_ghost(n: String, pos: Vector3, yaw: float, size: Vector3, on: bool) -> void:
+	var id := multiplayer.get_remote_sender_id()
+	if Game.dedicated:
+		return
+	var av := _get_avatar(id)
+	av.show_ghost(n, pos, yaw, size, on)
 
 
 func send_placed(p: PlacedItem, state: Dictionary) -> void:

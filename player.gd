@@ -921,7 +921,10 @@ func _physics_process(delta: float) -> void:
 	_render_guard(delta)
 	_material_guard(delta)
 	_light_manager(delta)
-	_scan_step()
+	_scan_t += delta
+	if _scan_t > 2.0:
+		_scan_t = 0.0
+		_scan_step()
 	fish_cast_t = maxf(fish_cast_t - delta, 0.0)
 	_air_t = 0.0 if is_on_floor() else _air_t + delta
 	Player.set_pants(body_visual, needs.pants if needs != null else 0)
@@ -942,6 +945,8 @@ func _physics_process(delta: float) -> void:
 	_update_held()
 	if placing:
 		_update_placement()
+		if place_item and item_ghost != null and is_instance_valid(item_ghost):
+			_sync_ghost()
 	_update_prompt()
 
 
@@ -1639,6 +1644,8 @@ func _start_item_placement() -> void:
 		psize = Vector3(1.8, 0.95, 0.5)
 	item_ghost = Node3D.new()
 	get_parent().add_child(item_ghost)
+	_ghost_name = held.item_name
+	_ghost_size = psize
 	item_ghost_mat = StandardMaterial3D.new()
 	item_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	item_ghost_mat.albedo_color = Color(0.3, 1.0, 0.3, 0.45)
@@ -1662,6 +1669,22 @@ func _start_item_placement() -> void:
 		holder.add_child(mi)
 	item_ghost.visible = false
 	ghost_valid = false
+
+
+var _ghost_name: String = ""
+var _ghost_size: Vector3 = Vector3.ONE
+var _ghost_sent: int = 0
+
+
+## Die Blaupause fuer die Mitspieler: alle 0,1 s Position, Drehung und Form senden.
+func _sync_ghost() -> void:
+	if Net.instance == null or not is_instance_valid(Net.instance):
+		return
+	var now := Time.get_ticks_msec()
+	if now - _ghost_sent < 100:
+		return
+	_ghost_sent = now
+	Net.instance.send_ghost(_ghost_name, item_ghost.global_position, item_ghost.rotation.y, _ghost_size, item_ghost.visible)
 
 
 func _update_item_placement() -> void:
@@ -1927,20 +1950,15 @@ var bad_report: String = ""
 var _scan_i: int = 0
 
 
-## Prueft pro Bild nur ein paar Knoten, damit es nicht ruckelt.
+## Alle 2 Sekunden die ganze Welt auf ungueltige Lagen pruefen (frueher jeden Frame: das ruckelte).
 func _scan_step() -> void:
-	var kids := get_parent().get_children()
-	if kids.is_empty():
+	var w := get_parent()
+	if w == null:
 		return
-	if _scan_i >= kids.size():
-		_scan_i = 0
-	var stop := mini(_scan_i + 40, kids.size())
-	for i in range(_scan_i, stop):
-		var c := kids[i]
+	for c in w.get_children():
 		if c is Node3D:
 			_check_one(c as Node3D)
 		_bad_transform_scan(c, 1)
-	_scan_i = stop
 
 
 ## Sucht Knoten mit ungueltiger Lage (NaN/unendlich/riesig). Die verderben beim Zeichnen die ganze Szene.
