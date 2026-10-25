@@ -34,6 +34,8 @@ static func add_visual(parent: Node3D, kind: String, size: Vector3, color: Color
 			return _tent_bag(parent, size, color)
 		"Bierkasten":
 			return _beer_crate(parent, size, color)
+		"Jack-Cola-Kiste":
+			return _jack_crate(parent, size)
 		"Hammer":
 			return _hammer(parent)
 		"Joint":
@@ -153,6 +155,47 @@ static func _beer_crate(parent: Node3D, size: Vector3, color: Color) -> Dictiona
 				Vector3(-0.2 + ix * 0.1, size.y / 2.0 + 0.1, -0.13 + iz * 0.087))
 			bottles.append(bottle)
 	return {"bottles": bottles}
+
+
+static var _jack_label: Texture2D = null
+
+
+## Dosen-Etikett Jack Daniel's & Cola (Foto als Textur, einmal geladen).
+static func _jack_label_tex() -> Texture2D:
+	if _jack_label == null:
+		var img := Image.load_from_file("res://assets/items/jack_dose_label.png")
+		if img != null and not img.is_empty():
+			_jack_label = ImageTexture.create_from_image(img)
+	return _jack_label
+
+
+## Eine Dose Jack Daniel's & Cola (330 ml): Zylinder mit Etikett rundum, Deckel und Boden silbern.
+static func _jack_can(parent: Node3D, pos: Vector3) -> void:
+	var m := CylinderMesh.new()
+	m.top_radius = 0.033
+	m.bottom_radius = 0.033
+	m.height = 0.115
+	m.radial_segments = 24
+	var label := StandardMaterial3D.new()
+	label.albedo_texture = _jack_label_tex()
+	label.albedo_color = Color(1, 1, 1) if label.albedo_texture != null else Color(0.05, 0.05, 0.06)
+	label.metallic = 0.2
+	label.roughness = 0.4
+	var mi := MeshInstance3D.new()
+	mi.mesh = m
+	mi.position = pos
+	parent.add_child(mi)
+	# Ein Flaechen-Satz fuer Mantel, Deckel und Boden: die Textur ist aussen silbern, das Etikett sitzt auf dem Mantel
+	mi.set_surface_override_material(0, label)
+
+
+## Kiste mit drei Dosen Jack Daniel's & Cola.
+static func _jack_crate(parent: Node3D, size: Vector3) -> Dictionary:
+	Util.add_box(parent, size, Color(0.42, 0.28, 0.14))
+	var top := size.y / 2.0 + 0.058
+	for x in [-0.12, 0.0, 0.12]:
+		_jack_can(parent, Vector3(x * size.x / 0.4, top, 0.0))
+	return {}
 
 
 static func _hammer(parent: Node3D) -> Dictionary:
