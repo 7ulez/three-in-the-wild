@@ -241,7 +241,7 @@ func _left_click() -> void:
 
 func cast(p: Vector3) -> void:
 	player.fish_cast_t = 0.8
-	Sfx.play("whoosh", player.global_position, -2.0)
+	Sfx.play("cast", player.global_position, 0.0)
 	get_tree().create_timer(0.5).timeout.connect(func() -> void:
 		Sfx.play("splash_small", p)
 		Fx.ripple(get_tree().current_scene, p, 0.8))
@@ -400,7 +400,7 @@ func hook() -> void:
 	run_timer = randf_range(0.8, 1.6)
 	led.light_energy = 0.0
 	player.shake = 2.5
-	Sfx.play("whoosh", player.global_position, -4.0)
+	Sfx.play("drill", player.global_position, -2.0)
 	if perfect_hook:
 		hud.card("PERFEKTER ANSCHLAG!", "Der Haken sitzt - der Fisch ist angeschlagen", Color(0.5, 1.0, 0.55), 1.8)
 		hud.flash(Color(0.3, 1.0, 0.4, 0.8))
