@@ -486,20 +486,18 @@ func _build_treasure() -> void:
 	gm.emission_enabled = true
 	gm.emission = Color(1.0, 0.7, 0.1)
 	gm.emission_energy_multiplier = 0.5
+	var coin_m := CylinderMesh.new()
+	coin_m.top_radius = 0.045
+	coin_m.bottom_radius = 0.045
+	coin_m.height = 0.012
+	coin_m.radial_segments = 8
+	var coin_xf: Array = []
 	for i in range(26):
-		var coin := MeshInstance3D.new()
-		var cm := CylinderMesh.new()
-		cm.top_radius = 0.045
-		cm.bottom_radius = 0.045
-		cm.height = 0.012
-		cm.radial_segments = 8
-		coin.mesh = cm
-		coin.material_override = gm
 		var rr := rng.randf() * 0.26
 		var an := rng.randf() * TAU
-		coin.position = Vector3(cos(an) * rr, 0.26 + 0.07 * (1.0 - rr / 0.26) + rng.randf() * 0.02, sin(an) * rr * 0.7)
-		coin.rotation_degrees = Vector3(rng.randf_range(-25, 25), 0, rng.randf_range(-25, 25))
-		gold.add_child(coin)
+		var cb := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-25, 25)), 0, deg_to_rad(rng.randf_range(-25, 25))))
+		coin_xf.append(Transform3D(cb, Vector3(cos(an) * rr, 0.26 + 0.07 * (1.0 - rr / 0.26) + rng.randf() * 0.02, sin(an) * rr * 0.7)))
+	_multi(gold, coin_m, gm, coin_xf)
 	chest.gold = gold
 	var gl := OmniLight3D.new()
 	gl.light_color = Color(1.0, 0.8, 0.35)
@@ -534,6 +532,23 @@ func _add_mesh(mesh: Mesh, mat: Material, pos: Vector3, rot_deg: Vector3 = Vecto
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	return mi
+
+
+## Viele gleiche Teile als ein einziges MultiMesh (im Browser zählen Einzel-Meshes teuer).
+func _multi(parent: Node, mesh: Mesh, mat: Material, xf: Array) -> void:
+	if xf.is_empty():
+		return
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = xf.size()
+	for i in range(xf.size()):
+		mm.set_instance_transform(i, xf[i])
+	var mi := MultiMeshInstance3D.new()
+	mi.multimesh = mm
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
 
 
 func _cone_mesh(r: float, h: float, seg: int = 6) -> CylinderMesh:
@@ -639,11 +654,11 @@ func _build_cave_decor() -> void:
 	var shroom_cols: Array = [Color(0.3, 1.0, 0.7), Color(0.4, 0.7, 1.0), Color(0.9, 0.5, 1.0)]
 	var shroom_spots: Array = [Vector3(90.0, 0, -79.2), Vector3(100.8, 0, -78.5), Vector3(89.2, 0, -69.0), Vector3(94.3, 0, -85.5),
 		Vector3(95.8, 0, -97.0), Vector3(79.0, 0, -72.4), Vector3(84.0, 0, -75.6), Vector3(101.3, 0, -69.4)]
+	var cap_xf: Array = [[], [], []]
+	var stem_mat := StandardMaterial3D.new()
+	stem_mat.albedo_color = Color(0.85, 0.85, 0.8)
 	for i in range(shroom_spots.size()):
 		var spt: Vector3 = shroom_spots[i]
-		var gm: StandardMaterial3D = _glow_mat(shroom_cols[i % 3], 1.8)
-		var stem := StandardMaterial3D.new()
-		stem.albedo_color = Color(0.85, 0.85, 0.8)
 		for k in range(4):
 			var off := Vector3(rng.randf_range(-0.3, 0.3), 0, rng.randf_range(-0.3, 0.3))
 			var sh := rng.randf_range(0.12, 0.34)
@@ -652,19 +667,38 @@ func _build_cave_decor() -> void:
 			cyl.bottom_radius = 0.03
 			cyl.height = sh
 			cyl.radial_segments = 5
-			_add_mesh(cyl, stem, spt + off + Vector3(0, sh * 0.5, 0))
-			var cap := SphereMesh.new()
-			cap.radius = rng.randf_range(0.07, 0.14)
-			cap.height = cap.radius * 1.2
-			cap.radial_segments = 6
-			cap.rings = 3
-			_add_mesh(cap, gm, spt + off + Vector3(0, sh, 0))
+			_add_mesh(cyl, stem_mat, spt + off + Vector3(0, sh * 0.5, 0))
+			var cr := rng.randf_range(0.07, 0.14)
+			(cap_xf[i % 3] as Array).append(Transform3D(Basis().scaled(Vector3(cr, cr * 0.6, cr)), spt + off + Vector3(0, sh, 0)))
+	var cap_mesh := SphereMesh.new()
+	cap_mesh.radius = 1.0
+	cap_mesh.height = 2.0
+	cap_mesh.radial_segments = 6
+	cap_mesh.rings = 3
+	for ci in range(3):
+		_multi(self, cap_mesh, _glow_mat(shroom_cols[ci], 1.8), cap_xf[ci])
 
 	# --- Fackeln (nur leuchtende Flamme, kein Licht) ---
 	var torch_spots: Array = [Vector3(79.2, 1.9, -75.6), Vector3(79.2, 1.9, -72.4), Vector3(88.3, 2.0, -70.0), Vector3(88.3, 2.0, -78.0),
 		Vector3(101.7, 2.0, -70.0), Vector3(101.7, 2.0, -78.0), Vector3(93.3, 1.9, -84.0), Vector3(96.7, 1.9, -84.0), Vector3(108.7, 1.8, -75.5), Vector3(108.7, 1.8, -72.5)]
+	var flame_xf: Array = []
+	var core_xf: Array = []
 	for tsp in torch_spots:
 		_torch(tsp as Vector3, wood, iron)
+		flame_xf.append(Transform3D(Basis().scaled(Vector3(1, 1.6, 1)), (tsp as Vector3) + Vector3(0, 0.34, 0)))
+		core_xf.append(Transform3D(Basis().scaled(Vector3(1, 1.6, 1)), (tsp as Vector3) + Vector3(0, 0.33, 0)))
+	var fl_mesh := SphereMesh.new()
+	fl_mesh.radius = 0.1
+	fl_mesh.height = 0.2
+	fl_mesh.radial_segments = 6
+	fl_mesh.rings = 3
+	var co_mesh := SphereMesh.new()
+	co_mesh.radius = 0.055
+	co_mesh.height = 0.11
+	co_mesh.radial_segments = 6
+	co_mesh.rings = 3
+	_multi(self, fl_mesh, _glow_mat(Color(1.0, 0.55, 0.15), 2.4), flame_xf)
+	_multi(self, co_mesh, _glow_mat(Color(1.0, 0.9, 0.5), 3.0), core_xf)
 	var nl := OmniLight3D.new()
 	nl.light_color = Color(1.0, 0.7, 0.35)
 	nl.light_energy = 1.4
@@ -680,15 +714,18 @@ func _build_cave_decor() -> void:
 	gmat.emission_enabled = true
 	gmat.emission = Color(1.0, 0.7, 0.1)
 	gmat.emission_energy_multiplier = 0.5
+	var cm2 := CylinderMesh.new()
+	cm2.top_radius = 0.08
+	cm2.bottom_radius = 0.08
+	cm2.height = 0.02
+	cm2.radial_segments = 8
+	var ncoin_xf: Array = []
 	for i in range(28):
-		var cm2 := CylinderMesh.new()
-		cm2.top_radius = 0.08
-		cm2.bottom_radius = 0.08
-		cm2.height = 0.02
-		cm2.radial_segments = 8
 		var a2 := rng.randf() * TAU
 		var rr := rng.randf_range(0.9, 2.1)
-		_add_mesh(cm2, gmat, Vector3(107.2 + cos(a2) * rr * 0.9 - 0.3, 0.025, -74.0 + sin(a2) * rr * 0.55), Vector3(rng.randf_range(-12, 12), 0, rng.randf_range(-12, 12)))
+		var nb := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-12, 12)), 0, deg_to_rad(rng.randf_range(-12, 12))))
+		ncoin_xf.append(Transform3D(nb, Vector3(107.2 + cos(a2) * rr * 0.9 - 0.3, 0.025, -74.0 + sin(a2) * rr * 0.55)))
+	_multi(self, cm2, gmat, ncoin_xf)
 	var gem_cols: Array = [Color(1.0, 0.2, 0.3), Color(0.2, 0.6, 1.0), Color(0.3, 1.0, 0.5), Color(0.9, 0.3, 1.0)]
 	for i in range(6):
 		var gem := PrismMesh.new()
@@ -824,18 +861,6 @@ func _torch(pos: Vector3, wood: Material, iron: Material) -> void:
 	var holder := BoxMesh.new()
 	holder.size = Vector3(0.14, 0.06, 0.14)
 	_add_mesh(holder, iron, pos + Vector3(0, 0.1, 0))
-	var fl := SphereMesh.new()
-	fl.radius = 0.1
-	fl.height = 0.32
-	fl.radial_segments = 6
-	fl.rings = 3
-	_add_mesh(fl, _glow_mat(Color(1.0, 0.55, 0.15), 2.4), pos + Vector3(0, 0.34, 0))
-	var core := SphereMesh.new()
-	core.radius = 0.055
-	core.height = 0.2
-	core.radial_segments = 6
-	core.rings = 3
-	_add_mesh(core, _glow_mat(Color(1.0, 0.9, 0.5), 3.0), pos + Vector3(0, 0.33, 0))
 
 
 ## Geheimeingänge: beide Tunnelmünder sind mit Fels, Gestrüpp und Brocken zugewachsen.
