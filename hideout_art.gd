@@ -156,6 +156,9 @@ static func crystal_cluster(parent: Node, pos: Vector3, col: Color, rng: RandomN
 		l.light_color = col
 		l.light_energy = 0.8
 		l.omni_range = 5.5
+		l.distance_fade_enabled = true   # weit weg aus (Leistung)
+		l.distance_fade_begin = 30.0
+		l.distance_fade_length = 10.0
 		l.position = pos + Vector3(0, 0.8, 0)
 		parent.add_child(l)
 
@@ -197,6 +200,9 @@ static func lantern(parent: Node, pos: Vector3, energy: float = 0.9) -> void:
 	l.light_color = Color(1.0, 0.68, 0.35)
 	l.light_energy = energy
 	l.omni_range = 6.0
+	l.distance_fade_enabled = true   # weit weg aus (Leistung)
+	l.distance_fade_begin = 30.0
+	l.distance_fade_length = 10.0
 	l.position = pos
 	parent.add_child(l)
 

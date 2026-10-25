@@ -210,7 +210,7 @@ func _setup_environment() -> void:
 	sun.light_color = Color(1.0, 0.9, 0.75)
 	sun.light_energy = 1.2
 	sun.shadow_enabled = not Game.low
-	sun.directional_shadow_max_distance = 70.0
+	sun.directional_shadow_max_distance = 45.0
 	sun.shadow_blur = 1.6
 	sun.light_angular_distance = 0.5
 	add_child(sun)

@@ -33,6 +33,7 @@ float vn(vec2 p) {
 	vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
 	return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y);
 }
+float inb(vec3 p, vec3 mn, vec3 mx) { vec3 t = step(mn, p) * step(p, mx); return t.x * t.y * t.z; }
 void vertex() {
 	wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
@@ -47,6 +48,9 @@ void fragment() {
 	float crack = smoothstep(0.04, 0.0, abs(vn(vec2(q.x * 1.3, q.y * 0.12) + 7.0) - 0.5));
 	col *= 1.0 - crack * 0.0;
 	float moss = smoothstep(3.0, 0.0, wp.y + n * 2.0);
+	float inc = max(max(inb(wp, vec3(61.0, -0.5, -76.2), vec3(90.2, 3.8, -71.8)), inb(wp, vec3(87.8, -0.5, -81.2), vec3(102.2, 5.3, -66.8))),
+		max(inb(wp, vec3(101.8, -0.5, -76.2), vec3(109.2, 3.8, -71.8)), inb(wp, vec3(92.8, -0.5, -95.2), vec3(97.2, 3.8, -80.8))));
+	moss *= 1.0 - inc;
 	col = mix(col, vec3(0.28, 0.40, 0.20), moss * 0.6);
 	float snow = smoothstep(21.0, 25.0, wp.y + n * 3.0) * smoothstep(0.2, 0.7, wn.y + n * 0.3);
 	col = mix(col, vec3(0.95, 0.96, 0.98), snow);
@@ -397,7 +401,8 @@ func _build_caves() -> void:
 		elif (c[1] as Vector3).z > 20.0:
 			fb = AABB(Vector3(box.position.x, box.position.y, -101.5), Vector3(box.size.x, box.size.y, -81.0 + 101.5))
 		var flb := BoxMesh.new()
-		flb.size = Vector3(fb.size.x, 0.06, fb.size.z)
+		# etwas breiter als der Hohlraum (steckt in der Wand), damit am Wandfuss kein Spalt zur Wiese bleibt
+		flb.size = Vector3(fb.size.x + (0.8 if (c[1] as Vector3).x < 20.0 else 0.0), 0.06, fb.size.z + 0.8)
 		var fli := _add_mesh(flb, flm, Vector3(fb.get_center().x, 0.03, fb.get_center().z))
 		fli.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -426,6 +431,9 @@ func _build_caves() -> void:
 		l.light_color = col
 		l.light_energy = 1.6
 		l.omni_range = 7.0
+		l.distance_fade_enabled = true   # weit weg aus (Leistung)
+		l.distance_fade_begin = 30.0
+		l.distance_fade_length = 10.0
 		l.position = sp + Vector3(0, 1.0, 0)
 		add_child(l)
 
@@ -686,6 +694,9 @@ func _build_cave_decor() -> void:
 	nl.light_color = Color(1.0, 0.7, 0.35)
 	nl.light_energy = 1.4
 	nl.omni_range = 6.5
+	nl.distance_fade_enabled = true   # weit weg aus (Leistung)
+	nl.distance_fade_begin = 30.0
+	nl.distance_fade_length = 10.0
 	nl.position = Vector3(106.0, 2.3, -74.0)
 	_deco.add_child(nl)
 

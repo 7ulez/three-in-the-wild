@@ -208,6 +208,9 @@ func _cave(root: Node3D, size: Vector3, tunnel: Vector3, chamber: Vector3, label
 		l2.light_color = Color(1.0, 0.65, 0.3)
 		l2.light_energy = 0.9
 		l2.omni_range = 6.0
+		l2.distance_fade_enabled = true   # weit weg aus (Leistung)
+		l2.distance_fade_begin = 30.0
+		l2.distance_fade_length = 10.0
 		l2.position = Vector3(0, 1.8, cz - 1.0)
 		root.add_child(l2)
 	else:
@@ -354,6 +357,9 @@ func _hut(root: Node3D) -> void:
 	l.light_color = Color(1.0, 0.7, 0.35)
 	l.light_energy = 0.9
 	l.omni_range = 5.0
+	l.distance_fade_enabled = true   # weit weg aus (Leistung)
+	l.distance_fade_begin = 30.0
+	l.distance_fade_length = 10.0
 	l.position = Vector3(0, 1.8, 0)
 	root.add_child(l)
 	var lab := Label3D.new()
@@ -459,6 +465,9 @@ func _hollow_tree(root: Node3D) -> void:
 	gl.light_color = Color(1.0, 0.7, 0.4)
 	gl.light_energy = 0.5
 	gl.omni_range = 3.0
+	gl.distance_fade_enabled = true   # weit weg aus (Leistung)
+	gl.distance_fade_begin = 30.0
+	gl.distance_fade_length = 10.0
 	gl.position = Vector3(0, 1.0, -1.3)
 	root.add_child(gl)
 	_stash(root, "Baumhöhle", Vector3(0, 0, -1.5), false)
