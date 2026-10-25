@@ -78,9 +78,13 @@ func start(p_main: Node) -> void:
 		_add("deer", _forest_point(rng))
 	for i in range(6):
 		_add("hare", _meadow_point(rng))
-	for i in range(2):
-		_add("fox", _forest_point(rng))
-	_add("fox", _meadow_point(rng))
+	for i in range(3):
+		var fp := _forest_point(rng)
+		for tries in range(60):
+			if not (fp.x > 50.0 and fp.z < -35.0) and absf(fp.x) < 75.0:
+				break
+			fp = _forest_point(rng)   # Sperrbereich (rechts hinten) meiden, sonst steckt der Fuchs fest
+		_add("fox", fp)
 	for i in range(4):
 		_add("bird", Vector3(rng.randf_range(-40, 40), 0, rng.randf_range(-90, -10)))
 	for i in range(26):
@@ -161,6 +165,7 @@ func _add(kind: String, pos: Vector3, uid: int = -1) -> void:
 	add_child(a)
 	a.setup(self, kind)
 	a.global_position = pos
+	a.target = pos
 	a.home = pos
 	animals.append(a)
 
@@ -448,7 +453,7 @@ class Animal extends Node3D:
 				speed = 1.2
 			"fox":
 				fox_parts = FoxModel.build(body)
-				speed = 1.5
+				speed = 2.3
 			"hare":
 				if ResourceLoader.exists("res://assets/fauna/hase.glb"):
 					var inst := (load("res://assets/fauna/hase.glb") as PackedScene).instantiate() as Node3D
@@ -707,9 +712,11 @@ class Animal extends Node3D:
 				elif wait > 0.0:
 					wait -= delta
 				elif _step_to(delta, speed):
-					wait = randf_range(3.0, 9.0)
+					# Fuchs streift umher: kurze Pausen, weite Wege
+					wait = randf_range(1.0, 4.0) if kind == "fox" else randf_range(3.0, 9.0)
+					var reach := 26.0 if kind == "fox" else 10.0
 					for i in range(20):
-						var cand2 := global_position + Vector3(randf_range(-10, 10), 0, randf_range(-10, 10))
+						var cand2 := global_position + Vector3(randf_range(-reach, reach), 0, randf_range(-reach, reach))
 						if _valid(cand2):
 							target = cand2
 							break
