@@ -326,6 +326,42 @@ static func _paint_bottle(b: Node3D, kind: int) -> void:
 
 
 ## Vornübergebeugt kotzen: Oberkörper kippt nach vorn, im Rhythmus des Würgens.
+static var _stain_tex: ImageTexture = null
+
+
+## Weicher, unregelmaessiger Fleck: oben breit (Schritt), unten zwei auslaufende Zungen. Alpha-Rand mit Rauschen.
+static func _stain_texture() -> ImageTexture:
+	if _stain_tex != null:
+		return _stain_tex
+	var w := 96
+	var h := 192
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var nz := FastNoiseLite.new()
+	nz.frequency = 0.06
+	nz.seed = 11
+	for y in range(h):
+		for x in range(w):
+			var u := (float(x) / (w - 1)) * 2.0 - 1.0      # -1..1
+			var v := float(y) / (h - 1)                     # 0 oben .. 1 unten
+			# Schritt-Blob
+			var f := 1.0 - sqrt(pow(u / 0.85, 2.0) + pow((v - 0.17) / 0.17, 2.0))
+			# zwei Zungen an den Oberschenkeln, unterschiedlich lang
+			for t in [[-0.42, 0.78], [0.42, 0.62]]:
+				var cx: float = t[0]
+				var len: float = t[1]
+				var wid := 0.26 * (1.0 - 0.55 * clampf((v - 0.17) / maxf(len - 0.17, 0.01), 0.0, 1.0))
+				var inside := 1.0 - maxf(absf(u - cx) / maxf(wid, 0.02), (v - len) / 0.05)
+				if v > 0.12:
+					f = maxf(f, inside * 0.9)
+			f += nz.get_noise_2d(x, y) * 0.35
+			var a := smoothstep(0.0, 0.22, f)
+			# innen etwas dunkler/satter als am Rand
+			var c := 0.7 + 0.3 * smoothstep(0.0, 0.8, f)
+			img.set_pixel(x, y, Color(c, c, c, a))
+	_stain_tex = ImageTexture.create_from_image(img)
+	return _stain_tex
+
+
 ## Nasse/braune Hose: Fleck am Schritt und an den Oberschenkeln, Stoff verfärbt sich.
 static func set_pants(parent: Node3D, kind: int) -> void:
 	if int(parent.get_meta("pants", 0)) == kind:
@@ -347,34 +383,124 @@ static func set_pants(parent: Node3D, kind: int) -> void:
 			var base := m.get_active_material(0) as StandardMaterial3D
 			if base != null:
 				var nm := base.duplicate() as StandardMaterial3D
-				var tint := Color(0.7, 0.58, 0.12) if kind == 1 else Color(0.3, 0.18, 0.08)
-				nm.albedo_color = base.albedo_color.lerp(tint, 0.45)
+				if kind == 1:
+					# nasser Stoff: dunkler, leicht gelblich, glaenzend
+					nm.albedo_color = base.albedo_color.darkened(0.3).lerp(Color(0.45, 0.38, 0.08), 0.18)
+					nm.roughness = 0.3
+				else:
+					nm.albedo_color = base.albedo_color.lerp(Color(0.24, 0.14, 0.06), 0.4)
+					nm.roughness = 0.6
 				m.material_override = nm
 	if kind == 0:
 		return
-	var col := Color(0.72, 0.6, 0.08) if kind == 1 else Color(0.27, 0.16, 0.07)
 	var st := Node3D.new()
 	st.name = "Stain"
 	inst.add_child(st)
 	parent.set_meta("stain", st)
-	var mat := Util.mat(col, 0.9)
-	var patch := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 0.5
-	sm.height = 1.0
-	patch.mesh = sm
-	patch.material_override = mat
-	patch.scale = Vector3(0.3, 0.24, 0.09)
-	patch.position = Vector3(0, 0.86, 0.11)
-	st.add_child(patch)
-	for sx in [-1.0, 1.0]:
-		var dr := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = Vector3(0.07, 0.4, 0.03)
-		dr.mesh = bm
-		dr.material_override = mat
-		dr.position = Vector3(sx * 0.1, 0.66, 0.12)
-		st.add_child(dr)
+	# Modell schaut nach +Z: vorn = +Z, hinten = -Z
+	if kind == 1:
+		var wet := StandardMaterial3D.new()
+		wet.albedo_texture = _stain_texture()
+		wet.albedo_color = Color(0.55, 0.45, 0.05, 0.72)
+		wet.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		wet.roughness = 0.12
+		wet.metallic_specular = 0.9
+		wet.cull_mode = BaseMaterial3D.CULL_DISABLED
+		var q := MeshInstance3D.new()
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.4, 0.62)
+		q.mesh = qm
+		q.material_override = wet
+		q.position = Vector3(0, 0.67, 0.135)
+		q.rotation_degrees.y = 180.0     # Quad schaut sonst nach +Z (=vorn): passt, aber sicher beidseitig
+		st.add_child(q)
+		var drip := CPUParticles3D.new()
+		drip.one_shot = true
+		drip.amount = 24
+		drip.lifetime = 2.6
+		drip.explosiveness = 0.0
+		drip.direction = Vector3(0, -1, 0.15)
+		drip.spread = 12.0
+		drip.initial_velocity_min = 0.1
+		drip.initial_velocity_max = 0.4
+		drip.gravity = Vector3(0, -6.0, 0)
+		var dm := SphereMesh.new()
+		dm.radius = 0.012
+		dm.height = 0.03
+		dm.radial_segments = 5
+		dm.rings = 3
+		var dmat := StandardMaterial3D.new()
+		dmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		dmat.albedo_color = Color(0.9, 0.82, 0.2, 0.8)
+		dmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		dm.material = dmat
+		drip.mesh = dm
+		drip.position = Vector3(0, 0.82, 0.1)
+		drip.emitting = true
+		st.add_child(drip)
+	else:
+		var brown := StandardMaterial3D.new()
+		brown.albedo_color = Color(0.25, 0.14, 0.06)
+		brown.roughness = 0.45
+		brown.metallic_specular = 0.4
+		var dark := StandardMaterial3D.new()
+		dark.albedo_texture = _stain_texture()
+		dark.albedo_color = Color(0.22, 0.12, 0.05, 1.0)
+		dark.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		dark.roughness = 0.5
+		dark.cull_mode = BaseMaterial3D.CULL_DISABLED
+		var bq := MeshInstance3D.new()
+		var bqm := QuadMesh.new()
+		bqm.size = Vector2(0.42, 0.64)
+		bq.mesh = bqm
+		bq.material_override = dark
+		bq.position = Vector3(0, 0.66, -0.13)
+		st.add_child(bq)
+		# Beule am Hosenboden: mehrere ungleiche Klumpen
+		var lumps := [
+			[Vector3(0.0, 0.8, -0.15), 0.1, Vector3(1.5, 1.0, 0.8)],
+			[Vector3(-0.07, 0.86, -0.14), 0.075, Vector3(1.0, 1.0, 0.8)],
+			[Vector3(0.08, 0.84, -0.14), 0.07, Vector3(1.0, 1.1, 0.8)],
+			[Vector3(0.01, 0.72, -0.14), 0.07, Vector3(1.2, 1.0, 0.8)],
+			[Vector3(-0.05, 0.76, -0.17), 0.05, Vector3(1.0, 1.0, 0.9)],
+		]
+		for l in lumps:
+			var lm := MeshInstance3D.new()
+			var ls := SphereMesh.new()
+			ls.radius = float(l[1])
+			ls.height = float(l[1]) * 2.0
+			ls.radial_segments = 10
+			ls.rings = 6
+			lm.mesh = ls
+			lm.material_override = brown
+			lm.scale = l[2]
+			lm.position = l[0]
+			st.add_child(lm)
+		# Fliegen schwirren um die Hose
+		var fl := CPUParticles3D.new()
+		fl.amount = 7
+		fl.lifetime = 1.4
+		fl.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		fl.emission_sphere_radius = 0.35
+		fl.direction = Vector3(0, 0, 0)
+		fl.spread = 180.0
+		fl.initial_velocity_min = 0.4
+		fl.initial_velocity_max = 1.0
+		fl.orbit_velocity_min = -2.5
+		fl.orbit_velocity_max = 2.5
+		fl.gravity = Vector3.ZERO
+		var fm := SphereMesh.new()
+		fm.radius = 0.012
+		fm.height = 0.024
+		fm.radial_segments = 4
+		fm.rings = 2
+		var fmat := StandardMaterial3D.new()
+		fmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		fmat.albedo_color = Color(0.03, 0.03, 0.03)
+		fm.material = fmat
+		fl.mesh = fm
+		fl.position = Vector3(0, 0.95, -0.1)
+		st.add_child(fl)
 
 
 static func vomit_pose(parent: Node3D, on: bool, delta: float) -> void:
