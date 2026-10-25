@@ -12,6 +12,12 @@ const OKC := Color("4aa35a")
 
 const ROLES := {"Marian": "Feuer", "Steffen": "Koch", "Julian": "Vape"}
 const ORDER := ["Marian", "Steffen", "Julian"]
+const PERKS := {
+	"Marian": ["+20 % Hechte", "Feuer brennt länger", "Feuerstahl schwerer"],
+	"Steffen": ["Kocht schneller", "Rührt besser", "Verträgt Jack-Cola"],
+	"Julian": ["Hat eine Vape (Q)"],
+}
+const PERK_H := 72.0
 
 var name_edit: LineEdit
 var pw_edit: LineEdit
@@ -43,6 +49,7 @@ class Backdrop:
 	var layers: Array = []
 	var trees: Array = []
 	var embers: Array = []
+	var fish: Array = []
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -61,6 +68,8 @@ class Backdrop:
 		while x < 1.04:
 			trees.append([x, rng.randf_range(0.07, 0.16), rng.randf_range(0.8, 1.2)])
 			x += rng.randf_range(0.018, 0.04)
+		for i in 7:
+			fish.append([rng.randf_range(0.27, 0.45), rng.randf_range(0.79, 0.95), rng.randf_range(0.022, 0.04), rng.randf_range(0.012, 0.03) * (1.0 if i % 2 == 0 else -1.0), rng.randf() * TAU, Color(0.05, 0.08, 0.11).lerp(Color(0.5, 0.28, 0.2), rng.randf() * 0.4)])
 		for i in 26:
 			embers.append([rng.randf(), rng.randf(), rng.randf_range(0.04, 0.12), rng.randf_range(-0.03, 0.03)])
 
@@ -97,9 +106,13 @@ class Backdrop:
 			poly.append(Vector2(w, h))
 			poly.append(Vector2(0, h))
 			draw_colored_polygon(poly, l["col"])
+		# See mit Fischen (Lichtung zwischen Lagerfeuer und Login-Karte)
+		_draw_lake(w, h)
 		# Wald
 		var tc := Color(0.025, 0.04, 0.05)
 		for tr in trees:
+			if tr[0] > LAKE_X0 and tr[0] < LAKE_X1:
+				continue
 			var bx: float = tr[0] * w
 			var th: float = tr[1] * h * tr[2]
 			var by := h * 1.01
@@ -107,7 +120,8 @@ class Backdrop:
 				var ww := th * (0.36 - 0.07 * k)
 				var y0 := by - th * (0.18 + 0.27 * k)
 				draw_colored_polygon(PackedVector2Array([Vector2(bx - ww, y0), Vector2(bx + ww, y0), Vector2(bx, y0 - th * 0.42)]), tc)
-		draw_rect(Rect2(0, h * 0.965, w, h * 0.04), tc)
+		draw_rect(Rect2(0, h * 0.965, w * LAKE_X0, h * 0.04), tc)
+		draw_rect(Rect2(w * LAKE_X1, h * 0.965, w * (1.0 - LAKE_X1), h * 0.04), tc)
 		# Lagerfeuer
 		var fp := Vector2(w * 0.17, h * 0.93)
 		var fl := 1.0 + 0.12 * sin(t * 11.0) + 0.08 * sin(t * 17.3)
@@ -119,6 +133,67 @@ class Backdrop:
 			var ph: float = fmod(t * float(e[2]) + float(e[1]), 1.0)
 			var ep := fp + Vector2(sin(ph * 6.0 + float(e[0]) * 9.0) * 22.0 + float(e[3]) * ph * 300.0, -ph * h * 0.38 - 20.0)
 			draw_circle(ep, 1.8 * (1.0 - ph) + 0.4, Color(1.0, 0.7, 0.3, 0.9 * (1.0 - ph)))
+
+	const LAKE_X0 := 0.26      # Lichtung im Wald (Wasser sichtbar)
+	const LAKE_X1 := 0.66
+	const FISH_X1 := 0.455     # rechts davon liegt die Login-Karte
+
+	func _fish_shape(c: Vector2, len: float, dir: float, col: Color, wig: float) -> void:
+		# Fisch von der Seite: Körper-Polygon + Schwanzflosse (dir = +1 nach rechts)
+		var pts := PackedVector2Array()
+		for i in 13:
+			var a := TAU * float(i) / 13.0
+			pts.append(c + Vector2(cos(a) * len * 0.5 * dir, sin(a) * len * 0.17))
+		draw_colored_polygon(pts, col)
+		var tx := c.x - dir * len * 0.46
+		var tw := sin(wig) * len * 0.09
+		draw_colored_polygon(PackedVector2Array([Vector2(tx, c.y), Vector2(tx - dir * len * 0.26, c.y - len * 0.2 + tw), Vector2(tx - dir * len * 0.2, c.y + tw), Vector2(tx - dir * len * 0.26, c.y + len * 0.2 + tw)]), col)
+		draw_colored_polygon(PackedVector2Array([c + Vector2(-dir * len * 0.05, -len * 0.15), c + Vector2(dir * len * 0.1, -len * 0.3), c + Vector2(dir * len * 0.2, -len * 0.14)]), col)
+
+	func _draw_lake(w: float, h: float) -> void:
+		var x0 := 0.0
+		var x1 := w
+		var top := h * 0.745
+		var strips := 14
+		for i in strips:
+			var f := float(i) / (strips - 1)
+			var c := Color(0.85, 0.5, 0.4).lerp(Color(0.07, 0.12, 0.2), clampf(f * 1.3, 0.0, 1.0))
+			draw_rect(Rect2(x0, top + (h - top) * float(i) / strips, x1 - x0, (h - top) / strips + 1.0), c)
+		# Glitzern der Sonne
+		for i in 9:
+			var gy := top + (h - top) * (0.06 + 0.09 * i)
+			var gw := h * (0.05 - 0.003 * i) * (1.0 + 0.35 * sin(t * 1.3 + i))
+			var gx := w * 0.3 + sin(t * 0.7 + i * 1.7) * 6.0
+			draw_line(Vector2(gx - gw, gy), Vector2(gx + gw, gy), Color(1.0, 0.85, 0.55, 0.55 - 0.04 * i), 2.0)
+		# Schwimmende Fische (dunkle Silhouetten unter der Oberfläche)
+		for f in fish:
+			var sp: float = f[3]
+			var span := (FISH_X1 - LAKE_X0 - 0.05)
+			var fx: float = LAKE_X0 + 0.03 + fposmod(float(f[0]) - LAKE_X0 + sp * t * 0.5, span)
+			var dir := 1.0 if sp > 0.0 else -1.0
+			var fy: float = float(f[1]) * h + sin(t * 0.9 + float(f[4])) * 4.0
+			var col: Color = f[5]
+			col.a = 0.8
+			_fish_shape(Vector2(fx * w, fy), float(f[2]) * w * 1.6, dir, col, t * 7.0 + float(f[4]))
+		# Springende Fische mit Ringen
+		for k in 3:
+			var period := 5.5 + k * 1.7
+			var ph := fmod(t + k * 2.3, period) / period
+			var jx := w * (0.31 + 0.065 * k)
+			var surf := top + (h - top) * (0.2 + 0.06 * k)
+			if ph < 0.16:
+				var q := ph / 0.16
+				var pos := Vector2(jx + (q - 0.5) * w * 0.05, surf - sin(q * PI) * h * (0.11 + 0.02 * k))
+				var vel := Vector2(w * 0.05, -cos(q * PI) * h * 0.11 * PI)
+				draw_set_transform(pos, vel.angle(), Vector2.ONE)
+				_fish_shape(Vector2.ZERO, w * 0.05, 1.0, Color(0.9, 0.7, 0.5), t * 25.0)
+				draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			var rq := clampf((ph - 0.14) / 0.2, 0.0, 1.0)
+			if rq > 0.0 and rq < 1.0:
+				var rc := Vector2(jx + w * 0.025, surf)
+				for r in 2:
+					var rr := (rq + r * 0.25) * w * 0.035
+					draw_arc(rc, rr, 0.0, TAU, 28, Color(1, 0.9, 0.75, 0.6 * (1.0 - rq)), 1.5)
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +255,7 @@ class CharCard:
 		cam.look_at_from_position(Vector3(0.0, 1.42, -3.1), Vector3(0.0, 1.27, 0.0))
 
 	func _init() -> void:
-		custom_minimum_size = Vector2(176, 216)
+		custom_minimum_size = Vector2(176, 216 + 72)
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		mouse_entered.connect(func() -> void: hover = true)
@@ -202,7 +277,7 @@ class CharCard:
 		sb.set_border_width_all(3 if selected else 2)
 		draw_style_box(sb, Rect2(0, lift, r.size.x, r.size.y))
 		# Porträtfläche
-		var pr := Rect2(8, 8 + lift, r.size.x - 16, r.size.y - 74)
+		var pr := Rect2(8, 8 + lift, r.size.x - 16, r.size.y - 74 - PERK_H)
 		var d: Dictionary = Player.CHARS[char_name]
 		if _vpc != null:
 			_vpc.position = pr.position
@@ -214,8 +289,16 @@ class CharCard:
 		UI.fonts()
 		var font: Font = UI.f_head
 		var nc := UI.INK
-		draw_string(font, Vector2(0, r.size.y - 38 + lift), char_name.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 22, nc)
-		draw_string(font, Vector2(0, r.size.y - 16 + lift), role, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 15, UI.TEXT_LOW)
+		var by := r.size.y - PERK_H
+		draw_string(font, Vector2(0, by - 38 + lift), char_name.to_upper(), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 22, nc)
+		draw_string(font, Vector2(0, by - 16 + lift), role, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 15, UI.TEXT_LOW)
+		# Perks
+		draw_line(Vector2(18, by - 6 + lift), Vector2(r.size.x - 18, by - 6 + lift), Color(0, 0, 0, 0.15), 1.0)
+		var perks: Array = PERKS.get(char_name, [])
+		for i in perks.size():
+			var py := by + 12.0 + 17.0 * i + lift
+			draw_circle(Vector2(14, py - 4), 2.5, Color(0.85, 0.45, 0.1))
+			draw_string(UI.f_label if UI.f_label != null else font, Vector2(22, py), perks[i], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 28, 13, UI.INK)
 
 	func draw_portrait(pr: Rect2, d: Dictionary, active: bool, time: float) -> void:
 		# Hintergrund des Porträts (Abendhimmel + Hügel), pro Figur leicht getönt
