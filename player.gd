@@ -2145,7 +2145,7 @@ func _render_guard(delta: float) -> void:
 	_rg_t = 0.0
 	var obj: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
 	var dc: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
-	var bad: bool = obj > 300 and dc < int(obj * 0.3) and absf(camera.global_transform.basis.z.y) < 0.5 and _view_is_empty()
+	var bad: bool = obj > 300 and absf(camera.global_transform.basis.z.y) < 0.35 and Weather.fog < 0.3 and _view_is_empty()
 	if bad:
 		_rg_good = 0
 		_rg_bad += 1
@@ -2167,8 +2167,8 @@ func _render_guard(delta: float) -> void:
 
 ## Echter Bildtest: im unteren Bilddrittel ist nichts als ein glatter Verlauf (jede Zeile ueberall gleich).
 func _view_is_empty() -> bool:
-	# Leer heisst: das ganze Bild ist eine einzige Farbe (nur Himmel oder nur Boden).
-	# Ein Bild mit Himmel UND Boden gilt als gut, auch wenn der Boden einheitlich gruen ist.
+	# Leer heisst: bei waagerechtem Blick fehlt jede Kante in der Bildmitte (kein Horizont, keine Baeume, kein Boden):
+	# nur ein glatter Himmelsverlauf. Flacher Boden mit Horizont hat immer eine Kante.
 	var tex := get_viewport().get_texture()
 	if tex == null:
 		return false
@@ -2177,17 +2177,13 @@ func _view_is_empty() -> bool:
 		return false
 	var w := img.get_width()
 	var h := img.get_height()
-	var ref := img.get_pixel(int(w * 0.5), int(h * 0.02))
-	var top_c := img.get_pixel(int(w * 0.5), int(h * 0.1))
-	var bottom_c := img.get_pixel(int(w * 0.5), int(h * 0.9))
-	# Oben und unten verschieden -> Himmel und Welt sind beide da
-	if absf(top_c.r - bottom_c.r) + absf(top_c.g - bottom_c.g) + absf(top_c.b - bottom_c.b) > 0.08:
-		return false
-	for iy in range(9):
-		for ix in range(9):
-			var c := img.get_pixel(int(w * (0.1 + 0.1 * ix)), int(h * (0.05 + 0.1 * iy)))
-			if absf(c.r - ref.r) + absf(c.g - ref.g) + absf(c.b - ref.b) > 0.06:
+	for fx in [0.3, 0.5, 0.7]:
+		var prev := img.get_pixel(int(w * fx), int(h * 0.04))
+		for k in range(1, 24):
+			var c := img.get_pixel(int(w * fx), int(h * (0.04 + 0.92 * float(k) / 23.0)))
+			if absf(c.r - prev.r) + absf(c.g - prev.g) + absf(c.b - prev.b) > 0.1:
 				return false
+			prev = c
 	return true
 
 

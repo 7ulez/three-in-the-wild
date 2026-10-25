@@ -60,6 +60,15 @@ func _ready() -> void:
   console[k] = function(){ try { push(k.toUpperCase() + ': ' + Array.prototype.map.call(arguments, String).join(' ')); } catch(e) {} return o.apply(console, arguments); };
  });
  window.addEventListener('error', function(e){ push('EXC: ' + e.message); });
+ // WebGL-Kontext verloren/zurueck: das ist die wahrscheinlichste Ursache fuer "Himmel da, Welt weg"
+ window.__glLost = 0; window.__glBack = 0;
+ function hookCanvas(){
+  var c = document.querySelector('canvas');
+  if (!c) { setTimeout(hookCanvas, 500); return; }
+  c.addEventListener('webglcontextlost', function(e){ window.__glLost++; push('WEBGL-KONTEXT VERLOREN'); });
+  c.addEventListener('webglcontextrestored', function(e){ window.__glBack++; push('WEBGL-KONTEXT ZURUECK'); });
+ }
+ hookCanvas();
 })();
 """, true)
 	UI.fonts()
@@ -79,6 +88,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_dbg_update(delta)
+	_gl_watch(delta)
 	if _help != null:
 		_help_t -= delta
 		_help.visible = (_help_t > 0.0 or Input.is_physical_key_pressed(KEY_F1)) and not _touch
@@ -344,6 +354,25 @@ func toggle_debug() -> void:
 	_dbg_t = 0.0
 
 
+var _gl_seen: int = 0
+var _gl_t: float = 0.0
+
+
+## Browser: meldet, wenn die Grafikkarte der Seite den WebGL-Kontext entzogen hat (dann bleibt nur der Himmel sichtbar)
+func _gl_watch(delta: float) -> void:
+	if not OS.has_feature("web"):
+		return
+	_gl_t += delta
+	if _gl_t < 1.0:
+		return
+	_gl_t = 0.0
+	var lost: int = int(JavaScriptBridge.eval("(window.__glLost || 0)", true))
+	if lost > _gl_seen:
+		_gl_seen = lost
+		toast("Grafik-Absturz im Browser (WebGL-Kontext verloren). Bitte Seite neu laden: Strg+F5.", 12.0)
+		print("[BILDBERICHT] WebGL-Kontext verloren (", lost, "x)")
+
+
 func _dbg_update(delta: float) -> void:
 	if _dbg == null or not _dbg.visible:
 		return
@@ -379,6 +408,9 @@ func _browser_errors() -> String:
 		return "-"
 	var v: Variant = JavaScriptBridge.eval("(window.__errs || []).join(' | ')", true)
 	var t := str(v)
+	var gl := int(JavaScriptBridge.eval("(window.__glLost || 0)", true))
+	if gl > 0:
+		t = "GL-KONTEXT %dx VERLOREN | %s" % [gl, t]
 	return t if t != "" else "(keine)"
 
 
