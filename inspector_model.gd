@@ -15,11 +15,16 @@ const GOLD := Color(0.85, 0.7, 0.25)
 const PAPER := Color(0.95, 0.95, 0.92)
 
 
-static func build(parent: Node3D) -> void:
-	# Beine und Stiefel
+static func build(parent: Node3D) -> Dictionary:
+	# Beine und Stiefel (an Huefte-Pivots, damit sie schwingen koennen)
+	var piv: Dictionary = {}
 	for x in [-0.11, 0.11]:
-		Util.add_box(parent, Vector3(0.15, 0.8, 0.16), TROUSER, Vector3(x, 0.45, 0.0))
-		Util.add_box(parent, Vector3(0.17, 0.1, 0.24), BOOT, Vector3(x, 0.05, -0.03))
+		var lp := Node3D.new()
+		lp.position = Vector3(x, 0.85, 0.0)
+		parent.add_child(lp)
+		Util.add_box(lp, Vector3(0.15, 0.8, 0.16), TROUSER, Vector3(0, -0.4, 0.0))
+		Util.add_box(lp, Vector3(0.17, 0.1, 0.24), BOOT, Vector3(0, -0.8, -0.03))
+		piv["legL" if x < 0.0 else "legR"] = lp
 	# Koerper: Uniformjacke, Guertel, Brustabzeichen
 	Util.add_box(parent, Vector3(0.46, 0.66, 0.27), UNIFORM, Vector3(0.0, 1.2, 0.0))
 	Util.add_box(parent, Vector3(0.48, 0.07, 0.29), UNIFORM_DARK, Vector3(0.0, 0.86, 0.0))
@@ -29,11 +34,15 @@ static func build(parent: Node3D) -> void:
 	# Kragenspiegel rot
 	for x in [-0.08, 0.08]:
 		Util.add_box(parent, Vector3(0.06, 0.05, 0.02), RED, Vector3(x, 1.52, -0.13))
-	# Arme, Haende
-	Util.add_box(parent, Vector3(0.14, 0.62, 0.15), UNIFORM, Vector3(-0.31, 1.18, 0.0))
-	Util.add_box(parent, Vector3(0.14, 0.62, 0.15), UNIFORM, Vector3(0.31, 1.18, 0.0))
-	Util.add_sphere(parent, 0.07, SKIN, Vector3(-0.31, 0.85, 0.0))
-	Util.add_sphere(parent, 0.07, SKIN, Vector3(0.31, 0.85, 0.0))
+	# Arme, Haende (rechter Arm schwingt; linker haelt das Klemmbrett)
+	for x in [-0.31, 0.31]:
+		var ap := Node3D.new()
+		ap.position = Vector3(x, 1.5, 0.0)
+		parent.add_child(ap)
+		Util.add_box(ap, Vector3(0.14, 0.62, 0.15), UNIFORM, Vector3(0, -0.32, 0.0))
+		Util.add_sphere(ap, 0.07, SKIN, Vector3(0, -0.65, 0.0))
+		if x > 0.0:
+			piv["armR"] = ap
 	# Klemmbrett in der linken Hand (vor der Brust)
 	var board := Util.add_box(parent, Vector3(0.26, 0.33, 0.02), BROWN, Vector3(-0.2, 1.0, -0.2))
 	board.rotation_degrees.x = -20.0
@@ -53,3 +62,21 @@ static func build(parent: Node3D) -> void:
 	Util.add_box(parent, Vector3(0.34, 0.02, 0.16), UNIFORM_DARK, Vector3(0.0, 1.9, -0.1))
 	var badge := Util.add_cylinder(parent, 0.04, 0.02, RED, Vector3(0.0, 1.96, -0.155))
 	badge.rotation_degrees.x = 90.0
+	return piv
+
+
+## Gangbewegung: phase laeuft weiter, moving=false -> Glieder gleiten zurueck in Ruhe.
+static func animate(piv: Dictionary, phase: float, moving: bool, delta: float) -> void:
+	var amp := 0.6 if moving else 0.0
+	var sw := sin(phase) * amp
+	var k := minf(delta * 10.0, 1.0)
+	for key in piv:
+		var n := piv[key] as Node3D
+		if n == null or not is_instance_valid(n):
+			continue
+		var target := 0.0
+		match key:
+			"legL": target = sw
+			"legR": target = -sw
+			"armR": target = sw * 0.8
+		n.rotation.x = lerpf(n.rotation.x, target, k)

@@ -60,6 +60,8 @@ static var _recent: Array = []   # zuletzt gestellte Fragen, damit sie sich nich
 var _pips: Array = []
 var _stamp: Label = null
 var _card: PanelContainer = null
+var _pivots: Dictionary = {}
+var _gait: float = 0.0
 
 
 ## Wird jeden Bildschirm-Durchlauf aufgerufen.
@@ -93,7 +95,8 @@ func _spawn() -> void:
 	_visit = Node3D.new()
 	main_node().add_child(_visit)
 	_visit.global_position = pos
-	InspectorModel.build(_visit)
+	_pivots = InspectorModel.build(_visit)
+	_gait = 0.0
 	_state = 0
 	player.toast("Da ist jemand auf dem Weg... Sieht aus wie ein Fischereiaufseher.", 4.0)
 
@@ -112,14 +115,20 @@ func _run_visit(delta: float) -> void:
 			var to := player.global_position - _visit.global_position
 			to.y = 0.0
 			var d := to.length()
+			_gait += delta * 8.0
+			InspectorModel.animate(_pivots, _gait, d > STOP_DIST, delta)
 			if d > STOP_DIST:
 				_visit.global_position += to.normalized() * minf(WALK_SPEED * delta, d - STOP_DIST)
 				_visit.look_at(Vector3(player.global_position.x, _visit.global_position.y, player.global_position.z), Vector3.UP)
 			else:
 				_visit.look_at(Vector3(player.global_position.x, _visit.global_position.y, player.global_position.z), Vector3.UP)
 				_start_quiz()
+		1:
+			InspectorModel.animate(_pivots, _gait, false, delta)
 		2:
 			_leave_t -= delta
+			_gait += delta * 8.0
+			InspectorModel.animate(_pivots, _gait, true, delta)
 			_visit.global_position += _visit.global_transform.basis.z * WALK_SPEED * delta
 			if _leave_t <= 0.0:
 				_visit.queue_free()
