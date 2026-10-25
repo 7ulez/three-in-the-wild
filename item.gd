@@ -138,6 +138,14 @@ func apply_net_state(x: Dictionary, beers: int, water: int) -> void:
 
 
 func _process(delta: float) -> void:
+	# Mitspieler traegt den Gegenstand: er liegt in der Hand (Griffhand des Mitspielers) und folgt ihr
+	if net_attached and get_parent() != null and get_parent().has_meta("hand"):
+		var h: Variant = get_parent().get_meta("hand")
+		if h is Node3D and is_instance_valid(h):
+			var grip := Transform3D.IDENTITY
+			if item_size.x > item_size.z * 2.0:
+				grip = Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3.ZERO)   # lange Sachen (Rute, Gewehr) zeigen nach vorn
+			global_transform = (h as Node3D).global_transform * grip
 	if label == null:
 		return
 	_lbl_t -= delta

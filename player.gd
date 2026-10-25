@@ -235,6 +235,7 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 				var att := BoneAttachment3D.new()
 				att.bone_name = "Hand.R"
 				sk.add_child(att)
+				parent.set_meta("hand", att)     # Gegenstaende der Mitspieler werden hier in die Hand gelegt
 				var bt := Node3D.new()
 				bt.visible = false
 				bt.rotation_degrees.z = -90.0
@@ -257,6 +258,10 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 		return
 	var d: Dictionary = CHARS[char_name]
 	var shirt: Color = d["shirt"]
+	var hand_n := Node3D.new()
+	hand_n.position = Vector3(0.36, 1.0, -0.2)
+	parent.add_child(hand_n)
+	parent.set_meta("hand", hand_n)
 	Util.add_box(parent, Vector3(0.42, 0.8, 0.26), d["pants"], Vector3(0, 0.4, 0))
 	Util.add_box(parent, Vector3(0.55, 0.7, 0.3), shirt, Vector3(0, 1.15, 0))
 	Util.add_box(parent, Vector3(0.14, 0.65, 0.14), shirt, Vector3(-0.36, 1.1, 0))
