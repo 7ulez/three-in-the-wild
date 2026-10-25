@@ -5,16 +5,35 @@ extends Node3D
 ## Die Fragen sind allgemeines Anglerwissen, nicht die offizielle Pruefung.
 
 const POOL: Array = [
-	{"q": "Frage numma eins: Was ist ein Raubfisch, bitte?", "a": ["Rotauge", "Hecht", "Brasse", "Karausche"], "c": 1},
-	{"q": "Frage zwei: Welcher Fisch gehört zu den Weißfischen?", "a": ["Zander", "Hecht", "Rotauge", "Wels"], "c": 2},
-	{"q": "Frage drei: Darf man ohne gültigen Fischereischein angeln?", "a": ["Ja, immer", "Nein, nur mit Fischereischein oder Urlaubsfischereischein", "Nur am Sonntag", "Nur mit Wodka"], "c": 1},
-	{"q": "Frage vier: Was bedeutet Schonzeit?", "a": ["Pause vom Angeln für den Angler", "Zeit, in der bestimmte Fische nicht entnommen werden dürfen", "Ruhezeit am Ufer", "Zeit zum Schlafen im Zelt"], "c": 1},
-	{"q": "Frage fünf: Was macht man mit einem Fisch unter dem Mindestmaß?", "a": ["Mitnehmen", "Verkaufen", "Schonend zurücksetzen", "Im Eimer lassen"], "c": 2},
-	{"q": "Frage sechs: Welcher dieser Fische ist ein Friedfisch?", "a": ["Hecht", "Zander", "Karpfen", "Wels"], "c": 2},
-	{"q": "Frage sieben: Was ist ein Kunstköder?", "a": ["Ein Wurm", "Ein Blinker", "Eine Made", "Ein Maiskorn"], "c": 1},
-	{"q": "Frage acht: Woran erkennt man einen Karpfen am sichersten?", "a": ["Er hat Barteln am Maul", "Er hat drei Rückenflossen", "Er hat keine Schuppen", "Er hat einen Schnabel"], "c": 0},
-	{"q": "Frage neun: Was ist das Mindestmaß?", "a": ["Die kleinste Länge, ab der ein Fisch entnommen werden darf", "Das maximale Gewicht", "Die Anzahl Fische pro Tag", "Der Mindestabstand zum Ufer"], "c": 0},
-	{"q": "Frage zehn: Wozu dient ein Kescher?", "a": ["Zum Kochen", "Zum sicheren Landen des Fisches", "Als Köderbox", "Zum Wassermessen"], "c": 1},
+	{"q": "Was ist ein Raubfisch, bitte?", "a": ["Rotauge", "Hecht", "Brasse", "Karausche"], "c": 1},
+	{"q": "Welcher Fisch gehört zu den Weißfischen?", "a": ["Zander", "Hecht", "Rotauge", "Wels"], "c": 2},
+	{"q": "Darf man ohne gültigen Fischereischein angeln?", "a": ["Ja, immer", "Nein, nur mit Fischereischein oder Urlaubsfischereischein", "Nur am Sonntag", "Nur mit Wodka"], "c": 1},
+	{"q": "Was bedeutet Schonzeit?", "a": ["Pause vom Angeln für den Angler", "Zeit, in der bestimmte Fische nicht entnommen werden dürfen", "Ruhezeit am Ufer", "Zeit zum Schlafen im Zelt"], "c": 1},
+	{"q": "Was macht man mit einem Fisch unter dem Mindestmaß?", "a": ["Mitnehmen", "Verkaufen", "Schonend zurücksetzen", "Im Eimer lassen"], "c": 2},
+	{"q": "Welcher dieser Fische ist ein Friedfisch?", "a": ["Hecht", "Zander", "Karpfen", "Wels"], "c": 2},
+	{"q": "Was ist ein Kunstköder?", "a": ["Ein Wurm", "Ein Blinker", "Eine Made", "Ein Maiskorn"], "c": 1},
+	{"q": "Woran erkennt man einen Karpfen am sichersten?", "a": ["Er hat Barteln am Maul", "Er hat drei Rückenflossen", "Er hat keine Schuppen", "Er hat einen Schnabel"], "c": 0},
+	{"q": "Was ist das Mindestmaß?", "a": ["Die kleinste Länge, ab der ein Fisch entnommen werden darf", "Das maximale Gewicht", "Die Anzahl Fische pro Tag", "Der Mindestabstand zum Ufer"], "c": 0},
+	{"q": "Wozu dient ein Kescher?", "a": ["Zum Kochen", "Zum sicheren Landen des Fisches", "Als Köderbox", "Zum Wassermessen"], "c": 1},
+	{"q": "Welcher dieser Fische gehört zu den Lachsartigen?", "a": ["Hecht", "Bachforelle", "Zander", "Brasse"], "c": 1},
+	{"q": "Wie misst man die Länge eines Fisches fürs Mindestmaß?", "a": ["Von der Maulspitze bis zum Ende der Schwanzflosse", "Nur den Körper ohne Kopf", "Von den Kiemen bis zur Rückenflosse", "Nach Gefühl"], "c": 0},
+	{"q": "Welcher Süßwasserfisch kann über zwei Meter lang werden?", "a": ["Barsch", "Wels", "Rotauge", "Schleie"], "c": 1},
+	{"q": "Was ist ein Köderfisch?", "a": ["Ein kleiner Fisch, der als Köder für Raubfische dient", "Ein Fisch, der besonders gut schmeckt", "Ein geschützter Fisch", "Ein Fisch aus der Dose"], "c": 0},
+	{"q": "Wozu dient ein Wirbel in der Angelschnur?", "a": ["Er verhindert, dass sich die Schnur verdrillt", "Er lockt Fische an", "Er misst die Tiefe", "Er hält den Köder warm"], "c": 0},
+	{"q": "Was tut man mit einem Fisch, der gegessen werden soll?", "a": ["Ihn betäuben und sofort töten", "Ihn im Eimer liegen lassen", "Ihn trocknen lassen", "Ihn lebend nach Hause tragen"], "c": 0},
+	{"q": "Welches dieser Gewässer ist ein Fließgewässer?", "a": ["Maschsee", "Steinhuder Meer", "Die Leine", "Ein Baggersee"], "c": 2},
+	{"q": "Welcher Fisch laicht schon im zeitigen Frühjahr?", "a": ["Hecht", "Karpfen", "Schleie", "Wels"], "c": 0},
+	{"q": "Wie heißt der Teil der Angel, auf den die Schnur aufgewickelt wird?", "a": ["Pose", "Rolle", "Blinker", "Kork"], "c": 1},
+	{"q": "Wozu dient eine Pose?", "a": ["Sie zeigt Bisse an und hält den Köder in der gewünschten Tiefe", "Sie beschwert die Rute", "Sie leuchtet im Wasser für den Fisch", "Sie ersetzt den Haken"], "c": 0},
+	{"q": "Was ist ein Blinker?", "a": ["Ein Metallköder, der im Wasser blinkt und glänzt", "Eine Stirnlampe", "Ein Warnsignal am Auto", "Ein Haken für Aale"], "c": 0},
+	{"q": "Welcher Fisch ist ein typischer Schwarmfisch?", "a": ["Hecht", "Wels", "Rotauge", "Zander"], "c": 2},
+	{"q": "Warum sollte man beim Zurücksetzen eines Fisches nasse Hände haben?", "a": ["Um die Schleimhaut des Fisches zu schonen", "Damit er nicht wegrutscht", "Damit die Hände sauber bleiben", "Das ist Pflicht beim Fotografieren"], "c": 0},
+	{"q": "Wozu dient ein Hakenlöser?", "a": ["Um den Haken schonend aus dem Fischmaul zu entfernen", "Um die Schnur zu kürzen", "Um Köder zu schneiden", "Um Fische zu wiegen"], "c": 0},
+	{"q": "Welcher dieser Fische gehört zu den Barschartigen?", "a": ["Hecht", "Karpfen", "Zander", "Wels"], "c": 2},
+	{"q": "Welcher Fisch ist schlangenförmig und wandert zum Laichen ins Meer?", "a": ["Aal", "Hecht", "Karausche", "Barsch"], "c": 0},
+	{"q": "Was gehört zum richtigen Verhalten am Wasser?", "a": ["Müll mitnehmen und die Natur schonen", "Schnurreste im Gebüsch lassen", "Lagerfeuer im Schilf", "Laute Musik für die Fische"], "c": 0},
+	{"q": "Wann beißen Raubfische oft besonders gut?", "a": ["In der Morgen- und Abenddämmerung", "Nur mittags bei Sonne", "Nur bei Gewitter", "Nie nachts"], "c": 0},
+	{"q": "Was zeigt ein Bissanzeiger an?", "a": ["Dass ein Fisch am Köder ist", "Die Wassertemperatur", "Die Uhrzeit", "Den Luftdruck"], "c": 0},
 ]
 
 const WALK_SPEED: float = 2.2
@@ -22,7 +41,7 @@ const STOP_DIST: float = 2.6
 
 var main: Node
 var player: Player = null
-var _countdown: float = 90.0
+var _countdown: float = 420.0
 var _visit: Node3D = null
 var _state: int = 0            # 0 kommt, 1 Quiz, 2 geht
 var _leave_t: float = 0.0
@@ -37,6 +56,7 @@ var _btns: Array = []
 var _busy: bool = false
 var _questions_started: bool = false
 var _was_captured: bool = false
+static var _recent: Array = []   # zuletzt gestellte Fragen, damit sie sich nicht wiederholen
 var _pips: Array = []
 var _stamp: Label = null
 var _card: PanelContainer = null
@@ -53,10 +73,11 @@ func tick(delta: float) -> void:
 	_countdown -= delta
 	if _countdown > 0.0:
 		return
-	_countdown = randf_range(120.0, 240.0)
+	_countdown = randf_range(300.0, 600.0)
 	if not Game.is_night() or player.sleeping or player.seat != null or player.hammock != null or player.placing:
 		return
-	if randf() < 0.5:
+	if randf() < 0.35:
+		_countdown = randf_range(1500.0, 2700.0)   # nach einem Besuch lange Ruhe
 		_spawn()
 
 
@@ -111,11 +132,18 @@ func _start_quiz() -> void:
 	_was_captured = Game.is_captured() and not Game.touch
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_questions_started = false
-	var pool := POOL.duplicate()
+	var pool: Array = []
+	for qq in POOL:
+		if not _recent.has(String((qq as Dictionary)["q"])):
+			pool.append(qq)
+	if pool.size() < 5:
+		_recent.clear()
+		pool = POOL.duplicate()
 	pool.shuffle()
 	_questions = []
 	for i in range(5):
 		var q: Dictionary = (pool[i] as Dictionary).duplicate(true)
+		_recent.append(String(q["q"]))
 		var answers: Array = (q["a"] as Array).duplicate()
 		var correct: String = String(answers[int(q["c"])])
 		answers.shuffle()
