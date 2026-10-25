@@ -25,7 +25,7 @@ const SHAPE_FILE := "res://assets/mountain_shape.res"
 
 const ROCK_SHADER: String = """
 shader_type spatial;
-render_mode shadows_disabled;
+render_mode shadows_disabled, cull_disabled;
 varying vec3 wp;
 varying vec3 wn;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -57,7 +57,7 @@ void fragment() {
 
 const GRAVEL_SHADER: String = """
 shader_type spatial;
-render_mode shadows_disabled;
+render_mode shadows_disabled, cull_disabled;
 varying vec3 wp;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p) {
@@ -76,7 +76,7 @@ void fragment() {
 
 const FLOOR_SHADER: String = """
 shader_type spatial;
-render_mode shadows_disabled;
+render_mode shadows_disabled, cull_disabled;
 varying vec3 wp;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p) {
@@ -101,7 +101,7 @@ void fragment() {
 
 const CAVE_SHADER: String = """
 shader_type spatial;
-render_mode shadows_disabled;
+render_mode shadows_disabled, cull_disabled;
 varying vec3 wp;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p) {
@@ -496,8 +496,48 @@ func _build_treasure() -> void:
 		var rr := rng.randf() * 0.26
 		var an := rng.randf() * TAU
 		var cb := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-25, 25)), 0, deg_to_rad(rng.randf_range(-25, 25))))
-		coin_xf.append(Transform3D(cb, Vector3(cos(an) * rr, 0.26 + 0.07 * (1.0 - rr / 0.26) + rng.randf() * 0.02, sin(an) * rr * 0.7)))
+		coin_xf.append(Transform3D(cb, Vector3(cos(an) * rr, 0.33 + 0.06 * (1.0 - rr / 0.26) + rng.randf() * 0.02, sin(an) * rr * 0.7)))
 	_multi(gold, coin_m, gm, coin_xf)
+	# Goldhaufen (flacher Hügel) und die aufgerollte Schatzkarte obenauf
+	var mound := MeshInstance3D.new()
+	var mound_m := SphereMesh.new()
+	mound_m.radius = 0.3
+	mound_m.height = 0.6
+	mound_m.radial_segments = 10
+	mound_m.rings = 5
+	mound.mesh = mound_m
+	mound.material_override = gm
+	mound.scale = Vector3(1.15, 0.28, 0.8)
+	mound.position = Vector3(0, 0.3, 0)
+	gold.add_child(mound)
+	var scroll := MeshInstance3D.new()
+	var scroll_m := CylinderMesh.new()
+	scroll_m.top_radius = 0.045
+	scroll_m.bottom_radius = 0.045
+	scroll_m.height = 0.34
+	scroll_m.radial_segments = 8
+	scroll.mesh = scroll_m
+	var pm := StandardMaterial3D.new()
+	pm.albedo_color = Color(0.93, 0.85, 0.62)
+	pm.roughness = 1.0
+	scroll.material_override = pm
+	scroll.rotation_degrees = Vector3(0, 20, 90)
+	scroll.position = Vector3(0.02, 0.43, 0.05)
+	gold.add_child(scroll)
+	var band := MeshInstance3D.new()
+	var band_m := CylinderMesh.new()
+	band_m.top_radius = 0.05
+	band_m.bottom_radius = 0.05
+	band_m.height = 0.05
+	band_m.radial_segments = 8
+	band.mesh = band_m
+	var bm := StandardMaterial3D.new()
+	bm.albedo_color = Color(0.7, 0.12, 0.1)
+	bm.roughness = 0.9
+	band.material_override = bm
+	band.rotation_degrees = Vector3(0, 20, 90)
+	band.position = Vector3(0.02, 0.43, 0.05)
+	gold.add_child(band)
 	chest.gold = gold
 	var gl := OmniLight3D.new()
 	gl.light_color = Color(1.0, 0.8, 0.35)
