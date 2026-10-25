@@ -142,10 +142,18 @@ func _process(delta: float) -> void:
 	if net_attached and get_parent() != null and get_parent().has_meta("hand"):
 		var h: Variant = get_parent().get_meta("hand")
 		if h is Node3D and is_instance_valid(h):
-			var grip := Transform3D.IDENTITY
 			if item_size.x > item_size.z * 2.0:
-				grip = Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3.ZERO)   # lange Sachen (Rute, Gewehr) zeigen nach vorn
-			global_transform = (h as Node3D).global_transform * grip
+				# lange Sachen (Rute, Gewehr): zeigen in Blickrichtung des Mitspielers, Rolle (-Y) zeigt immer nach unten
+				var fwd: Vector3 = -(get_parent() as Node3D).global_transform.basis.z
+				fwd.y = 0.0
+				if fwd.length() < 0.01:
+					fwd = Vector3.FORWARD
+				var bx := fwd.normalized()
+				var by := Vector3.UP
+				var bz := bx.cross(by).normalized()
+				global_transform = Transform3D(Basis(bx, by, bz), (h as Node3D).global_position)
+			else:
+				global_transform = (h as Node3D).global_transform
 	if label == null:
 		return
 	_lbl_t -= delta

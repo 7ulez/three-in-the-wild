@@ -1625,6 +1625,8 @@ func _confirm_placement() -> void:
 		Game.claim_camp(ghost.global_position, get_parent())
 		toast("Hier ist jetzt euer Lager (grüner Ring)!", 3.0)
 	ghost.begin_site()
+	if Net.instance != null:
+		Net.instance.send_tent_site(ghost.global_position, ghost.rotation.y)
 	Game.tents.append(ghost)
 	ghost = null
 	toast("Zelt ausgelegt! Hammer in die Hand nehmen und die 4 Heringe einschlagen (je 3x E).", 6.0)

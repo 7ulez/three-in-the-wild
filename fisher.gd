@@ -207,14 +207,13 @@ func aim_point() -> Vector3:
 func _unhandled_input(event: InputEvent) -> void:
 	if player == null or player.placing or player.seat != null or player.sleeping:
 		return
-	if not Game.is_captured():
-		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if (event as InputEventKey).keycode == KEY_T and has_rod():
+		if Game.is_captured() and (event as InputEventKey).keycode == KEY_T and has_rod():
 			cycle_mode()
 	elif event is InputEventMouseButton and event.pressed and has_rod():
 		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_LEFT:
+		# Anschlag auch dann, wenn die Maus gerade nicht eingefangen ist (z.B. nach Esc oder Fischereiaufseher)
+		if mb.button_index == MOUSE_BUTTON_LEFT and (Game.is_captured() or state == S.BITE):
 			_left_click()
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and state != S.IDLE and state != S.FIGHT:
 			reel_in("Schnur eingeholt.")

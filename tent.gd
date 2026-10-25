@@ -15,6 +15,7 @@ var ghost_mat: StandardMaterial3D = null
 var door: MeshInstance3D
 var mat_flat: MeshInstance3D
 var pegs_driven: int = 0
+var peg_list: Array = []     # die Heringe in fester Reihenfolge (fuer den Mitspieler-Abgleich)
 var finished: bool = false
 var _last_valid: int = -1
 var smelly: bool = false
@@ -101,6 +102,7 @@ func set_ghost_valid(valid: bool) -> void:
 
 ## Aus der Vorschau wird die ausgelegte Plane mit vier Heringen.
 func begin_site() -> void:
+	add_to_group("tent_site")
 	if ghost_model != null:
 		ghost_model.queue_free()
 		ghost_model = null
@@ -114,16 +116,31 @@ func begin_site() -> void:
 			peg.build()
 			peg.position = Vector3(sx * 1.55, 0.0, sz * 1.75)
 			add_child(peg)
+			peg_list.append(peg)
 
 
 func peg_driven(player: Node) -> void:
-	pegs_driven += 1
+	pegs_driven = _count_driven()
 	if pegs_driven >= 4:
 		_finish(player)
 
 
+func peg_driven_count() -> int:
+	return _count_driven()
+
+
+func _count_driven() -> int:
+	var n := 0
+	for p in peg_list:
+		if is_instance_valid(p) and (p as TentPeg).is_driven():
+			n += 1
+	return n
+
+
 func _finish(player: Node) -> void:
 	finished = true
+	remove_from_group("tent_site")
+	add_to_group("tent_done")
 	if player != null and Net.instance != null:
 		Net.instance.send_tent(global_position, rotation.y)
 	mat_flat.visible = false

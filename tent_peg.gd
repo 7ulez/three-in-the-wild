@@ -52,6 +52,8 @@ func interact_with_held(player: Node, held: Item) -> bool:
 		player.swing_hammer()
 	var tw := create_tween()
 	tw.tween_property(visual, "position:y", 0.17 - 0.1 * hits, 0.12)
+	if tent != null and Net.instance != null:
+		Net.instance.send_peg(tent.global_position, tent.peg_list.find(self), hits)
 	if is_driven() and tent != null:
 		tent.peg_driven(player)
 	return true

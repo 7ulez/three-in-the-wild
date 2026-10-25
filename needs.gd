@@ -74,31 +74,7 @@ func setup(p: Player, layer: CanvasLayer) -> void:
 	pee_particles = Fx.pee_stream()
 	player.add_child(pee_particles)
 
-	vape_particles = CPUParticles3D.new()
-	vape_particles.emitting = false
-	vape_particles.one_shot = true
-	vape_particles.amount = 40
-	vape_particles.lifetime = 2.5
-	vape_particles.explosiveness = 0.7
-	vape_particles.direction = Vector3(0, 0.3, -1)
-	vape_particles.spread = 25.0
-	vape_particles.initial_velocity_min = 0.8
-	vape_particles.initial_velocity_max = 1.6
-	vape_particles.gravity = Vector3(0, 0.25, 0)
-	vape_particles.scale_amount_min = 0.7
-	vape_particles.scale_amount_max = 1.6
-	var vm := SphereMesh.new()
-	vm.radius = 0.12
-	vm.height = 0.24
-	vm.radial_segments = 6
-	vm.rings = 3
-	var vmat := StandardMaterial3D.new()
-	vmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	vmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	vmat.albedo_color = Color(0.92, 0.92, 0.96, 0.35)
-	vm.material = vmat
-	vape_particles.mesh = vm
-	vape_particles.position = Vector3(0, 1.45, -0.45)
+	vape_particles = Needs.make_vape_particles()
 	player.add_child(vape_particles)
 
 
@@ -329,3 +305,33 @@ func vape() -> void:
 	var flavors := ["Mango-Eis", "Blaubeere", "Wassermelone", "Cola", "Minze"]
 	player.toast("Julian dampft (%s). Wolke!" % flavors[puffs % flavors.size()], 2.5)
 	bladder = minf(bladder + 0.01, 1.0)
+
+
+## Vape-Rauch: wird auch fuer die Mitspieler-Avatare gebraucht.
+static func make_vape_particles() -> CPUParticles3D:
+	var vape := CPUParticles3D.new()
+	vape.emitting = false
+	vape.one_shot = true
+	vape.amount = 40
+	vape.lifetime = 2.5
+	vape.explosiveness = 0.7
+	vape.direction = Vector3(0, 0.3, -1)
+	vape.spread = 25.0
+	vape.initial_velocity_min = 0.8
+	vape.initial_velocity_max = 1.6
+	vape.gravity = Vector3(0, 0.25, 0)
+	vape.scale_amount_min = 0.7
+	vape.scale_amount_max = 1.6
+	var vm := SphereMesh.new()
+	vm.radius = 0.12
+	vm.height = 0.24
+	vm.radial_segments = 6
+	vm.rings = 3
+	var vmat := StandardMaterial3D.new()
+	vmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	vmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	vmat.albedo_color = Color(0.92, 0.92, 0.96, 0.35)
+	vm.material = vmat
+	vape.mesh = vm
+	vape.position = Vector3(0, 1.45, -0.45)
+	return vape

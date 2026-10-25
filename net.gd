@@ -25,6 +25,8 @@ class RemoteAvatar:
 	var anim: int = 0
 	var _pee: CPUParticles3D = null
 	var _pee_on: bool = false
+	var _vape: CPUParticles3D = null
+	var _vape_on: bool = false
 	var _wet_cd: float = 0.0
 	var _vom: CPUParticles3D = null
 	var _vom_on: bool = false
@@ -122,6 +124,17 @@ class RemoteAvatar:
 				_vom_cd = 0.25
 				var vp := global_position - global_transform.basis.z * 1.5
 				Fx.vomit_puddle(get_parent(), Vector3(vp.x, 0.0, vp.z))
+		# Vape der anderen: Rauchwolke am Kopf (Flag 64 = Vape-Animation laeuft)
+		var vape_now := (anim & 64) != 0
+		if vape_now != _vape_on:
+			_vape_on = vape_now
+			if vape_now:
+				if _vape == null:
+					_vape = Needs.make_vape_particles()
+					add_child(_vape)
+				_vape.restart()
+				_vape.emitting = true
+				Sfx.play("joint", global_position, -6.0, 1.0)
 		# Pinkeln der anderen: Strahl + nasse Stelle
 		var pee_now := (anim & 128) != 0
 		if _pee == null:
@@ -610,7 +623,74 @@ func remote_camp(spot_name: String) -> void:
 
 @rpc("any_peer", "reliable")
 func remote_tent(pos: Vector3, yaw: float) -> void:
-	_create_tent(pos, yaw)
+	var site := _find_tent_site(pos)
+	if site != null:
+		_finish_site(site)
+	elif _find_in_group("tent_done", pos) == null:
+		_create_tent(pos, yaw)
+
+
+## Zelt steht (von einem Mitspieler gemeldet oder durch seine vier Heringe)
+func _finish_site(t: Tent) -> void:
+	if t.finished:
+		return
+	Game.tents.append(t)
+	if not Game.camp_claimed:
+		Game.claim_camp(t.global_position, main)
+	t._finish(null)
+
+
+## Zelt-Aufbau: die ausgelegte Plane mit den Heringen sehen alle Mitspieler.
+func send_tent_site(pos: Vector3, yaw: float) -> void:
+	rpc("remote_tent_site", pos, yaw)
+
+
+@rpc("any_peer", "reliable")
+func remote_tent_site(pos: Vector3, yaw: float) -> void:
+	if Game.dedicated or main == null or _find_tent_site(pos) != null:
+		return
+	var t := Tent.new()
+	main.add_child(t)
+	t.build_ghost()
+	t.global_position = pos
+	t.rotation.y = yaw
+	t.begin_site()
+
+
+## Ein Hering wurde eingeschlagen (Anzahl Schläge).
+func send_peg(tent_pos: Vector3, idx: int, hits: int) -> void:
+	rpc("remote_peg", tent_pos, idx, hits)
+
+
+@rpc("any_peer", "reliable")
+func remote_peg(tent_pos: Vector3, idx: int, hits: int) -> void:
+	if Game.dedicated:
+		return
+	var t := _find_tent_site(tent_pos)
+	if t == null or idx < 0 or idx >= t.peg_list.size():
+		return
+	var peg := t.peg_list[idx] as TentPeg
+	if peg == null or peg.is_driven():
+		return
+	peg.hits = hits
+	if peg.visual != null:
+		create_tween().tween_property(peg.visual, "position:y", 0.17 - 0.1 * hits, 0.12)
+	if peg.is_driven() and t.peg_driven_count() >= 4:
+		_finish_site(t)
+
+
+func _find_tent_site(pos: Vector3) -> Tent:
+	return _find_in_group("tent_site", pos)
+
+
+func _find_in_group(g: String, pos: Vector3) -> Tent:
+	if main == null:
+		return null
+	for n in get_tree().get_nodes_in_group(g):
+		var t := n as Tent
+		if t != null and is_instance_valid(t) and t.global_position.distance_to(pos) < 0.6:
+			return t
+	return null
 
 
 @rpc("any_peer", "reliable")

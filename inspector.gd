@@ -36,6 +36,7 @@ var _prog: Label = null
 var _btns: Array = []
 var _busy: bool = false
 var _questions_started: bool = false
+var _was_captured: bool = false
 
 
 ## Wird jeden Bildschirm-Durchlauf aufgerufen.
@@ -106,6 +107,7 @@ func _run_visit(delta: float) -> void:
 func _start_quiz() -> void:
 	_state = 1
 	player.set_physics_process(false)
+	_was_captured = Game.is_captured() and not Game.touch
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_questions_started = false
 	var pool := POOL.duplicate()
@@ -215,7 +217,7 @@ func _close_ui() -> void:
 	_ui = null
 	if player != null and is_instance_valid(player):
 		player.set_physics_process(true)
-	if Game.is_captured() and not Game.touch:
+	if _was_captured and not Game.touch:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
