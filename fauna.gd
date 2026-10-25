@@ -189,8 +189,49 @@ func kill_near(kind: String, pos: Vector3) -> void:
 	best.die()
 
 
+var _mate_cd: float = 45.0
+
+
+func _try_mating() -> void:
+	var hares: Array = []
+	for a in animals:
+		if is_instance_valid(a) and not a.dead and a.kind == "hare" and a.visible and a.mate_role == 0 and a.wait >= 0.0:
+			hares.append(a)
+	if hares.size() < 2:
+		return
+	hares.shuffle()
+	var a1: Animal = hares[0]
+	var best: Animal = null
+	var bd := 25.0
+	for h in hares:
+		if h == a1:
+			continue
+		var d := (h as Animal).global_position.distance_to(a1.global_position)
+		if d < bd:
+			bd = d
+			best = h
+	if best == null:
+		return
+	var pdv: Variant = nearest_player_pos(a1.global_position)
+	if pdv != null and Vector2((pdv as Vector3).x - a1.global_position.x, (pdv as Vector3).z - a1.global_position.z).length() < 6.0:
+		return
+	var dur := randf_range(6.0, 11.0) + bd / 2.5
+	a1.mate = best
+	a1.mate_role = 1
+	a1.mate_t = dur
+	best.mate = a1
+	best.mate_role = 2
+	best.mate_t = dur
+	best.target = best.global_position
+
+
 func _process(delta: float) -> void:
 	_t += delta
+	_mate_cd -= delta
+	if _mate_cd <= 0.0:
+		_mate_cd = randf_range(50.0, 130.0)
+		if not is_puppet():
+			_try_mating()
 	if player == null or not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("local_player") as Node3D
 	var night := Game.is_night()
@@ -279,6 +320,10 @@ class Animal extends Node3D:
 	var fox_parts: Dictionary = {}
 	var _last_p: Vector3 = Vector3.ZERO
 	var _gait: float = 0.0
+	var mate: Animal = null
+	var mate_role: int = 0      # 0 nichts, 1 = oben, 2 = unten
+	var mate_t: float = 0.0
+	var _humping: bool = false
 
 	## Trefferzone (Mittelpunkt über dem Boden und Radius) für das Luftgewehr
 	func hit_center_y() -> float:
@@ -562,6 +607,58 @@ class Animal extends Node3D:
 		head.rotation.y = sin(_t * 0.6) * 0.25 if sp < 0.2 else 0.0
 		body.position.y = absf(sin(_gait)) * 0.03 * amp
 
+	## Rammeln (rein zum Spass): Hase 1 (role 1) sitzt hinter Hase 2 (role 2) auf und wippt
+	func end_mating() -> void:
+		mate_role = 0
+		mate = null
+		if _humping:
+			_humping = false
+			body.position = Vector3.ZERO
+			body.rotation.x = 0.0
+		if _cur == "Rammeln":
+			_cur = ""
+		wait = randf_range(2.0, 5.0)
+
+	func _hump_pose(on: bool) -> void:
+		if on:
+			_humping = true
+			body.position.y = 0.16
+			body.position.z = sin(_t * 24.0) * 0.045
+			body.rotation.x = 0.55
+		elif _humping:
+			_humping = false
+			body.position = Vector3.ZERO
+			body.rotation.x = 0.0
+
+	func _mate_step(delta: float, pd: float) -> void:
+		if mate == null or not is_instance_valid(mate) or mate.dead or mate.mate_role == 0 or pd < 5.0:
+			end_mating()
+			return
+		mate_t -= delta
+		if mate_t <= 0.0:
+			end_mating()
+			return
+		if mate_role == 2:
+			_cur = ""
+			if ap != null and ap.current_animation != "Idle" and ap.has_animation("Idle"):
+				ap.play("Idle", 0.2)
+			return
+		var slot := mate.global_position + mate.global_transform.basis.z * 0.3
+		slot.y = 0.0
+		var d := slot - global_position
+		d.y = 0.0
+		if d.length() > 0.12:
+			target = slot
+			_step_to(delta, speed * 2.2)
+			_play("Hop", 1.4)
+			return
+		global_position = slot
+		rotation.y = mate.rotation.y
+		_cur = "Rammeln"
+		if ap != null and ap.has_animation("Idle") and ap.current_animation != "Idle":
+			ap.play("Idle", 0.1)
+		_hump_pose(true)
+
 	func _valid(p: Vector3) -> bool:
 		match kind:
 			"swan":
@@ -607,7 +704,15 @@ class Animal extends Node3D:
 				global_position = global_position.lerp(net_pos, minf(delta * 6.0, 1.0))
 				rotation.y = lerp_angle(rotation.y, net_yaw, minf(delta * 8.0, 1.0))
 				visible = net_vis
-				if net_anim != "":
+				if kind == "hare":
+					if net_anim == "Rammeln":
+						if ap != null and ap.has_animation("Idle") and ap.current_animation != "Idle":
+							ap.play("Idle", 0.1)
+						_cur = "Rammeln"
+						_hump_pose(true)
+					elif _humping:
+						_hump_pose(false)
+				if net_anim != "" and net_anim != "Rammeln":
 					_play(net_anim)
 				if kind == "bird" and wing_l != null:
 					wing_l.rotation.z = sin(_t * 12.0) * 0.6
@@ -697,6 +802,9 @@ class Animal extends Node3D:
 						_snd_cd = randf_range(15.0, 40.0)
 						Sfx.play("croak", global_position, -8.0, randf_range(0.8, 1.2))
 			"deer", "hare", "fox":
+				if kind == "hare" and mate_role != 0:
+					_mate_step(delta, pd)
+					return
 				var flee_d := 14.0 if kind == "deer" else (12.0 if kind == "fox" else 8.0)
 				var fleeing := pd < flee_d
 				if fleeing and fauna.player != null:
