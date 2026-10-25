@@ -78,6 +78,9 @@ func start(p_main: Node) -> void:
 		_add("deer", _forest_point(rng))
 	for i in range(6):
 		_add("hare", _meadow_point(rng))
+	for i in range(2):
+		_add("fox", _forest_point(rng))
+	_add("fox", _meadow_point(rng))
 	for i in range(4):
 		_add("bird", Vector3(rng.randf_range(-40, 40), 0, rng.randf_range(-90, -10)))
 	for i in range(26):
@@ -268,6 +271,9 @@ class Animal extends Node3D:
 	var _cur: String = ""
 	var dead: bool = false
 	var home: Vector3 = Vector3.ZERO
+	var fox_parts: Dictionary = {}
+	var _last_p: Vector3 = Vector3.ZERO
+	var _gait: float = 0.0
 
 	## Trefferzone (Mittelpunkt über dem Boden und Radius) für das Luftgewehr
 	func hit_center_y() -> float:
@@ -277,6 +283,7 @@ class Animal extends Node3D:
 			"duck": return 0.18
 			"swan": return 0.4
 			"frog": return 0.06
+			"fox": return 0.32
 		return 0.0
 
 	func hit_radius() -> float:
@@ -286,6 +293,7 @@ class Animal extends Node3D:
 			"duck": return 0.3
 			"swan": return 0.5
 			"frog": return 0.18
+			"fox": return 0.42
 		return 0.3
 
 	func display_name() -> String:
@@ -295,6 +303,7 @@ class Animal extends Node3D:
 			"duck": return "Ente"
 			"swan": return "Schwan"
 			"frog": return "Frosch"
+			"fox": return "Fuchs"
 		return "Vogel"
 
 	## Abgeschossen: kippt um, bleibt kurz liegen und kommt später als neues Tier wieder.
@@ -437,6 +446,9 @@ class Animal extends Node3D:
 					for lz in [-0.35, 0.35]:
 						Util.add_box(body, Vector3(0.09, 0.7, 0.09), c.darkened(0.15), Vector3(lx, 0.35, lz))
 				speed = 1.2
+			"fox":
+				fox_parts = FoxModel.build(body)
+				speed = 1.5
 			"hare":
 				if ResourceLoader.exists("res://assets/fauna/hase.glb"):
 					var inst := (load("res://assets/fauna/hase.glb") as PackedScene).instantiate() as Node3D
@@ -524,6 +536,27 @@ class Animal extends Node3D:
 		d.y = 0
 		return global_position + d.normalized() * dist
 
+	## Fuchs: Beine pendeln im Takt der echten Geschwindigkeit, Schwanz wedelt, im Stand schnuppert der Kopf
+	func _fox_anim(delta: float) -> void:
+		if fox_parts.is_empty() or delta <= 0.0:
+			return
+		var sp := Vector2(global_position.x - _last_p.x, global_position.z - _last_p.z).length() / delta
+		_last_p = global_position
+		sp = minf(sp, 9.0)
+		_gait += delta * (3.0 + sp * 2.2)
+		var amp := clampf(sp / 3.0, 0.0, 1.0) * 0.75
+		var legs: Array = fox_parts["legs"]
+		for i in range(legs.size()):
+			var ph := _gait + (0.0 if (i == 0 or i == 3) else PI)   # diagonale Beinpaare
+			(legs[i] as Node3D).rotation.x = sin(ph) * amp
+		var tail: Node3D = fox_parts["tail"]
+		tail.rotation.y = sin(_t * (2.0 + sp * 0.6)) * (0.18 + 0.12 * amp)
+		tail.rotation_degrees.x = lerpf(25.0, 5.0, clampf(sp / 5.0, 0.0, 1.0))
+		var head: Node3D = fox_parts["head"]
+		head.rotation.x = sin(_t * 1.7) * 0.08 if sp < 0.2 else 0.0
+		head.rotation.y = sin(_t * 0.6) * 0.25 if sp < 0.2 else 0.0
+		body.position.y = absf(sin(_gait)) * 0.03 * amp
+
 	func _valid(p: Vector3) -> bool:
 		match kind:
 			"swan":
@@ -534,6 +567,8 @@ class Animal extends Node3D:
 				return true
 			"deer":
 				return not fauna.main.call("_tree_blocked", p) and not fauna._in_lake(p, 1.2) and absf(p.x) < 100.0 and p.z > -110.0
+			"fox":
+				return not fauna.main.call("_tree_blocked", p) and not fauna._in_lake(p, 1.2) and absf(p.x) < 80.0 and p.z > -105.0 and p.z < 60.0 and not (p.x > 50.0 and p.z < -35.0)
 			"hare":
 				return not fauna._in_lake(p, 1.2) and absf(p.x) < 70.0 and p.z > -105.0 and p.z < 60.0 and not (p.x > 50.0 and p.z < -35.0)
 		return true
@@ -559,6 +594,8 @@ class Animal extends Node3D:
 		if dead:
 			return
 		_t += delta
+		if kind == "fox":
+			_fox_anim(delta)
 		if fauna.is_puppet():
 			_was_puppet = true
 			if net_has:
@@ -654,8 +691,8 @@ class Animal extends Node3D:
 					if night and _snd_cd <= 0.0 and pd < 22.0:
 						_snd_cd = randf_range(15.0, 40.0)
 						Sfx.play("croak", global_position, -8.0, randf_range(0.8, 1.2))
-			"deer", "hare":
-				var flee_d := 14.0 if kind == "deer" else 8.0
+			"deer", "hare", "fox":
+				var flee_d := 14.0 if kind == "deer" else (12.0 if kind == "fox" else 8.0)
 				var fleeing := pd < flee_d
 				if fleeing and fauna.player != null:
 					var tries := 0
@@ -666,7 +703,7 @@ class Animal extends Node3D:
 						tries += 1
 					if _valid(away):
 						target = away
-					_step_to(delta, speed * (5.0 if kind == "deer" else 4.0))
+					_step_to(delta, speed * (5.0 if kind == "deer" else (4.5 if kind == "fox" else 4.0)))
 				elif wait > 0.0:
 					wait -= delta
 				elif _step_to(delta, speed):
@@ -699,7 +736,7 @@ class Animal extends Node3D:
 							_play("Walk", 1.0)
 						else:
 							_play("Eat" if int(_t / 9.0) % 2 == 0 else "Idle")
-					else:
+					elif kind == "deer":
 						body.rotation.z = sin(_t * (12.0 if fleeing else 4.0)) * 0.03
 			"bird":
 				visible = not night
