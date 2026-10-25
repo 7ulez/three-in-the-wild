@@ -498,14 +498,19 @@ func _fish_anim() -> int:
 ## Erste Person: eigener Körper und Füße sind sichtbar (ohne Kopf), Blick nach unten zeigt Oberkörper und Schuhe.
 func _apply_view() -> void:
 	body_visual.position.z = 0.0 if third_person else 0.16
-	# Ego-Ansicht: alles oberhalb des Halses (Kopf, Haare, Gesicht) ist nur noch Schatten, sonst steht man im Modellkopf
-	if body_visual.is_inside_tree():
-		var head_n := body_visual.find_child("Kopf_Gruppe", true, false) as Node3D
-		var cut_y := (head_n.global_position.y - 0.1) if head_n != null else (body_visual.global_position.y + 1.5)
-		for mi in body_visual.find_children("*", "MeshInstance3D", true, false):
-			var m := mi as MeshInstance3D
-			var above := m.global_position.y > cut_y
-			m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if (above and not third_person) else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	# Ego-Ansicht: nur Kopf und Hals sind Schatten-only (sonst steht man im Modellkopf), der restliche Koerper bleibt sichtbar.
+	# Die Teile werden ueber ihren Namen gefunden: bei skinned Modellen liegen alle Mesh-Ursprünge bei 0, Positionen taugen nicht.
+	for mi in body_visual.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	if not third_person:
+		for nm in ["Kopf_Gruppe", "Hals"]:
+			var hn := body_visual.find_child(nm, true, false) as Node3D
+			if hn != null:
+				var meshes: Array = hn.find_children("*", "MeshInstance3D", true, false)
+				if hn is MeshInstance3D:
+					meshes.append(hn)
+				for m in meshes:
+					(m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 	if third_person:
 		camera.position = Vector3(0.6, 0.4, 3.2)
 		ray.target_position = Vector3(0, 0, -11.2)
