@@ -170,6 +170,17 @@ func _draw() -> void:
 			draw_line(sp + Vector2(-1, 2), sp + Vector2(4, -3), Color(0.9, 1.0, 0.6), 2.0)
 			_label(f_lab, sp + Vector2(0, 19), (s as Stash).label, 12, true)
 
+	# Schatzkarte: rotes X am geheimen Schießstand
+	if Game.map_found:
+		var xp := _w2m(ShootingRange.CENTER.x - 2.0, ShootingRange.CENTER.z)
+		var xr := 10.0 + sin(_t * 3.0) * 1.5
+		draw_arc(xp, xr + 8.0, 0.0, TAU, 32, Color(0.75, 0.1, 0.08, 0.5), 2.0, true)
+		for sgn in [1.0, -1.0]:
+			draw_line(xp + Vector2(-xr, -xr * sgn), xp + Vector2(xr, xr * sgn), C_INK, 7.0, true)
+		for sgn in [1.0, -1.0]:
+			draw_line(xp + Vector2(-xr, -xr * sgn), xp + Vector2(xr, xr * sgn), Color(0.85, 0.12, 0.08), 4.0, true)
+		_label(f_lab, xp + Vector2(0, xr + 22), "Schießstand" if Game.range_open else "X", 14, true, Color(0.6, 0.08, 0.05))
+
 	# Mitspieler
 	if Net.instance != null and is_instance_valid(Net.instance):
 		for key in Net.instance.avatars.keys():

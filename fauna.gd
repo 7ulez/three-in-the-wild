@@ -740,7 +740,7 @@ class Animal extends Node3D:
 			"fox":
 				return not fauna.main.call("_tree_blocked", p) and not fauna._in_lake(p, 1.2) and absf(p.x) < 80.0 and p.z > -105.0 and p.z < 60.0 and not (p.x > 50.0 and p.z < -35.0)
 			"hare":
-				return not fauna._in_lake(p, 1.2) and absf(p.x) < 70.0 and p.z > -105.0 and p.z < 60.0 and not (p.x > 50.0 and p.z < -35.0)
+				return not ShootingRange.in_zone(p) and not fauna._in_lake(p, 1.2) and absf(p.x) < 70.0 and p.z > -105.0 and p.z < 60.0 and not (p.x > 50.0 and p.z < -35.0)
 		return true
 
 	func _step_to(delta: float, spd: float) -> bool:

@@ -19,6 +19,8 @@ static var catches: Array = []          # {"name","kg","cm"}
 static var fish_penalty_until: float = 0.0
 static var lure_until: float = 0.0
 static var treasure_found: bool = false
+static var map_found: bool = false          # Schatzkarte aus der Höhlenkiste: zeigt das X auf der Karte
+static var range_open: bool = false         # Tor zum Schießstand aufgeschlossen
 static var fire_lit_once: bool = false
 static var chili_served: int = 0
 static var cars_opened: int = 0
@@ -138,6 +140,8 @@ static func reset() -> void:
 	catches.clear()
 	fish_penalty_until = 0.0
 	treasure_found = false
+	map_found = false
+	range_open = false
 	lure_until = 0.0
 	Stash.reset()
 	fire_lit_once = false

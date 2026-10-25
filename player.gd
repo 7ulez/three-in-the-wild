@@ -890,6 +890,8 @@ func _update_help() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if sleeping:
 		return
+	if minigame != null and minigame.handle_input(event):
+		return
 	if event is InputEventMouseMotion and Game.is_captured():
 		var mm := event as InputEventMouseMotion
 		var sens := MOUSE_SENS * (1.0 - 0.45 * _aim_f)
@@ -994,6 +996,9 @@ func _physics_process(delta: float) -> void:
 	vomit_tilt = lerpf(vomit_tilt, 0.85 if vomit_t > 0.0 else 0.0, minf(delta * 6.0, 1.0))
 	Player.vomit_pose(body_visual, vomit_t > 0.0, delta)
 	if sleeping:
+		velocity = Vector3.ZERO
+		return
+	if minigame != null:
 		velocity = Vector3.ZERO
 		return
 	if seat != null:
@@ -2492,6 +2497,7 @@ var _strike_speed: float = 1.0
 var _ember_t: float = 0.0
 var _ember_light: OmniLight3D = null
 var minihud: MiniHud = null
+var minigame: ShootingRange = null     # laeuft gerade ein Schiessstand-Minispiel?
 var stir_oven: PlacedItem = null
 
 

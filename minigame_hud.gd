@@ -81,6 +81,8 @@ func _draw() -> void:
 			_draw_fire()
 		"stir":
 			_draw_stir()
+		"range":
+			_draw_range()
 	for b in _bits:
 		var cc: Color = b["col"]
 		cc.a = clampf(float(b["life"]) * 2.0, 0.0, 1.0)
@@ -330,3 +332,41 @@ func _draw_stir() -> void:
 	draw_rect(Rect2(c.x - 100, c.y + R + 34, 200, 10), Color(0, 0, 0, 0.55))
 	draw_rect(Rect2(c.x - 100, c.y + R + 34, 200 * clampf(tl, 0, 1), 10), UI.FIRE)
 	_keycap(Vector2(c.x, c.y + R + 78), "E", false)
+
+
+# ---------- Schießstand: Punkte, Kraftbalken ----------
+
+func _draw_range() -> void:
+	var cx := size.x / 2.0
+	var score: int = d.get("score", 0)
+	var best: int = d.get("best", 0)
+	var info: String = d.get("info", "")
+	var md: String = d.get("mode", "")
+	var title: String = {"gun": "LUFTGEWEHR", "axe": "AXT-ZIELWERFEN", "spear": "SPEERWURF"}.get(md, "")
+	# Kopf: Punkte
+	_panel(Rect2(cx - 190, 112, 380, 92))
+	_text(Vector2(cx, 138), title, 18, UI.PAPER)
+	_text(Vector2(cx, 184), "%d" % score, 44, UI.FIRE)
+	_text(Vector2(cx - 176, 160), "Rekord %d" % best, 15, Color(1, 1, 1, 0.7), HORIZONTAL_ALIGNMENT_LEFT)
+	_text(Vector2(cx + 176, 160), info, 15, Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_RIGHT)
+	# Kraftbalken (Axt / Speer)
+	var pw: float = d.get("power", -1.0)
+	if pw >= 0.0:
+		var w := 420.0
+		var x0 := cx - w / 2.0
+		var y0 := size.y - 150.0
+		_panel(Rect2(x0 - 16, y0 - 38, w + 32, 84))
+		_text(Vector2(cx, y0 - 14), "KRAFT", 16, UI.PAPER)
+		draw_rect(Rect2(x0, y0, w, 26), Color(0.12, 0.12, 0.13))
+		var zone: Array = d.get("zone", [])
+		for z in zone:
+			draw_rect(Rect2(x0 + w * float(z[0]), y0, w * (float(z[1]) - float(z[0])), 26), Color(0.3, 0.85, 0.35))
+		draw_rect(Rect2(x0, y0, w * pw, 26), Color(1.0, 0.85, 0.3, 0.35))
+		draw_rect(Rect2(x0 + w * pw - 4, y0 - 6, 8, 38), Color(1.0, 0.95, 0.6))
+		draw_rect(Rect2(x0, y0, w, 26), UI.INK, false, 3.0)
+		if md == "axe":
+			_text(Vector2(cx, y0 + 62), "Loslassen, wenn der Balken im GRÜNEN Bereich ist (dann bleibt die Axt stecken)", 14, Color(1, 1, 1, 0.75))
+	else:
+		var ph: String = d.get("phase", "")
+		if ph == "play":
+			_text(Vector2(cx, size.y - 70), d.get("hint", ""), 16, Color(1, 1, 1, 0.7))

@@ -93,7 +93,11 @@ class Chest:
 		opened = true
 		Game.treasure_found = true
 		create_tween().tween_property(lid, "rotation_degrees:x", 110.0, 0.6)
-		player.toast("SCHATZ! Ein goldener Glücksköder - die Fische beißen jetzt schneller!", 6.0)
+		player.toast("SCHATZ! Ein goldener Glücksköder - die Fische beißen jetzt schneller! Und eine alte Schatzkarte: Auf der Karte (M) ist ein X eingezeichnet.", 8.0)
+		Game.map_found = true
+		if player.has_method("get_minihud"):
+			player.get_minihud().card("SCHATZKARTE!", "Schau auf die Karte (M) - da ist ein X", Color(0.95, 0.8, 0.3), 5.0)
+		Sfx.play("pop", Vector3.INF, -2.0, 1.2)
 
 
 # ---------------------------------------------------------------------------

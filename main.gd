@@ -44,6 +44,10 @@ func _ready() -> void:
 	var massif := Massif.new()
 	add_child(massif)
 	massif.build(self)
+	var range_node := ShootingRange.new()
+	range_node.name = "ShootingRange"
+	add_child(range_node)
+	range_node.build(self)
 	_build_piers()
 	_build_cars()
 	_build_signs()
@@ -420,6 +424,8 @@ func _tree_blocked(pos: Vector3) -> bool:
 	if absf(pos.x) < 27.0 and pos.z > -22.0 and pos.z < 30.0:
 		return true
 	if Hideouts.in_zone(pos):
+		return true
+	if ShootingRange.in_zone(pos):
 		return true
 	for hp in HAMMOCK_PAIRS:
 		if Vector2(pos.x - hp.x, pos.z - hp.y).length() < 5.0:
