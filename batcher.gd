@@ -45,6 +45,29 @@ static func run(world: Node) -> int:
 	return removed
 
 
+## Kleine Dinge weit weg gar nicht erst zeichnen (spart Zeichenaufrufe). Grosse Teile
+## (Berg, See, Boden) bleiben, ebenso Spielerfiguren.
+static func apply_ranges(world: Node, mesh_end: float = 110.0, label_end: float = 28.0) -> int:
+	var n_set := 0
+	var stack: Array = [world]
+	while stack.size() > 0:
+		var n: Node = stack.pop_back()
+		if n is CharacterBody3D:
+			continue
+		for c in n.get_children():
+			stack.append(c)
+		if n is Label3D:
+			(n as Label3D).visibility_range_end = label_end
+			n_set += 1
+		elif n is MeshInstance3D or n is MultiMeshInstance3D:
+			var g := n as GeometryInstance3D
+			var bb: AABB = g.get_aabb()
+			if maxf(bb.size.x, maxf(bb.size.y, bb.size.z)) < 30.0 and g.visibility_range_end <= 0.0:
+				g.visibility_range_end = mesh_end
+				n_set += 1
+	return n_set
+
+
 static func _collect_refs(world: Node, refs: Dictionary) -> void:
 	var stack: Array = [world]
 	while stack.size() > 0:

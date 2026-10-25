@@ -64,6 +64,7 @@ func _ready() -> void:
 	sfx.name = "Sfx"
 	add_child(sfx)
 	Batcher.run(self)
+	Batcher.apply_ranges(self)
 	player = Player.new()
 	player.character_name = Game.start_char
 	add_child(player)
@@ -100,7 +101,7 @@ func _process(delta: float) -> void:
 			_range_node = get_node_or_null("ShootingRange") as Node3D
 		if _range_node != null:
 			# Im Browser ist die Zahl gleichzeitig sichtbarer Objekte begrenzt: Schiessstand nur in der Naehe zeichnen
-			_range_node.visible = player.global_position.distance_to(Vector3(-109.0, 0.0, -10.0)) < 130.0
+			_range_node.visible = player.global_position.distance_to(Vector3(-109.0, 0.0, -10.0)) < 100.0
 		var hn: Node = get_node_or_null("Hideouts")
 		if hn != null:
 			for hid in ["fuchsbau", "huette", "tropf", "baum", "lager"]:
