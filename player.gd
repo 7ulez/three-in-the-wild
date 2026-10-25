@@ -2149,6 +2149,8 @@ func _render_guard(delta: float) -> void:
 
 ## Echter Bildtest: im unteren Bilddrittel ist nichts als ein glatter Verlauf (jede Zeile ueberall gleich).
 func _view_is_empty() -> bool:
+	# Leer heisst: das ganze Bild ist eine einzige Farbe (nur Himmel oder nur Boden).
+	# Ein Bild mit Himmel UND Boden gilt als gut, auch wenn der Boden einheitlich gruen ist.
 	var tex := get_viewport().get_texture()
 	if tex == null:
 		return false
@@ -2157,14 +2159,17 @@ func _view_is_empty() -> bool:
 		return false
 	var w := img.get_width()
 	var h := img.get_height()
-	for k in range(6):
-		var y := int(h * (0.62 + 0.05 * k))
-		var a := img.get_pixel(int(w * 0.40), y)
-		var b := img.get_pixel(int(w * 0.50), y)
-		var c := img.get_pixel(int(w * 0.60), y)
-		var d := absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) + absf(c.r - b.r) + absf(c.g - b.g) + absf(c.b - b.b)
-		if d > 0.03:
-			return false
+	var ref := img.get_pixel(int(w * 0.5), int(h * 0.02))
+	var top_c := img.get_pixel(int(w * 0.5), int(h * 0.1))
+	var bottom_c := img.get_pixel(int(w * 0.5), int(h * 0.9))
+	# Oben und unten verschieden -> Himmel und Welt sind beide da
+	if absf(top_c.r - bottom_c.r) + absf(top_c.g - bottom_c.g) + absf(top_c.b - bottom_c.b) > 0.08:
+		return false
+	for iy in range(9):
+		for ix in range(9):
+			var c := img.get_pixel(int(w * (0.1 + 0.1 * ix)), int(h * (0.05 + 0.1 * iy)))
+			if absf(c.r - ref.r) + absf(c.g - ref.g) + absf(c.b - ref.b) > 0.06:
+				return false
 	return true
 
 
