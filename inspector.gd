@@ -37,6 +37,9 @@ var _btns: Array = []
 var _busy: bool = false
 var _questions_started: bool = false
 var _was_captured: bool = false
+var _pips: Array = []
+var _stamp: Label = null
+var _card: PanelContainer = null
 
 
 ## Wird jeden Bildschirm-Durchlauf aufgerufen.
@@ -69,9 +72,7 @@ func _spawn() -> void:
 	_visit = Node3D.new()
 	main_node().add_child(_visit)
 	_visit.global_position = pos
-	Player.build_body(_visit, "Marian")
-	var clip := Util.add_box(_visit, Vector3(0.25, 0.32, 0.02), Color(0.85, 0.82, 0.7), Vector3(0.3, 1.0, -0.25))
-	clip.rotation_degrees.x = -20.0
+	InspectorModel.build(_visit)
 	_state = 0
 	player.toast("Da ist jemand auf dem Weg... Sieht aus wie ein Fischereiaufseher.", 4.0)
 
@@ -129,8 +130,8 @@ func _start_quiz() -> void:
 
 func _intro() -> void:
 	_info.text = "Guten Abend. Inspektor Wladimir Petrowitsch, Fischereiaufsicht. Kontrolle, bitte.\nFünf Fragen. Zwei richtige müssen Sie haben. Sonst: ein Tag Angelverbot. Verstanden?"
-	_qlabel.text = ""
-	_prog.text = ""
+	_qlabel.text = "Fischereikontrolle"
+	_prog.text = "Einleitung"
 	_set_buttons_visible(false)
 	_btn_next_label("Ja, verstanden")
 
@@ -154,16 +155,18 @@ func _on_btn0() -> void:
 
 func _show_question() -> void:
 	var q: Dictionary = _questions[_qi]
-	_prog.text = "Frage %d von 5" % (_qi + 1)
+	_prog.text = "FRAGE %d VON 5" % (_qi + 1)
 	_qlabel.text = String(q["q"])
 	_info.text = "Konzentration, Genosse."
+	_set_pip(_qi, 1)
 	_set_buttons_visible(false)
 	var answers: Array = q["a"]
 	for i in range(4):
 		var b: Button = _btns[i + 1]
-		b.text = String(answers[i])
+		b.text = "%s   %s" % [["A", "B", "C", "D"][i], String(answers[i])]
 		b.visible = true
 		b.disabled = false
+		_answer_style(b, null)
 
 
 func _on_answer(i: int) -> void:
@@ -173,7 +176,13 @@ func _on_answer(i: int) -> void:
 	var q: Dictionary = _questions[_qi]
 	for k in range(4):
 		(_btns[k + 1] as Button).disabled = true
-	if i == int(q["c"]):
+	var right := i == int(q["c"])
+	# richtige Antwort gruen, eigene falsche Antwort rot
+	_answer_style(_btns[int(q["c"]) + 1], true)
+	if not right:
+		_answer_style(_btns[i + 1], false)
+	_set_pip(_qi, 2 if right else 3)
+	if right:
 		_score += 1
 		_info.text = ["Oh, sehr gut, Genosse! Richtig.", "Da, da! Richtig.", "Ha! Sie sind kein Dummkopf."][_qi % 3]
 	else:
@@ -185,11 +194,14 @@ func _next_question() -> void:
 	_busy = false
 	_qi += 1
 	if _qi >= 5:
-		_qlabel.text = ""
-		_prog.text = "Ergebnis: %d von 5 richtig" % _score
+		_qlabel.text = "Ergebnis"
+		_prog.text = "%d VON 5 RICHTIG" % _score
 		_set_buttons_visible(false)
 		_btn_next_label("Weiter")
 		_info.text = _verdict()
+		_stamp.text = "BESTANDEN" if _score >= 2 else "DURCHGEFALLEN"
+		_stamp.add_theme_color_override("font_color", Color(0.4, 0.95, 0.5) if _score >= 2 else Color(0.95, 0.35, 0.3))
+		_stamp.visible = true
 		return
 	_show_question()
 
@@ -226,6 +238,43 @@ func _set_buttons_visible(v: bool) -> void:
 		(b as Button).visible = v
 
 
+## Fortschritt: 0 offen, 1 aktuell, 2 richtig, 3 falsch
+func _set_pip(i: int, state: int) -> void:
+	if i < 0 or i >= _pips.size():
+		return
+	var colors := [Color(0.25, 0.27, 0.3), Color(0.9, 0.75, 0.3), Color(0.35, 0.8, 0.45), Color(0.9, 0.3, 0.28)]
+	(_pips[i] as PanelContainer).add_theme_stylebox_override("panel", _sb(colors[state], colors[state], 0, 4, 0))
+
+
+func _sb(bg: Color, border: Color, border_w: int, radius: int, margin: int) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg
+	s.border_color = border
+	s.set_border_width_all(border_w)
+	s.set_corner_radius_all(radius)
+	s.set_content_margin_all(margin)
+	return s
+
+
+## Antwort-Knopf faerben: correct = true (gruen), false (rot), null (neutral)
+func _answer_style(b: Button, correct: Variant) -> void:
+	var bg := Color(0.14, 0.17, 0.21)
+	var border := Color(0.32, 0.37, 0.44)
+	if correct == true:
+		bg = Color(0.16, 0.42, 0.24)
+		border = Color(0.4, 0.85, 0.5)
+	elif correct == false:
+		bg = Color(0.5, 0.16, 0.16)
+		border = Color(0.95, 0.4, 0.35)
+	b.add_theme_stylebox_override("disabled", _sb(bg, border, 2, 10, 10))
+	b.add_theme_stylebox_override("normal", _sb(bg, border, 2, 10, 10))
+	b.add_theme_stylebox_override("hover", _sb(bg.lightened(0.12), Color(0.9, 0.75, 0.3), 2, 10, 10))
+	b.add_theme_stylebox_override("pressed", _sb(bg.darkened(0.1), Color(0.9, 0.75, 0.3), 2, 10, 10))
+	b.add_theme_stylebox_override("focus", _sb(bg, border, 2, 10, 10))
+	b.add_theme_color_override("font_color", Color(0.95, 0.94, 0.9))
+	b.add_theme_color_override("font_disabled_color", Color(0.95, 0.94, 0.9))
+
+
 func _build_ui() -> void:
 	_ui = CanvasLayer.new()
 	_ui.layer = 20
@@ -234,44 +283,104 @@ func _build_ui() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
 	_ui.add_child(root)
-	var panel := PanelContainer.new()
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.custom_minimum_size = Vector2(560, 0)
-	panel.position = Vector2(-280, -210)
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.96, 0.93, 0.85)
-	sb.border_color = Color(0.2, 0.2, 0.2)
-	sb.set_border_width_all(3)
-	sb.set_corner_radius_all(10)
-	sb.set_content_margin_all(18)
-	panel.add_theme_stylebox_override("panel", sb)
-	root.add_child(panel)
+	var shade := ColorRect.new()
+	shade.color = Color(0, 0, 0, 0.55)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(shade)
+
+	_card = PanelContainer.new()
+	_card.custom_minimum_size = Vector2(700, 0)
+	_card.add_theme_stylebox_override("panel", _sb(Color(0.08, 0.1, 0.13, 0.97), Color(0.85, 0.7, 0.3), 3, 16, 22))
+	_card.set_anchors_preset(Control.PRESET_CENTER)
+	_card.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_card.grow_vertical = Control.GROW_DIRECTION_BOTH
+	root.add_child(_card)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	panel.add_child(box)
+	box.add_theme_constant_override("separation", 14)
+	_card.add_child(box)
+
+	# Kopfzeile: Titel links, Fortschritt rechts
+	var head := HBoxContainer.new()
+	box.add_child(head)
 	var title := Label.new()
-	title.text = "Fischereikontrolle"
-	title.add_theme_font_size_override("font_size", 22)
-	box.add_child(title)
+	title.text = "FISCHEREIKONTROLLE"
+	title.add_theme_font_size_override("font_size", 16)
+	title.add_theme_color_override("font_color", Color(0.9, 0.75, 0.3))
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	_prog = Label.new()
+	_prog.add_theme_font_size_override("font_size", 16)
+	_prog.add_theme_color_override("font_color", Color(0.8, 0.82, 0.86))
+	head.add_child(_prog)
+
+	# Fortschrittsbalken: fuenf Abschnitte, einer pro Frage
+	var pips := HBoxContainer.new()
+	pips.add_theme_constant_override("separation", 8)
+	box.add_child(pips)
+	_pips = []
+	for i in range(5):
+		var p := PanelContainer.new()
+		p.custom_minimum_size = Vector2(0, 10)
+		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pips.add_child(p)
+		_pips.append(p)
+		_set_pip(i, 0)
+
+	# Sprechblase des Inspektors
+	var bubble := PanelContainer.new()
+	bubble.add_theme_stylebox_override("panel", _sb(Color(0.96, 0.93, 0.85), Color(0.2, 0.2, 0.2), 2, 12, 14))
+	box.add_child(bubble)
 	_info = Label.new()
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_info.add_theme_font_size_override("font_size", 17)
-	box.add_child(_info)
-	_prog = Label.new()
-	_prog.add_theme_font_size_override("font_size", 14)
-	box.add_child(_prog)
+	_info.add_theme_color_override("font_color", Color(0.12, 0.1, 0.08))
+	bubble.add_child(_info)
+
+	# Frage
 	_qlabel = Label.new()
 	_qlabel.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_qlabel.add_theme_font_size_override("font_size", 19)
+	_qlabel.add_theme_font_size_override("font_size", 24)
+	_qlabel.add_theme_color_override("font_color", Color(1, 1, 1))
+	_qlabel.custom_minimum_size = Vector2(0, 64)
 	box.add_child(_qlabel)
+
+	# Antworten als Raster aus vier grossen Knoepfen
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	box.add_child(grid)
 	_btns = []
-	for i in range(5):
+	var main_btn := Button.new()
+	_btns.append(main_btn)
+	for i in range(4):
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(0, 40)
+		b.custom_minimum_size = Vector2(320, 62)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.add_theme_font_size_override("font_size", 18)
 		b.visible = false
-		box.add_child(b)
+		_answer_style(b, null)
+		grid.add_child(b)
 		_btns.append(b)
-	# Knopf 0: Einleitung und Ergebnis. Knoepfe 1-4: Antworten (einmal verbunden, Index fest)
+
+	# Stempel fuer das Ergebnis
+	_stamp = Label.new()
+	_stamp.visible = false
+	_stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_stamp.add_theme_font_size_override("font_size", 38)
+	box.add_child(_stamp)
+
+	# Hauptknopf: Einleitung, Ergebnis
+	main_btn.custom_minimum_size = Vector2(0, 54)
+	main_btn.add_theme_font_size_override("font_size", 19)
+	main_btn.visible = false
+	main_btn.add_theme_stylebox_override("normal", _sb(Color(0.85, 0.7, 0.3), Color(0.6, 0.45, 0.15), 2, 10, 10))
+	main_btn.add_theme_stylebox_override("hover", _sb(Color(0.95, 0.8, 0.4), Color(0.6, 0.45, 0.15), 2, 10, 10))
+	main_btn.add_theme_stylebox_override("pressed", _sb(Color(0.7, 0.56, 0.22), Color(0.6, 0.45, 0.15), 2, 10, 10))
+	main_btn.add_theme_color_override("font_color", Color(0.1, 0.08, 0.05))
+	box.add_child(main_btn)
+
 	(_btns[0] as Button).pressed.connect(_on_btn0)
 	for i in range(4):
 		(_btns[i + 1] as Button).pressed.connect(_on_answer.bind(i))
