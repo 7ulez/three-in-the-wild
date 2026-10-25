@@ -302,8 +302,6 @@ func vape() -> void:
 	puffs += 1
 	vape_particles.restart()
 	vape_particles.emitting = true
-	if Net.instance != null:
-		Net.instance.send_vape()
 	var flavors := ["Mango-Eis", "Blaubeere", "Wassermelone", "Cola", "Minze"]
 	player.toast("Julian dampft (%s). Wolke!" % flavors[puffs % flavors.size()], 2.5)
 	bladder = minf(bladder + 0.01, 1.0)
