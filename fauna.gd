@@ -327,6 +327,9 @@ class Animal extends Node3D:
 	var _aggro: bool = false
 	var _hiss_cd: float = 0.0
 	var _bite_cd: float = 0.0
+	var _bite_t: float = 0.0
+	var _neck: Node3D = null
+	var _neck_on: bool = false
 
 	## Trefferzone (Mittelpunkt über dem Boden und Radius) für das Luftgewehr
 	func hit_center_y() -> float:
@@ -678,20 +681,51 @@ class Animal extends Node3D:
 			Sfx.play("hiss", global_position, 2.0, randf_range(0.9, 1.1))
 		var puff := 1.18 if _aggro else 1.0
 		body.scale = body.scale.lerp(Vector3.ONE * puff, minf(delta * 6.0, 1.0))
-		var lunge := d < 2.4
-		var tilt := 0.0
-		if _aggro:
-			tilt = -0.22 + sin(_t * 9.0) * 0.07 - (0.25 if lunge else 0.0)
-		body.rotation.x = lerpf(body.rotation.x, tilt, minf(delta * 8.0, 1.0))
+		if _neck == null:
+			_neck = body.find_child("Neck", true, false) as Node3D
+		if ap != null:
+			ap.active = not _aggro
+		var lunge := d < 2.6
 		if _aggro:
 			# dem Spieler zugewandt (Puppen werden sonst vom Host gedreht)
 			var ang := atan2(-(pl.global_position.x - global_position.x), -(pl.global_position.z - global_position.z))
-			rotation.y = lerp_angle(rotation.y, ang, minf(delta * 5.0, 1.0))
-		if lunge and _bite_cd <= 0.0 and pl.get("needs") != null:
-			_bite_cd = 1.8
-			Sfx.play("thunk", global_position, 0.0, 1.3)
-			Sfx.play("hiss", global_position, 4.0, 1.2)
-			pl.needs.damage(6.0, "Ein Schwan hat dich angegriffen.")
+			rotation.y = lerp_angle(rotation.y, ang, minf(delta * 6.0, 1.0))
+		# Hals/Kopf von Hand steuern (Modell schaut nach -Z, Drehpunkt am Halsansatz)
+		var th := 0.0
+		var off := 0.0
+		if _aggro:
+			if lunge:
+				var prev := _bite_t
+				_bite_t += delta
+				var ph := fposmod(_bite_t, 1.4) / 1.4
+				var pph := fposmod(prev, 1.4) / 1.4
+				if ph < 0.35:          # zurueckziehen, Schnabel auf den Spieler gerichtet
+					th = lerpf(-0.95, -0.4, ph / 0.35)
+				elif ph < 0.47:        # Zustossen
+					var k := (ph - 0.35) / 0.12
+					th = lerpf(-0.4, -1.35, k)
+					off = -0.12 * k
+				else:                  # zurueck in Drohhaltung
+					var k2 := (ph - 0.47) / 0.53
+					th = lerpf(-1.35, -0.95, k2)
+					off = -0.12 * (1.0 - k2)
+				if pph < 0.45 and ph >= 0.45 and pl.get("needs") != null:
+					Sfx.play("thunk", global_position, 0.0, 1.3)
+					Sfx.play("hiss", global_position, 4.0, 1.2)
+					pl.needs.damage(6.0, "Ein Schwan hat dich gebissen.")
+			else:
+				_bite_t = 0.0
+				th = -0.95 + sin(_t * 6.0) * 0.06
+		if _neck != null:
+			if _aggro:
+				var bs := Basis(Vector3.RIGHT, th)
+				var piv := Vector3(0.0, 0.22, -0.38)
+				var tt := Transform3D(bs, piv - bs * piv + Vector3(0, 0, off))
+				_neck.transform = tt if (lunge or not _neck_on) else _neck.transform.interpolate_with(tt, minf(delta * 10.0, 1.0))
+				_neck_on = true
+			elif _neck_on:
+				_neck.transform = Transform3D.IDENTITY
+				_neck_on = false
 
 	func _valid(p: Vector3) -> bool:
 		match kind:
