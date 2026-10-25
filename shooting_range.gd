@@ -1562,8 +1562,11 @@ func _hit_target(p: Dictionary, hp: Vector3, d: float, tg: Dictionary) -> void:
 		node.rotation = Vector3(0, 0, randf_range(-0.12, 0.12))
 		_stuck[mode].append(node)
 		_proj.erase(p)
-		Sfx.play("thunk", hp, 3.0, 0.7)
-		Sfx.play("crate", hp, -6.0, 1.3)
+		if mode == "axe":
+			Sfx.play("axe_hit", hp, 2.0, randf_range(0.95, 1.05))
+		else:
+			Sfx.play("thunk", hp, 3.0, 0.7)
+			Sfx.play("crate", hp, -6.0, 1.3)
 		_popup(hp, "+%d" % pts, Color(1.0, 0.85, 0.3) if pts < 100 else Color(1.0, 0.4, 0.2))
 		_score_card(pts)
 		_after_throw(pts)

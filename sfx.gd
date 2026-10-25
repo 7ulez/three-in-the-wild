@@ -16,6 +16,7 @@ var _amb_wind: AudioStreamPlayer
 var _amb_birds_t: float = 4.0
 var _amb_night_t: float = 3.0
 var _amb_water: AudioStreamPlayer
+var _amb_birdloop: AudioStreamPlayer = null
 var _water_near: float = 0.0
 var _player: Node3D = null
 var enabled: bool = true
@@ -29,6 +30,12 @@ func _ready() -> void:
 		_amb_water.volume_db = -60.0
 		add_child(_amb_water)
 		_amb_water.play()
+	if has_file("birds"):
+		_amb_birdloop = AudioStreamPlayer.new()
+		_amb_birdloop.stream = get_stream("birds")
+		_amb_birdloop.volume_db = -60.0
+		add_child(_amb_birdloop)
+		_amb_birdloop.play()
 	_amb_wind = AudioStreamPlayer.new()
 	_amb_wind.stream = get_stream("wind")
 	_amb_wind.volume_db = -22.0
@@ -58,7 +65,7 @@ func _process(delta: float) -> void:
 	_amb_birds_t -= delta
 	if _amb_birds_t <= 0.0:
 		_amb_birds_t = randf_range(2.5, 7.0)
-		if not night and Weather.rain < 0.15:
+		if _amb_birdloop == null and not night and Weather.rain < 0.15:
 			var a := randf() * TAU
 			play("chirp", _player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(8.0, 25.0) + Vector3(0, 6, 0), -6.0, randf_range(0.85, 1.2))
 	_amb_night_t -= delta
@@ -70,6 +77,10 @@ func _process(delta: float) -> void:
 			if randf() < 0.12:
 				play("owl", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * 30.0 + Vector3(0, 5, 0), -6.0)
 	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -22.0 if not night else -27.0, 0.02)
+	if _amb_birdloop != null:
+		# Vogelgezwitscher: nur tagsueber und ohne Regen, weich ein-/ausgeblendet
+		var bird_on := not night and Weather.rain < 0.15
+		_amb_birdloop.volume_db = lerpf(_amb_birdloop.volume_db, -17.0 if bird_on else -60.0, 0.02)
 	if _amb_water != null:
 		# Wellenplätschern: nur in Ufernähe, mit weichem Ein-/Ausblenden
 		var lake: Variant = get_tree().current_scene.get("lake_root") if get_tree().current_scene != null else null
@@ -144,7 +155,7 @@ static func _file_streams(sound: String) -> Array:
 		var path := "%s_%d.ogg" % [base, i]
 		if ResourceLoader.exists(path):
 			list.append(load(path))
-	if sound == "water" or sound == "fire" or sound == "rain":
+	if sound == "water" or sound == "fire" or sound == "rain" or sound == "birds":
 		for st in list:
 			(st as AudioStreamOggVorbis).loop = true
 	_files[sound] = list
