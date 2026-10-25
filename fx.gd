@@ -113,28 +113,51 @@ static func pee_stream() -> CPUParticles3D:
 	p.position = Vector3(0, 0.95, -0.25)
 	# Cartoon-Pimmel: nur sichtbar, solange gepinkelt wird (relativ zum Strahl-Ursprung)
 	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color(0.92, 0.7, 0.6)
-	var pen := MeshInstance3D.new()
-	pen.name = "Pimmel"
-	var cap := CapsuleMesh.new()
-	cap.radius = 0.028
-	cap.height = 0.17
-	cap.material = skin
-	pen.mesh = cap
-	pen.rotation_degrees = Vector3(90, 0, 0)
-	pen.position = Vector3(0, -0.01, 0.15)
-	pen.visible = false
-	p.add_child(pen)
-	for sx in [-0.03, 0.03]:
+	skin.albedo_color = Color(0.93, 0.72, 0.62)
+	skin.roughness = 0.55
+	var tip := StandardMaterial3D.new()
+	tip.albedo_color = Color(0.86, 0.5, 0.48)
+	tip.roughness = 0.4
+	var shaft := MeshInstance3D.new()
+	shaft.name = "Pimmel"
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.022
+	cyl.bottom_radius = 0.026
+	cyl.height = 0.15
+	cyl.radial_segments = 14
+	cyl.rings = 1
+	cyl.cap_top = false
+	cyl.cap_bottom = true
+	cyl.material = skin
+	shaft.mesh = cyl
+	shaft.rotation_degrees = Vector3(-90, 0, 0)
+	shaft.position = Vector3(0, -0.015, 0.155)
+	shaft.visible = false
+	p.add_child(shaft)
+	var glans := MeshInstance3D.new()
+	glans.name = "Eichel"
+	var gm := SphereMesh.new()
+	gm.radius = 0.027
+	gm.height = 0.05
+	gm.radial_segments = 14
+	gm.rings = 8
+	gm.material = tip
+	glans.mesh = gm
+	glans.position = Vector3(0, -0.015, 0.082)
+	glans.visible = false
+	p.add_child(glans)
+	for sx in [-1.0, 1.0]:
 		var b := MeshInstance3D.new()
 		var sm := SphereMesh.new()
-		sm.radius = 0.032
-		sm.height = 0.064
+		sm.radius = 0.034
+		sm.height = 0.082
+		sm.radial_segments = 12
+		sm.rings = 8
 		sm.material = skin
 		b.mesh = sm
-		b.position = Vector3(sx, -0.045, 0.2)
+		b.position = Vector3(sx * 0.03, -0.065, 0.225)
+		b.name = "Hoden" + str(int(sx))
 		b.visible = false
-		b.name = "Ei" + str(sx)
 		p.add_child(b)
 	return p
 
