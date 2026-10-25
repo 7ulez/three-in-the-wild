@@ -1152,7 +1152,12 @@ func _deep_in_rock(p: Vector3) -> bool:
 		return false
 	var d := Vector2(p.x - C.x, p.z - C.z)
 	var th := atan2(d.y, d.x)
-	if d.length() > surf_r(th, maxf(p.y, 0.0)) - 3.0:
+	var rs := surf_r(th, maxf(p.y, 0.0))
+	if d.length() > rs - 4.5:
+		return false
+	# Auf dem Bergpfad (Spirale) nie zurücksetzen: Pfadhöhe an diesem Winkel +/- Toleranz
+	var py := path_y(path_t(th))
+	if p.y > py - 2.0 and p.y < py + 4.0 and d.length() > rs - 7.0:
 		return false
 	for b in main.cave_boxes:
 		if (b as AABB).grow(0.3).has_point(p + Vector3(0, 0.9, 0)):
