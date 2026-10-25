@@ -8,12 +8,13 @@ extends Node3D
 const CENTER: Vector3 = Vector3(-109.0, 0.0, -10.0)
 const FX0: float = -22.0     # Zaun West
 const FX1: float = 18.0      # Zaun Ost (Tor)
-const FZS: float = 17.0      # Zaun Süd (+Z)
+const FZS: float = 28.0      # Zaun Süd (+Z)
 const FZN: float = 28.0      # Zaun Nord (-Z)
 const LANE_BOW: float = -22.0
 const LANE_GUN: float = -11.0
 const LANE_AXE: float = 0.0
 const LANE_SPEAR: float = 11.0
+const LANE_DILDO: float = 22.0
 const STAND_X_GUN: float = 13.1
 const STAND_X_THROW: float = 8.6
 const COUNTER_X: float = 12.0   # alle Schießbuden stehen auf einer Linie
@@ -48,8 +49,8 @@ const BOW_SHOTS: int = 6
 const GUN_SHOTS: int = 20
 const GUN_TIME: float = 60.0
 
-static var bests: Dictionary = {"gun": 0, "axe": 0, "spear": 0, "bow": 0}
-static var best_names: Dictionary = {"gun": "", "axe": "", "spear": "", "bow": ""}
+static var bests: Dictionary = {"gun": 0, "axe": 0, "spear": 0, "bow": 0, "dildo": 0}
+static var best_names: Dictionary = {"gun": "", "axe": "", "spear": "", "bow": "", "dildo": ""}
 
 var main: Node
 var gate_body: StaticBody3D = null
@@ -79,7 +80,7 @@ var _saved_third: bool = false
 var _vm: Node3D = null
 var _vm_base: Vector3 = Vector3.ZERO
 var _proj: Array = []
-var _stuck: Dictionary = {"axe": [], "spear": [], "bow": []}
+var _stuck: Dictionary = {"axe": [], "spear": [], "bow": [], "dildo": []}
 var _plane_targets: Array = []
 var _preview: Node3D = null
 var _zone: Array = []           # grüne Bereiche im Kraftbalken [[a,b], ...]
@@ -106,6 +107,7 @@ func build(p_main: Node) -> void:
 	_build_axe_lane()
 	_build_spear_lane()
 	_build_bow_lane()
+	_build_dildo_lane()
 	_build_decor()
 
 
@@ -146,7 +148,7 @@ func _build_floor() -> void:
 	var fl := Util.add_box(self, Vector3(FX1 - FX0 + 2.0, 0.04, (FZN + FZS) + 2.0), Color(0.62, 0.55, 0.4), Vector3((FX0 + FX1) / 2.0, 0.02, zc))
 	fl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Laufbahnen: etwas dunklerer, festgetretener Streifen je Bahn
-	for lane in [LANE_BOW, LANE_GUN, LANE_AXE, LANE_SPEAR]:
+	for lane in [LANE_BOW, LANE_GUN, LANE_AXE, LANE_SPEAR, LANE_DILDO]:
 		var lw := 8.4 if lane != LANE_GUN else 9.6
 		var ln := Util.add_box(self, Vector3(FX1 - FX0 - 3.0, 0.05, lw), Color(0.56, 0.49, 0.35), Vector3((FX0 + FX1) / 2.0 - 1.0, 0.03, lane))
 		ln.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -169,7 +171,7 @@ func _build_floor() -> void:
 	var gp := Util.add_box(self, Vector3(3.4, 0.06, 3.0), Color(0.5, 0.42, 0.3), Vector3(FX1 - 1.4, 0.035, 0.0))
 	gp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Abwurf-Plattformen mit Foul-Linie
-	for lane in [LANE_AXE, LANE_SPEAR, LANE_BOW]:
+	for lane in [LANE_AXE, LANE_SPEAR, LANE_BOW, LANE_DILDO]:
 		var pf := Util.add_box(self, Vector3(2.6, 0.08, 3.2), WOOD_L, Vector3(STAND_X_THROW + 0.3, 0.04, lane))
 		pf.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		for k in range(5):
@@ -221,7 +223,7 @@ func _build_fence() -> void:
 		var cap := Util.add_cone(self, 0.26, 0.28, Color(0.55, 0.14, 0.12), Vector3(c.x, 3.14, c.y))
 		cap.rotation_degrees.x = 0.0
 	# Zwischenpfosten entlang der Zäune
-	for pz in range(-24, 17, 4):
+	for pz in range(-24, 29, 4):
 		Util.add_box(self, Vector3(0.2, 2.65, 0.2), WOOD_D, Vector3(FX0, 1.32, float(pz)))
 		if absf(float(pz)) > 2.5:
 			Util.add_box(self, Vector3(0.2, 2.65, 0.2), WOOD_D, Vector3(FX1, 1.32, float(pz)))
@@ -435,6 +437,13 @@ func _stall_props(counter: Node3D, mode_id: String) -> void:
 			ax2.position = Vector3(-0.1, top + 0.55, 0.75)
 			counter.add_child(ax2)
 			_axe_model(ax2)
+		"dildo":
+			for i in range(3):
+				var dd := Node3D.new()
+				dd.position = Vector3(-0.15, top + 0.05, -0.9 + float(i) * 0.4)
+				dd.rotation_degrees = Vector3(0, 90.0 + 25.0 * float(i), 0)
+				counter.add_child(dd)
+				_dildo_model(dd)
 		"spear":
 			for i in range(3):
 				var sp := Node3D.new()
@@ -476,7 +485,7 @@ func _update_board(mode_id: String) -> void:
 		return
 	var best: int = int(bests.get(mode_id, 0))
 	var who: String = String(best_names.get(mode_id, ""))
-	var base: String = {"gun": "20 Schuss in 60 s", "axe": "5 Würfe", "spear": "5 Würfe", "bow": "6 Pfeile"}.get(mode_id, "")
+	var base: String = {"gun": "20 Schuss in 60 s", "axe": "5 Würfe", "dildo": "5 Würfe", "spear": "5 Würfe", "bow": "6 Pfeile"}.get(mode_id, "")
 	bl.text = "%s\nRekord: %s\n[E] spielen" % [base, ("%d  (%s)" % [best, who]) if best > 0 else "noch keiner"]
 	_fit(bl, float(bl.get_meta("wmax", 1.3)), 0.0034)
 	_update_records()
@@ -485,14 +494,14 @@ func _update_board(mode_id: String) -> void:
 func _update_records() -> void:
 	if records_label == null:
 		return
-	var names: Dictionary = {"gun": "Luftgewehr", "axe": "Axtwurf", "spear": "Speerwurf", "bow": "Bogen"}
+	var names: Dictionary = {"gun": "Luftgewehr", "axe": "Axtwurf", "spear": "Speerwurf", "bow": "Bogen", "dildo": "Dildowurf"}
 	var lines: Array = ["REKORDE"]
-	for k in ["gun", "axe", "spear", "bow"]:
+	for k in ["gun", "axe", "spear", "bow", "dildo"]:
 		var best: int = int(bests.get(k, 0))
 		var nm: String = String(names[k])
 		lines.append("%s  %s" % [nm, ("%d  %s" % [best, String(best_names.get(k, ""))]) if best > 0 else "-"])
 	records_label.text = "\n".join(lines)
-	_fit(records_label, 2.3, 0.0048)
+	_fit(records_label, 2.3, 0.0042)
 
 
 func _build_gun_lane() -> void:
@@ -557,11 +566,13 @@ func _target_rings() -> Array:
 	return [[0.15, 100], [0.35, 50], [0.58, 30], [0.8, 20], [1.0, 10]]
 
 
-func _target_disc(parent: Node3D, radius: float, archery: bool = false) -> void:
+func _target_disc(parent: Node3D, radius: float, archery: bool = false, custom: Array = []) -> void:
 	var radii: Array = [1.0, 0.8, 0.58, 0.35, 0.15]
 	var cols: Array = [Color(0.8, 0.65, 0.4), Color(0.12, 0.12, 0.12), WHITE, RED, Color(0.96, 0.82, 0.15)]
 	if archery:
 		cols = [WHITE, Color(0.1, 0.1, 0.12), Color(0.2, 0.5, 0.85), RED, Color(0.96, 0.82, 0.15)]
+	if not custom.is_empty():
+		cols = custom
 	var outer := Util.add_cylinder(parent, radius * 1.07, 0.14, WOOD_D, Vector3(-0.08, 0, 0))
 	outer.rotation_degrees.z = 90.0
 	var x := 0.0
@@ -617,6 +628,20 @@ func _build_spear_lane() -> void:
 		_label(self, "x%d" % int(t["mult"]), Vector3(tx + 0.12, 1.6 + r + 0.35, tz), 0.01, Color(1, 0.9, 0.3), 90.0, 64)
 
 
+func _build_dildo_lane() -> void:
+	_build_stall(LANE_DILDO, "dildo", "DILDOWURF", 2.6)
+	_solid(Vector3(0.5, 3.4, 8.0), Color(0.36, 0.24, 0.13), Vector3(-2.8, 1.7, LANE_DILDO))
+	for i in range(16):
+		Util.add_cylinder(self, 0.26, 3.3, Color(0.55, 0.3, 0.4) if i % 2 == 0 else Color(0.7, 0.45, 0.55), Vector3(-2.5, 1.65, LANE_DILDO - 3.75 + float(i) * 0.5))
+	for sz in [-0.6, 0.6]:
+		Util.add_box(self, Vector3(0.18, 2.6, 0.18), WOOD_D, Vector3(AXE_BOARD_X - 0.2, 1.3, LANE_DILDO + sz))
+	var board := Node3D.new()
+	board.position = Vector3(AXE_BOARD_X, 1.5, LANE_DILDO)
+	add_child(board)
+	# glatte Kachelscheibe: nur darauf haftet ein Saugnapf
+	_target_disc(board, 0.8, false, [Color(0.85, 0.95, 0.98), Color(0.25, 0.6, 0.85), Color(0.95, 0.97, 1.0), Color(0.9, 0.3, 0.55), Color(0.98, 0.85, 0.2)])
+
+
 # ---------------------------------------------------------------------------
 # Bogenschießen
 # ---------------------------------------------------------------------------
@@ -661,7 +686,7 @@ func _build_decor() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4242
 	# Strohballen und Fässer am Ostzaun
-	for i in range(8):
+	for i in range(9):
 		var bz := -26.0 + float(i) * 6.0 + rng.randf()
 		if absf(bz) < 3.2:
 			continue
@@ -670,7 +695,7 @@ func _build_decor() -> void:
 		if i % 3 == 0:
 			var b2 := Util.add_box(self, Vector3(1.2, 0.7, 0.8), Color(0.82, 0.7, 0.3), Vector3(17.0, 1.05, bz + 0.1))
 			b2.rotation.y = rng.randf() * 0.3
-	for zz in [-19.5, -6.5, 8.0]:
+	for zz in [-19.5, -6.5, 8.0, 21.0]:
 		var bar := Util.add_cylinder(self, 0.36, 0.95, Color(0.4, 0.26, 0.14), Vector3(16.9, 0.48, zz))
 		bar.rotation_degrees.x = 0.0
 		for hy in [0.18, 0.78]:
@@ -701,7 +726,7 @@ func _build_decor() -> void:
 	for mz in [-0.5, 0.3]:
 		Util.add_cylinder(pt, 0.06, 0.12, Color(0.85, 0.8, 0.7), Vector3(0.1, 0.88, mz))
 	# Laternenpfähle am Steg
-	for lz in [-24.0, -16.0, -8.0, 8.0, 14.0]:
+	for lz in [-24.0, -16.0, -8.0, 8.0, 14.0, 20.0, 26.0]:
 		Util.add_box(self, Vector3(0.12, 3.0, 0.12), WOOD_D, Vector3(16.5, 1.5, lz))
 		Util.add_box(self, Vector3(0.5, 0.06, 0.06), WOOD_D, Vector3(16.3, 2.9, lz))
 		_glow(self, Vector3(16.05, 2.75, lz), Color(1.0, 0.82, 0.4), 0.13)
@@ -723,7 +748,7 @@ func _build_decor() -> void:
 			tri.position = Vector3(FX0 + 1.5 + float(i) * 2.7, 2.75 - 0.15 * sin(float(i) * 0.9), zz)
 			add_child(tri)
 	# Wimpel über den Steg (quer, zwischen den Laternenpfählen)
-	for i in range(21):
+	for i in range(27):
 		var tri2 := MeshInstance3D.new()
 		var pm2 := PrismMesh.new()
 		pm2.size = Vector3(0.4, 0.5, 0.02)
@@ -785,6 +810,21 @@ func _arrow_model(parent: Node3D) -> void:
 		f.rotation_degrees.z = a
 
 
+## Comic-Wurfspielzeug (bewusst klobig/low-poly): Ursprung = Mitte, Länge entlang X,
+## Saugnapf-Ende bei -X (fliegt voraus, wenn es richtig trifft), Spitze bei +X.
+func _dildo_model(parent: Node3D) -> void:
+	var skin := Color(0.93, 0.72, 0.6)
+	var shaft := Util.add_cylinder(parent, 0.034, 0.34, skin, Vector3(0.0, 0, 0))
+	shaft.rotation_degrees.z = 90.0
+	Util.add_sphere(parent, 0.044, skin.lightened(0.05), Vector3(0.19, 0, 0))
+	for sz in [-0.03, 0.03]:
+		Util.add_sphere(parent, 0.04, skin.darkened(0.06), Vector3(-0.13, -0.03, sz))
+	var cup := Util.add_cylinder(parent, 0.065, 0.02, Color(0.85, 0.55, 0.5), Vector3(-0.19, 0, 0))
+	cup.rotation_degrees.z = 90.0
+	var rim := Util.add_cylinder(parent, 0.072, 0.01, Color(0.78, 0.48, 0.44), Vector3(-0.2, 0, 0))
+	rim.rotation_degrees.z = 90.0
+
+
 ## Ursprung = Klingenmitte. Griff zeigt nach -Y (unten), Schneide nach -X (vorn).
 func _axe_model(parent: Node3D) -> void:
 	Util.add_box(parent, Vector3(0.045, 0.62, 0.045), Color(0.5, 0.33, 0.16), Vector3(0, -0.31, 0))
@@ -829,7 +869,7 @@ class GateHandle:
 		range_ref.open_gate()
 		player.toast("Das Schloss springt auf! Willkommen am geheimen Schießstand.", 5.0)
 		if player.has_method("get_minihud"):
-			player.get_minihud().card("SCHIESSSTAND ENTDECKT!", "Luftgewehr · Axtwurf · Speerwurf · Bogen", Color(0.95, 0.8, 0.3), 4.0)
+			player.get_minihud().card("SCHIESSSTAND ENTDECKT!", "Luftgewehr · Axt · Speer · Bogen · Dildowurf", Color(0.95, 0.8, 0.3), 4.0)
 
 	func interact_with_held(_player: Node, _item: Node) -> bool:
 		return false
@@ -841,7 +881,7 @@ class Booth:
 	var mode_id: String = ""
 
 	func get_prompt() -> String:
-		var nm: String = {"gun": "Luftgewehr-Schießbude", "axe": "Axt-Zielwerfen", "spear": "Speerwurf", "bow": "Bogenschießen"}.get(mode_id, "")
+		var nm: String = {"gun": "Luftgewehr-Schießbude", "axe": "Axt-Zielwerfen", "spear": "Speerwurf", "bow": "Bogenschießen", "dildo": "Dildowurf"}.get(mode_id, "")
 		return "E: %s spielen" % nm
 
 	func interact(player: Node) -> void:
@@ -864,6 +904,8 @@ func _stand_for(m: String) -> Vector3:
 			return to_global(Vector3(STAND_X_THROW, 0.0, LANE_AXE))
 		"bow":
 			return to_global(Vector3(STAND_X_THROW, 0.0, LANE_BOW))
+		"dildo":
+			return to_global(Vector3(STAND_X_THROW, 0.0, LANE_DILDO))
 	return to_global(Vector3(STAND_X_THROW, 0.0, LANE_SPEAR))
 
 
@@ -903,6 +945,9 @@ func begin(m: String, player: Player) -> void:
 		"axe":
 			shots_left = AXE_THROWS
 			_plane_targets = [{"x": to_global(Vector3(AXE_BOARD_X, 0, 0)).x, "c": to_global(Vector3(AXE_BOARD_X, 1.5, LANE_AXE)), "R": 0.8, "mult": 1}]
+		"dildo":
+			shots_left = AXE_THROWS
+			_plane_targets = [{"x": to_global(Vector3(AXE_BOARD_X, 0, 0)).x, "c": to_global(Vector3(AXE_BOARD_X, 1.5, LANE_DILDO)), "R": 0.8, "mult": 1}]
 		"bow":
 			shots_left = BOW_SHOTS
 			_plane_targets = []
@@ -917,8 +962,8 @@ func begin(m: String, player: Player) -> void:
 	_draw_t = 0.0
 	phase = "intro"
 	_t_phase = 1.6
-	var title: String = {"gun": "LUFTGEWEHR", "axe": "AXT-ZIELWERFEN", "spear": "SPEERWURF", "bow": "BOGENSCHIESSEN"}[m]
-	var subt: String = {"gun": "20 Schuss in 60 Sekunden", "axe": "5 Würfe · Kraft-Balken im grünen Bereich loslassen", "spear": "5 Würfe · Ziele: x1, x2, x3", "bow": "6 Pfeile · Maustaste halten zum Spannen · Ziele: x1, x2, x3"}[m]
+	var title: String = {"gun": "LUFTGEWEHR", "axe": "AXT-ZIELWERFEN", "spear": "SPEERWURF", "bow": "BOGENSCHIESSEN", "dildo": "DILDOWURF"}[m]
+	var subt: String = {"gun": "20 Schuss in 60 Sekunden", "axe": "5 Würfe · Kraft-Balken im grünen Bereich loslassen", "spear": "5 Würfe · Ziele: x1, x2, x3", "bow": "6 Pfeile · Maustaste halten zum Spannen · Ziele: x1, x2, x3", "dildo": "5 Würfe · nur der Saugnapf klebt · Kraft-Balken im grünen Bereich loslassen"}[m]
 	pl.get_minihud().card(title, subt, Color(0.95, 0.8, 0.3), 1.6)
 	Sfx.play("pop", Vector3.INF, -3.0, 0.9)
 	_push_hud()
@@ -959,9 +1004,9 @@ func _finish() -> void:
 		bests[mode] = score
 		best_names[mode] = Game.player_name
 		_update_board(mode)
-	var gold: int = {"gun": 300, "axe": 260, "spear": 330, "bow": 420}[mode]
-	var silver: int = {"gun": 180, "axe": 140, "spear": 180, "bow": 260}[mode]
-	var bronze: int = {"gun": 80, "axe": 60, "spear": 70, "bow": 110}[mode]
+	var gold: int = {"gun": 300, "axe": 260, "spear": 330, "bow": 420, "dildo": 260}[mode]
+	var silver: int = {"gun": 180, "axe": 140, "spear": 180, "bow": 260, "dildo": 140}[mode]
+	var bronze: int = {"gun": 80, "axe": 60, "spear": 70, "bow": 110, "dildo": 60}[mode]
 	var rating := "Übung macht den Meister"
 	var col := Color(0.8, 0.8, 0.75)
 	if score >= gold:
@@ -983,7 +1028,7 @@ func _finish() -> void:
 
 func _total_throws() -> int:
 	match mode:
-		"axe":
+		"axe", "dildo":
 			return AXE_THROWS
 		"bow":
 			return BOW_SHOTS
@@ -1008,7 +1053,7 @@ func _push_hud() -> void:
 	match mode:
 		"gun":
 			info = "Schuss %d / %d  ·  %d s" % [GUN_SHOTS - shots_left, GUN_SHOTS, int(ceil(time_left))]
-		"axe", "spear", "bow":
+		"axe", "spear", "bow", "dildo":
 			var total := _total_throws()
 			info = ("Pfeil %d / %d" if mode == "bow" else "Wurf %d / %d") % [mini(total - shots_left + (0 if phase == "result" else 1), total), total]
 	mh.d = {"mode": mode, "phase": phase, "score": score, "info": info, "best": int(bests.get(mode, 0)),
@@ -1075,6 +1120,11 @@ func _build_viewmodel() -> void:
 			_vm.position = Vector3(0.22, -0.2, -0.55)
 			_vm.rotation_degrees.x = 4.0
 			_spear_model(_vm)
+		"dildo":
+			_vm.position = Vector3(0.3, -0.05, -0.7)
+			_vm.rotation_degrees = Vector3(0, 0, 90)
+			_vm.scale = Vector3.ONE * 0.9
+			_dildo_model(_vm)
 		"bow":
 			_vm.position = Vector3(-0.1, -0.12, -0.6)
 			_vm.scale = Vector3.ONE * 0.5
@@ -1195,6 +1245,10 @@ func _popup(pos: Vector3, text: String, col: Color) -> void:
 # Würfe (Axt, Speer)
 # ---------------------------------------------------------------------------
 
+func _axe_like() -> bool:
+	return mode == "axe" or mode == "dildo"
+
+
 func _throw_dir() -> Vector3:
 	var cb := pl.camera.global_transform.basis
 	var d := -cb.z
@@ -1213,13 +1267,13 @@ func _throw_origin() -> Vector3:
 func _speed(p: float) -> float:
 	if mode == "bow":
 		return lerpf(BOW_V0, BOW_V1, p)
-	return lerpf(AXE_V0, AXE_V1, p) if mode == "axe" else lerpf(SP_V0, SP_V1, p)
+	return lerpf(AXE_V0, AXE_V1, p) if _axe_like() else lerpf(SP_V0, SP_V1, p)
 
 
 func _grav() -> float:
 	if mode == "bow":
 		return BOW_G
-	return AXE_G if mode == "axe" else SP_G
+	return AXE_G if _axe_like() else SP_G
 
 
 ## Flug bis zur Brettebene simulieren: {"t": Flugzeit, "reached": bool, "pts": Array[Vector3]}
@@ -1238,7 +1292,7 @@ func _sim(origin: Vector3, dir: Vector3, v: float, want_pts: bool) -> Dictionary
 		vel.y -= g * dt
 		var np := pos + vel * dt
 		t += dt
-		if mode != "axe":
+		if not _axe_like():
 			# bis zum fernsten Ziel verfolgen
 			if np.y <= 0.03:
 				break
@@ -1265,7 +1319,7 @@ func _stick_ok(t: float) -> bool:
 
 func _update_zone(origin: Vector3, dir: Vector3) -> void:
 	_zone = []
-	if mode != "axe":
+	if not _axe_like():
 		return
 	var start := -1.0
 	for i in range(0, 51):
@@ -1300,7 +1354,7 @@ func _draw_preview(pts: Array, good: bool) -> void:
 			dot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_preview.add_child(dot)
 	var col := Color(0.4, 1.0, 0.45) if good else Color(1.0, 0.45, 0.35)
-	if mode != "axe":
+	if not _axe_like():
 		col = Color(1, 1, 1)
 	var n := _preview.get_child_count()
 	for i in range(n):
@@ -1338,7 +1392,9 @@ func _release() -> void:
 	var node := Node3D.new()
 	main.add_child(node)
 	node.global_position = origin
-	if mode == "axe":
+	if mode == "dildo":
+		_dildo_model(node)
+	elif _axe_like():
 		_axe_model(node)
 	elif mode == "bow":
 		_arrow_model(node)
@@ -1417,7 +1473,7 @@ func _update_throw(delta: float) -> void:
 		var dir := _throw_dir()
 		_update_zone(origin, dir)
 		var s := _sim(origin, dir, _speed(power), true)
-		_draw_preview(s["pts"], mode != "axe" or (bool(s["reached"]) and _stick_ok(float(s["t"]))))
+		_draw_preview(s["pts"], not _axe_like() or (bool(s["reached"]) and _stick_ok(float(s["t"]))))
 		if mode == "bow":
 			if not _bow_parts.is_empty():
 				_bow_string(_bow_parts, power)
@@ -1457,7 +1513,7 @@ func _step_proj(p: Dictionary, delta: float) -> void:
 					if d <= float(tg["R"]):
 						_hit_target(p, hp, d, tg)
 						return
-		var back_x := to_global(Vector3(AXE_BACK_X if mode == "axe" else SP_BACK_X, 0, 0)).x
+		var back_x := to_global(Vector3(AXE_BACK_X if _axe_like() else SP_BACK_X, 0, 0)).x
 		if not bouncing and np.x <= back_x:
 			_land(p, Vector3(back_x, np.y, np.z), "Fehlwurf", false)
 			return
@@ -1471,7 +1527,7 @@ func _step_proj(p: Dictionary, delta: float) -> void:
 		p["pos"] = np
 		p["vel"] = vel
 		node.global_position = np
-		if mode == "axe":
+		if _axe_like():
 			node.rotation = Vector3(0, 0, AXE_W * float(p["t"]) * (1.0 if not bouncing else 0.5))
 		else:
 			if vel.length() > 0.1:
@@ -1489,7 +1545,7 @@ func _ring_pts(d: float, r: float) -> int:
 func _hit_target(p: Dictionary, hp: Vector3, d: float, tg: Dictionary) -> void:
 	var node: Node3D = p["node"]
 	var mult: int = tg["mult"]
-	if mode == "axe":
+	if _axe_like():
 		var ok := _stick_ok(float(p["t"]))
 		if not ok:
 			# Axt prallt ab
@@ -1498,13 +1554,13 @@ func _hit_target(p: Dictionary, hp: Vector3, d: float, tg: Dictionary) -> void:
 			p["vel"] = Vector3(randf_range(1.5, 2.5), randf_range(1.0, 2.0), randf_range(-1.0, 1.0))
 			node.global_position = p["pos"]
 			Sfx.play("thunk", hp, 2.0, 0.6)
-			pl.get_minihud().card("ABGEPRALLT!", "Die Schneide steckt nicht", Color(1.0, 0.45, 0.35), 1.2)
+			pl.get_minihud().card("ABGEPRALLT!", "Der Saugnapf klebt nicht" if mode == "dildo" else "Die Schneide steckt nicht", Color(1.0, 0.45, 0.35), 1.2)
 			_after_throw(0)
 			return
 		var pts := _ring_pts(d, float(tg["R"]))
 		node.global_position = hp
 		node.rotation = Vector3(0, 0, randf_range(-0.12, 0.12))
-		_stuck["axe"].append(node)
+		_stuck[mode].append(node)
 		_proj.erase(p)
 		Sfx.play("thunk", hp, 3.0, 0.7)
 		Sfx.play("crate", hp, -6.0, 1.3)
@@ -1542,7 +1598,7 @@ func _land(p: Dictionary, at: Vector3, msg: String, was_bounce: bool) -> void:
 	node.global_position = at
 	if was_bounce:
 		node.rotation = Vector3(0, 0, PI / 2.0)
-	elif mode != "axe":
+	elif not _axe_like():
 		node.global_position.y = maxf(at.y, 0.1)
 	_stuck[mode].append(node)
 	_proj.erase(p)

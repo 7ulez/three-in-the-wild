@@ -342,7 +342,7 @@ func _draw_range() -> void:
 	var best: int = d.get("best", 0)
 	var info: String = d.get("info", "")
 	var md: String = d.get("mode", "")
-	var title: String = {"gun": "LUFTGEWEHR", "axe": "AXT-ZIELWERFEN", "spear": "SPEERWURF", "bow": "BOGENSCHIESSEN"}.get(md, "")
+	var title: String = {"gun": "LUFTGEWEHR", "axe": "AXT-ZIELWERFEN", "spear": "SPEERWURF", "bow": "BOGENSCHIESSEN", "dildo": "DILDOWURF"}.get(md, "")
 	# Kopf: Punkte
 	_panel(Rect2(cx - 190, 112, 380, 92))
 	_text(Vector2(cx, 138), title, 18, UI.PAPER)
@@ -364,8 +364,8 @@ func _draw_range() -> void:
 		draw_rect(Rect2(x0, y0, w * pw, 26), Color(1.0, 0.85, 0.3, 0.35))
 		draw_rect(Rect2(x0 + w * pw - 4, y0 - 6, 8, 38), Color(1.0, 0.95, 0.6))
 		draw_rect(Rect2(x0, y0, w, 26), UI.INK, false, 3.0)
-		if md == "axe":
-			_text(Vector2(cx, y0 + 62), "Loslassen, wenn der Balken im GRÜNEN Bereich ist (dann bleibt die Axt stecken)", 14, Color(1, 1, 1, 0.75))
+		if md == "axe" or md == "dildo":
+			_text(Vector2(cx, y0 + 62), "Loslassen, wenn der Balken im GRÜNEN Bereich ist (dann bleibt sie stecken)", 14, Color(1, 1, 1, 0.75))
 	else:
 		var ph: String = d.get("phase", "")
 		if ph == "play":
