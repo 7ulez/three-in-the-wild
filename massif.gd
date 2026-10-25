@@ -523,6 +523,9 @@ func _glow_mat(col: Color, energy: float = 1.6) -> StandardMaterial3D:
 	return m
 
 
+var _deco: Node3D = null   # Container der Höhlen-Deko (wird ausgeblendet, wenn der Spieler weit weg ist)
+
+
 func _add_mesh(mesh: Mesh, mat: Material, pos: Vector3, rot_deg: Vector3 = Vector3.ZERO) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
@@ -530,7 +533,7 @@ func _add_mesh(mesh: Mesh, mat: Material, pos: Vector3, rot_deg: Vector3 = Vecto
 	mi.position = pos
 	mi.rotation_degrees = rot_deg
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mi)
+	(_deco if _deco != null else self).add_child(mi)
 	return mi
 
 
@@ -564,6 +567,9 @@ func _cone_mesh(r: float, h: float, seg: int = 6) -> CylinderMesh:
 ## Die Höhle schön machen: Boden, Tropfsteine, Stützbalken, Gleise mit Lore, Teich,
 ## Leuchtpilze, Fackeln, Schatznische mit Gold, Edelsteinen und Knochen.
 func _build_cave_decor() -> void:
+	_deco = CaveDecor.new()
+	_deco.name = "CaveDecor"
+	add_child(_deco)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2026
 	var stone := StandardMaterial3D.new()
@@ -676,7 +682,7 @@ func _build_cave_decor() -> void:
 	cap_mesh.radial_segments = 6
 	cap_mesh.rings = 3
 	for ci in range(3):
-		_multi(self, cap_mesh, _glow_mat(shroom_cols[ci], 1.8), cap_xf[ci])
+		_multi(_deco, cap_mesh, _glow_mat(shroom_cols[ci], 1.8), cap_xf[ci])
 
 	# --- Fackeln (nur leuchtende Flamme, kein Licht) ---
 	var torch_spots: Array = [Vector3(79.2, 1.9, -75.6), Vector3(79.2, 1.9, -72.4), Vector3(88.3, 2.0, -70.0), Vector3(88.3, 2.0, -78.0),
@@ -697,14 +703,14 @@ func _build_cave_decor() -> void:
 	co_mesh.height = 0.11
 	co_mesh.radial_segments = 6
 	co_mesh.rings = 3
-	_multi(self, fl_mesh, _glow_mat(Color(1.0, 0.55, 0.15), 2.4), flame_xf)
-	_multi(self, co_mesh, _glow_mat(Color(1.0, 0.9, 0.5), 3.0), core_xf)
+	_multi(_deco, fl_mesh, _glow_mat(Color(1.0, 0.55, 0.15), 2.4), flame_xf)
+	_multi(_deco, co_mesh, _glow_mat(Color(1.0, 0.9, 0.5), 3.0), core_xf)
 	var nl := OmniLight3D.new()
 	nl.light_color = Color(1.0, 0.7, 0.35)
 	nl.light_energy = 1.4
 	nl.omni_range = 6.5
 	nl.position = Vector3(106.0, 2.3, -74.0)
-	add_child(nl)
+	_deco.add_child(nl)
 
 	# --- Schatznische: Münzen, Edelsteine, Knochen, Wächter-Schädel ---
 	var gmat := StandardMaterial3D.new()
@@ -725,7 +731,7 @@ func _build_cave_decor() -> void:
 		var rr := rng.randf_range(0.9, 2.1)
 		var nb := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-12, 12)), 0, deg_to_rad(rng.randf_range(-12, 12))))
 		ncoin_xf.append(Transform3D(nb, Vector3(107.2 + cos(a2) * rr * 0.9 - 0.3, 0.025, -74.0 + sin(a2) * rr * 0.55)))
-	_multi(self, cm2, gmat, ncoin_xf)
+	_multi(_deco, cm2, gmat, ncoin_xf)
 	var gem_cols: Array = [Color(1.0, 0.2, 0.3), Color(0.2, 0.6, 1.0), Color(0.3, 1.0, 0.5), Color(0.9, 0.3, 1.0)]
 	for i in range(6):
 		var gem := PrismMesh.new()
@@ -805,7 +811,7 @@ func _support_frame(pos: Vector3, along_z: bool, wood: Material, wood_l: Materia
 func _build_cart(pos: Vector3, wood: Material, iron: Material) -> void:
 	var cart := Node3D.new()
 	cart.position = pos
-	add_child(cart)
+	_deco.add_child(cart)
 	var floor_b := BoxMesh.new()
 	floor_b.size = Vector3(1.3, 0.08, 1.0)
 	var parts: Array = [
@@ -1138,3 +1144,19 @@ func _process(_delta: float) -> void:
 		summit_reached = true
 		Game.summit = true
 		main.player.toast("Aussichtspunkt erreicht! Was für ein Blick über den See und die Wälder.", 6.0)
+
+
+## Höhlen-Deko: im Browser ist die Zahl gleichzeitig sichtbarer Objekte begrenzt,
+## darum wird sie nur gezeichnet, wenn der Spieler in der Nähe ist.
+class CaveDecor extends Node3D:
+	var _t: float = 0.0
+
+	func _process(delta: float) -> void:
+		_t -= delta
+		if _t > 0.0:
+			return
+		_t = 0.5
+		var main: Node = get_parent().get_parent()
+		var pl: Variant = main.get("player") if main != null else null
+		if pl is Node3D:
+			visible = (pl as Node3D).global_position.distance_to(Vector3(95.0, 0.0, -74.0)) < 90.0

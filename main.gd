@@ -88,7 +88,25 @@ func _ready() -> void:
 		net.start(self)
 
 
+var _cull_t: float = 0.0
+var _range_node: Node3D = null
+
+
 func _process(delta: float) -> void:
+	_cull_t -= delta
+	if _cull_t <= 0.0 and player != null:
+		_cull_t = 0.5
+		if _range_node == null:
+			_range_node = get_node_or_null("ShootingRange") as Node3D
+		if _range_node != null:
+			# Im Browser ist die Zahl gleichzeitig sichtbarer Objekte begrenzt: Schiessstand nur in der Naehe zeichnen
+			_range_node.visible = player.global_position.distance_to(Vector3(-109.0, 0.0, -10.0)) < 130.0
+		var hn: Node = get_node_or_null("Hideouts")
+		if hn != null:
+			for hid in ["fuchsbau", "huette", "tropf", "baum", "lager"]:
+				var hc := hn.get_node_or_null(hid) as Node3D
+				if hc != null:
+					hc.visible = player.global_position.distance_to(hc.global_position) < 95.0
 	if Game.dedicated:
 		if weather == null:
 			weather = Weather.new()
