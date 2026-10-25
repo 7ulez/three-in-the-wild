@@ -1323,6 +1323,9 @@ func _update_held() -> void:
 		return
 	held.linear_velocity = (diff * 12.0).limit_length(14.0)
 	held.angular_velocity *= 0.8
+	if held.item_name != "Joint" and held.item_name != "Luftgewehr" and body_visual.has_meta("hand"):
+		_hold_in_hand()
+		return
 	if held.item_name == "Joint":
 		# Joint hängt zwischen den Fingern rechts unten im Bild, Glut zeigt nach oben-vorn
 		var jb := head.global_transform.basis
@@ -1345,6 +1348,24 @@ func _update_held() -> void:
 		held.linear_velocity = ((gt - held.global_position) * 20.0).limit_length(20.0)
 		held.angular_velocity = Vector3.ZERO
 		held.global_transform.basis = gb
+
+
+## Gegenstand liegt in der echten rechten Hand (Ego- und Dritte Person), lange Sachen zeigen nach vorn, Rolle nach unten.
+func _hold_in_hand() -> void:
+	var h := body_visual.get_meta("hand") as Node3D
+	if h == null or not is_instance_valid(h):
+		return
+	var gb := h.global_transform.basis
+	if held.item_size.x > held.item_size.z * 2.0:
+		var fwd := -head.global_transform.basis.z
+		fwd.y = 0.0
+		if fwd.length() < 0.01:
+			fwd = Vector3.FORWARD
+		var bx := fwd.normalized()
+		gb = Basis(bx, Vector3.UP, bx.cross(Vector3.UP).normalized())
+	held.linear_velocity = ((h.global_position - held.global_position) * 20.0).limit_length(20.0)
+	held.angular_velocity = Vector3.ZERO
+	held.global_transform.basis = gb
 
 
 ## Das Objekt, auf das man zielt, wenn es nah genug ist (sonst null).
