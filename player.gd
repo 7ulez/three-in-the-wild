@@ -769,6 +769,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				hud.toggle_map()
 			KEY_F3:
 				hud.toggle_debug()
+			KEY_F2:
+				bild_report("Manuell (F2)")
 			KEY_F4:
 				repair_view()
 			KEY_E:
@@ -2129,6 +2131,7 @@ func _render_guard(delta: float) -> void:
 		_rg_bad += 1
 		if _rg_bad >= 2:
 			_rg_bad = 0
+			bild_report("BILDFEHLER erkannt")
 			_rg_apply()
 	else:
 		_rg_bad = 0
@@ -2180,6 +2183,40 @@ func _rg_restore() -> void:
 		if is_instance_valid(o):
 			o.set(e[1], e[2])
 	_rg_undo.clear()
+
+
+## Bericht fuer die Browser-Konsole (F2 oder automatisch bei Bildfehler): alles, was zur Diagnose noetig ist.
+func bild_report(tag: String) -> void:
+	var w := get_parent()
+	var obj: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)
+	var dc: int = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)
+	var nav := 0
+	var mi_n := 0
+	var lights := 0
+	var visible_items := 0
+	for c in w.find_children("*", "Node3D", true, false):
+		if c is MeshInstance3D:
+			mi_n += 1
+		elif c is Light3D and (c as Light3D).visible:
+			lights += 1
+		if c is Item and (c as Item).visible:
+			visible_items += 1
+	var av_n := 0
+	if Net.instance != null:
+		av_n = Net.instance.avatars.size()
+	var lines := PackedStringArray([
+		"=== %s === Zeit %s, Tag %d" % [tag, Game.clock_text(), Game.day_count],
+		"FPS %d  Objekte %d  Drawcalls %d  Nodes %d" % [Engine.get_frames_per_second(), obj, dc, w.get_child_count()],
+		"Kamera %s  far %.0f  near %.2f  Spieler %s" % [str(camera.global_position), camera.far, camera.near, str(global_position)],
+		"Netz-Netze %d  sichtbare Lichter %d  sichtbare Gegenstaende %d  Mitspieler %d" % [mi_n, lights, visible_items, av_n],
+		"Material-Ersatz bisher %d  %s" % [mat_fixes, mat_report],
+		"Wächter-Schritt %d  %s" % [_rg_step, guard_log],
+	])
+	var txt := "\n".join(lines)
+	print(txt)
+	if OS.has_feature("web"):
+		var errs: Variant = JavaScriptBridge.eval("(window.__errs || []).slice(-8).join(' | ')", true)
+		JavaScriptBridge.eval("console.warn(%s)" % JSON.stringify("[BILDBERICHT] " + txt + "\nBrowser-Fehler: " + str(errs)), true)
 
 
 func _rg_apply() -> void:
