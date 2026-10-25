@@ -589,6 +589,11 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			for k in range(1 + v % 2 + 1):
 				s = _add(s, _croak(), k * 0.3)
 			return _wav(s, 0.7)
+		"hiss":
+			var n := _white(0.9)
+			var h := _env(_nf(n, 1, 4200.0, 0.8), 0.06, 2.2, 1.0)
+			h = _add(h, _env(_nf(_white(0.9), 1, 2400.0, 0.9), 0.08, 2.6, 0.5))
+			return _wav(h, 0.8)
 		"quack":
 			var s := PackedFloat32Array()
 			for k in range(2 if v == 2 else 1):

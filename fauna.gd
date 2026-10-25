@@ -324,6 +324,9 @@ class Animal extends Node3D:
 	var mate_role: int = 0      # 0 nichts, 1 = oben, 2 = unten
 	var mate_t: float = 0.0
 	var _humping: bool = false
+	var _aggro: bool = false
+	var _hiss_cd: float = 0.0
+	var _bite_cd: float = 0.0
 
 	## Trefferzone (Mittelpunkt über dem Boden und Radius) für das Luftgewehr
 	func hit_center_y() -> float:
@@ -659,6 +662,37 @@ class Animal extends Node3D:
 			ap.play("Idle", 0.1)
 		_hump_pose(true)
 
+	## Schwan: Naeherst du dich (< 7 m), faucht er, plustert sich auf und hackt zu, wenn du in Reichweite bist.
+	## Laeuft lokal fuer den eigenen Spieler (auch bei Puppen), die Bewegung kommt vom Host.
+	func _swan_local(delta: float) -> void:
+		var pl := fauna.player
+		if pl == null or not is_instance_valid(pl) or dead or not visible:
+			return
+		var d := Vector2(pl.global_position.x - global_position.x, pl.global_position.z - global_position.z).length()
+		var was := _aggro
+		_aggro = d < (9.0 if _aggro else 7.0)
+		_hiss_cd -= delta
+		_bite_cd -= delta
+		if _aggro and (not was or _hiss_cd <= 0.0):
+			_hiss_cd = randf_range(2.5, 4.0)
+			Sfx.play("hiss", global_position, 2.0, randf_range(0.9, 1.1))
+		var puff := 1.18 if _aggro else 1.0
+		body.scale = body.scale.lerp(Vector3.ONE * puff, minf(delta * 6.0, 1.0))
+		var lunge := d < 2.4
+		var tilt := 0.0
+		if _aggro:
+			tilt = -0.22 + sin(_t * 9.0) * 0.07 - (0.25 if lunge else 0.0)
+		body.rotation.x = lerpf(body.rotation.x, tilt, minf(delta * 8.0, 1.0))
+		if _aggro:
+			# dem Spieler zugewandt (Puppen werden sonst vom Host gedreht)
+			var ang := atan2(-(pl.global_position.x - global_position.x), -(pl.global_position.z - global_position.z))
+			rotation.y = lerp_angle(rotation.y, ang, minf(delta * 5.0, 1.0))
+		if lunge and _bite_cd <= 0.0 and pl.get("needs") != null:
+			_bite_cd = 1.8
+			Sfx.play("thunk", global_position, 0.0, 1.3)
+			Sfx.play("hiss", global_position, 4.0, 1.2)
+			pl.needs.damage(6.0, "Ein Schwan hat dich angegriffen.")
+
 	func _valid(p: Vector3) -> bool:
 		match kind:
 			"swan":
@@ -698,6 +732,8 @@ class Animal extends Node3D:
 		_t += delta
 		if kind == "fox":
 			_fox_anim(delta)
+		if kind == "swan":
+			_swan_local(delta)
 		if fauna.is_puppet():
 			_was_puppet = true
 			if net_has:
@@ -730,11 +766,23 @@ class Animal extends Node3D:
 		var pd := _pdist()
 		match kind:
 			"swan":
-				var sflee := pd < 6.0
-				if sflee and fauna.player != null:
-					var saway := _away_from_player(6.0)
-					if _valid(saway):
-						target = saway
+				# Schwan greift an statt zu fliehen: schwimmt auf den naechsten Spieler zu, soweit der See reicht
+				var sflee := pd < 7.0
+				if sflee:
+					var pp: Variant = fauna.nearest_player_pos(global_position)
+					if pp != null:
+						var dv := (pp as Vector3) - global_position
+						dv.y = 0.0
+						if dv.length() > 1.0:
+							var np := global_position + dv.normalized() * speed * 2.6 * delta
+							if _valid(np):
+								global_position = np
+							else:
+								var side := Vector3(-dv.z, 0, dv.x).normalized() * speed * 1.5 * delta
+								if _valid(global_position + side):
+									global_position += side
+								elif _valid(global_position - side):
+									global_position -= side
 				elif wait > 0.0:
 					wait -= delta
 				elif _step_to(delta, speed):
@@ -745,8 +793,8 @@ class Animal extends Node3D:
 							target = scand
 							break
 				var moving := sflee or wait <= 0.0
-				if moving:
-					_step_to(delta, speed * (2.5 if sflee else 1.0))
+				if moving and not sflee:
+					_step_to(delta, speed)
 				global_position.y = 0.0
 				if ap != null:
 					if moving:
