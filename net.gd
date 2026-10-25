@@ -150,6 +150,7 @@ class RemoteAvatar:
 				add_child(_pee)
 			if _pee != null and is_instance_valid(_pee):
 				_pee.emitting = pee_now
+				Fx.pee_show(_pee, pee_now)
 			if pee_now:
 				Sfx.play("trickle", global_position)
 		if pee_now:

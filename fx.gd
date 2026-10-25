@@ -111,7 +111,39 @@ static func pee_stream() -> CPUParticles3D:
 	pm.material = pmat
 	p.mesh = pm
 	p.position = Vector3(0, 0.95, -0.25)
+	# Cartoon-Pimmel: nur sichtbar, solange gepinkelt wird (relativ zum Strahl-Ursprung)
+	var skin := StandardMaterial3D.new()
+	skin.albedo_color = Color(0.92, 0.7, 0.6)
+	var pen := MeshInstance3D.new()
+	pen.name = "Pimmel"
+	var cap := CapsuleMesh.new()
+	cap.radius = 0.028
+	cap.height = 0.17
+	cap.material = skin
+	pen.mesh = cap
+	pen.rotation_degrees = Vector3(90, 0, 0)
+	pen.position = Vector3(0, -0.01, 0.15)
+	pen.visible = false
+	p.add_child(pen)
+	for sx in [-0.03, 0.03]:
+		var b := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.032
+		sm.height = 0.064
+		sm.material = skin
+		b.mesh = sm
+		b.position = Vector3(sx, -0.045, 0.2)
+		b.visible = false
+		b.name = "Ei" + str(sx)
+		p.add_child(b)
 	return p
+
+
+## Zeigt/versteckt den Pimmel am Strahl (beim Pinkeln).
+static func pee_show(p: CPUParticles3D, on: bool) -> void:
+	for c in p.get_children():
+		if c is MeshInstance3D:
+			(c as MeshInstance3D).visible = on
 
 
 ## Nasse Stelle am Boden: wird größer, wenn man weiter hinpinkelt, und trocknet nach einer Weile wieder.

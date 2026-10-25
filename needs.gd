@@ -201,6 +201,7 @@ func _process(delta: float) -> void:
 	if want_pee != peeing:
 		peeing = want_pee
 		pee_particles.emitting = peeing
+		Fx.pee_show(pee_particles, peeing)
 		if peeing:
 			player.toast("Sch...pläätscher.", 1.5)
 			Sfx.play("trickle", player.global_position)
@@ -210,6 +211,7 @@ func _process(delta: float) -> void:
 		if bladder <= 0.0:
 			peeing = false
 			pee_particles.emitting = false
+			Fx.pee_show(pee_particles, false)
 			player.toast("Ahh. Besser.", 2.0)
 
 	bars["Gesundheit"].value = health / 100.0
