@@ -44,7 +44,7 @@ static func rock(parent: Node, pos: Vector3, radii: Vector3, seed_v: int, color:
 	noise.frequency = 1.6
 	for i in range(mdt.get_vertex_count()):
 		var v := mdt.get_vertex(i)
-		var n := noise.get_noise_3dv(v * 2.0 + Vector3(seed_v, 0, 0))
+		var n := noise.get_noise_3dv(v * 2.0 + Vector3(float(absi(seed_v) % 997), 0, 0))   # kleiner Versatz: riesige Seeds ergaben NaN-Felsen
 		v *= 1.0 + n * rough
 		v.y = maxf(v.y, -0.55)       # unten abgeflacht, liegt satt auf
 		mdt.set_vertex(i, v * 2.0 * Vector3.ONE)

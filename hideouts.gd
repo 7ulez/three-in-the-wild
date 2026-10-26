@@ -34,29 +34,35 @@ func build(p_main: Node) -> void:
 		match String(s["id"]):
 			"fuchsbau":
 				_cave(root, Vector3(9, 4.2, 8), Vector3(2.4, 2.4, 6), Vector3(4.4, 2.8, 4.2), "Fuchsbau")
+				HideoutDeco.fuchsbau(root, Vector3(9, 4.2, 8), Vector3(2.4, 2.4, 6))
 				_trap(root, "pit", Vector3(0.4, 0, -8.2))
 				_trap(root, "bear", Vector3(-3.5, 0, -6.5))
 				_mush(root, "gut", Vector3(5.5, 0, -3))
 				_mush(root, "gift", Vector3(-5.5, 0, -2))
 			"huette":
 				_hut(root)
+				HideoutDeco.huette(root)
 				_trap(root, "bear", Vector3(1.2, 0, -5.0))
 				_trap(root, "wasp", Vector3(-3.0, 0, -2.0))
 				_mush(root, "gift", Vector3(4.5, 0, 1))
 				_mush(root, "gut", Vector3(-5, 0, 3))
 			"tropf":
 				_cave(root, Vector3(15, 6.2, 12), Vector3(3.2, 3.0, 8), Vector3(8.4, 4.2, 7.0), "Tropfsteinhöhle", true)
+				HideoutDeco.tropf(root, Vector3(15, 6.2, 12), Vector3(3.2, 3.0, 8))
 				_trap(root, "rocks", Vector3(0, 0, -6.5))
 				_trap(root, "pit", Vector3(-2.6, 0, -10.0))
 				_mush(root, "gift", Vector3(7.5, 0, -6))
 				_mush(root, "beere", Vector3(-8.5, 0, -4))
 			"baum":
 				_hollow_tree(root)
+				HideoutDeco.baum(root)
+				HideoutDeco.fireflies(root, Vector3(0, 1.3, -2.5), 3.0)
 				_trap(root, "wasp", Vector3(2.5, 0, -1.0))
 				_trap(root, "bear", Vector3(-1.5, 0, -4.0))
 				_mush(root, "beere", Vector3(3.5, 0, 3))
 			"lager":
 				_stone_camp(root)
+				HideoutDeco.lager(root)
 				_trap(root, "bear", Vector3(2.0, 0, -5.0))
 				_trap(root, "rocks", Vector3(-4.0, 0, -3.0))
 				_mush(root, "gift", Vector3(4.5, 0, 2.5))
@@ -181,14 +187,14 @@ func _cave(root: Node3D, size: Vector3, tunnel: Vector3, chamber: Vector3, label
 		HideoutArt.moss(root, Vector3(rng.randf_range(-size.x * 0.3, size.x * 0.3), size.y * rng.randf_range(0.82, 0.98), rng.randf_range(-size.z * 0.25, size.z * 0.3)), rng.randf_range(1.0, 1.8))
 	for i in range(6):
 		var a2 := rng.randf() * TAU
-		HideoutArt.bush(root, Vector3(cos(a2) * size.x * rng.randf_range(0.3, 0.7), size.y * rng.randf_range(0.0, 0.5) * 0.4, sin(a2) * size.z * rng.randf_range(0.3, 0.7)), rng.randf_range(0.5, 0.9), rng)
+		var bf := rng.randf_range(0.62, 0.75)     # außen am Hügelfuß (früher landeten Büsche auch in der Kammer)
+		if sin(a2) < -0.5 and absf(cos(a2)) < 0.45:
+			a2 += PI * 0.5
+		HideoutArt.bush(root, Vector3(cos(a2) * size.x * bf, 0.0, sin(a2) * size.z * bf), rng.randf_range(0.5, 0.9), rng)
 	var wood := Color(0.34, 0.22, 0.12)
 	if not drip:
 		# Fuchsbau: Holzrahmen am Eingang, Wurzeln, Knochen, Laterne
-		var hw := tunnel.x / 2.0
-		HideoutArt.beam(root, Vector3(-hw - 0.15, 0, front - 0.9), Vector3(-hw - 0.15, tunnel.y + 0.25, front - 0.9), 0.13, wood, true)
-		HideoutArt.beam(root, Vector3(hw + 0.15, 0, front - 0.9), Vector3(hw + 0.15, tunnel.y + 0.25, front - 0.9), 0.13, wood, true)
-		HideoutArt.beam(root, Vector3(-hw - 0.4, tunnel.y + 0.2, front - 0.9), Vector3(hw + 0.4, tunnel.y + 0.2, front - 0.9), 0.12, wood.darkened(0.1))
+		var hw := tunnel.x / 2.0     # (der Holzrahmen ist einem Wurzelbogen gewichen, siehe HideoutDeco)
 		for i in range(6):
 			var rx := rng.randf_range(-hw - 0.2, hw + 0.2)
 			var rl := rng.randf_range(0.4, 1.1)
@@ -295,7 +301,15 @@ func _hut(root: Node3D) -> void:
 	HideoutArt.lantern(root, Vector3(-1.0, 2.2, -3.05), 0.7)
 	# Fenster mit Läden an der Seite
 	for sx in [-1.0, 1.0]:
-		Util.add_box(root, Vector3(0.06, 0.55, 0.7), Color(0.05, 0.06, 0.08), Vector3(sx * 2.38, 1.4, 0.3))
+		var win := Util.add_box(root, Vector3(0.06, 0.55, 0.7), Color(0.05, 0.06, 0.08), Vector3(sx * 2.38, 1.4, 0.3))
+		var wm := StandardMaterial3D.new()       # warmes Licht hinter den Scheiben
+		wm.albedo_color = Color(0.95, 0.7, 0.35)
+		wm.emission_enabled = true
+		wm.emission = Color(1.0, 0.62, 0.25)
+		wm.emission_energy_multiplier = 0.9
+		win.material_override = wm
+		Util.add_box(root, Vector3(0.07, 0.04, 0.72), Color(0.25, 0.17, 0.1), Vector3(sx * 2.4, 1.4, 0.3))      # Fensterkreuz
+		Util.add_box(root, Vector3(0.07, 0.57, 0.04), Color(0.25, 0.17, 0.1), Vector3(sx * 2.4, 1.4, 0.3))
 		Util.add_box(root, Vector3(0.08, 0.6, 0.3), dk, Vector3(sx * 2.4, 1.4, -0.25))
 		Util.add_box(root, Vector3(0.08, 0.6, 0.3), dk, Vector3(sx * 2.4, 1.4, 0.85))
 	# Schornstein aus Steinen mit Rauch
