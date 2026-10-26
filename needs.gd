@@ -33,10 +33,16 @@ func setup(p: Player, layer: CanvasLayer) -> void:
 	player = p
 	var frame := PanelContainer.new()
 	frame.theme = UI.theme()
-	frame.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	frame.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	frame.offset_left = 14.0
-	frame.offset_bottom = -14.0
+	if Game.touch:
+		# Touch: unten links sitzt der Joystick - Leisten nach oben unter die Info-Kästen
+		frame.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		frame.offset_left = 14.0
+		frame.offset_top = 136.0
+	else:
+		frame.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+		frame.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		frame.offset_left = 14.0
+		frame.offset_bottom = -14.0
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.add_theme_stylebox_override("panel", UI.sticker(UI.PAPER, 14, 4.0, Vector4(12, 8, 12, 8)))
 	layer.add_child(frame)

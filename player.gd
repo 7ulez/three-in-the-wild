@@ -884,7 +884,7 @@ func _update_help() -> void:
 			[tinder, sticks, logs, stones, beers_drunk, water_drunk, Game.catches.size(), Game.chili_served], others)
 	if Game.touch:
 		var hl: PackedStringArray = help_label.text.split("\n")
-		help_label.text = hl[0] + "\n" + hl[1] + "\nLinks: Joystick laufen (ganz raus = rennen) · Rechts wischen: umschauen · BENUTZEN: Tür, Kiste, Feuer ... · Mehr: alles andere"
+		help_label.text = hl[0] + "\n" + hl[1] + "\nLinks: Joystick laufen (leicht = schleichen, ganz raus = rennen) · Rechts wischen: umschauen · BENUTZEN: Tür, Kiste, Feuer ... · Mehr: alles andere"
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1047,6 +1047,11 @@ func _physics_process(delta: float) -> void:
 		dir.x -= 1.0
 	if Input.is_physical_key_pressed(KEY_D):
 		dir.x += 1.0
+	var analog := 1.0
+	if Game.touch and Game.touch_move != Vector2.ZERO:
+		# Touch-Joystick: stufenlose Richtung, leicht ausgelenkt = langsam schleichen
+		dir = Vector3(Game.touch_move.x, 0.0, Game.touch_move.y)
+		analog = lerpf(0.3, 1.0, clampf(Game.touch_move.length() / 0.85, 0.0, 1.0))
 	_drink_cd = maxf(_drink_cd - delta, 0.0)
 	promille = maxf(promille - delta * 0.005, 0.0)
 	var drunk := clampf(promille / 1.5, 0.0, 1.5)
@@ -1069,6 +1074,7 @@ func _physics_process(delta: float) -> void:
 	var sprinting := Input.is_physical_key_pressed(KEY_SHIFT) and held == null and not crouching
 	var speed := SPRINT_SPEED if sprinting else WALK_SPEED
 	speed *= _carry_factor()
+	speed *= analog
 	if crouching:
 		speed *= 0.5
 	speed *= 1.0 - 0.45 * water_d

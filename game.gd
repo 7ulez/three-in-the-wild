@@ -67,6 +67,8 @@ static func apply_quality(win: Window) -> void:
 static var touch_reel: bool = false   # "Aktion"-Knopf wird gehalten (Angel einholen)
 
 
+static var touch_move: Vector2 = Vector2.ZERO   # analoger Joystick (Touch), Länge 0..1
+
 static func is_captured() -> bool:
 	return touch or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 

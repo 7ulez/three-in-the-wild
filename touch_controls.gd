@@ -6,18 +6,22 @@ extends CanvasLayer
 ## Die Knöpfe "drücken" einfach die gleichen Tasten wie am PC, dadurch funktioniert
 ## alles im Spiel genauso wie mit Tastatur und Maus.
 
-const LOOK_SPEED: float = 1.4
-const JOY_RADIUS: float = 95.0
+const LOOK_SPEED: float = 1.25        # Grundempfindlichkeit beim Umschauen
+const LOOK_ACCEL: float = 0.035       # schnelle Wischer drehen überproportional weiter
+const JOY_RADIUS: float = 90.0
+const JOY_DEAD: float = 0.12           # Totzone in der Mitte
+const JOY_SPRINT: float = 0.9          # ab hier wird gerannt
+const HIT_SLOP: float = 16.0           # Knöpfe reagieren etwas außerhalb des Kreises
 
 # id, Beschriftung, Art ("key", "hold", "lmb", "rmb", "wheel", "more", "full"), Taste
 var main_buttons: Array = [
-	{"id": "act", "label": "Aktion", "kind": "lmb", "r": 68.0},
-	{"id": "jump", "label": "Springen", "kind": "hold", "key": KEY_SPACE, "r": 48.0},
-	{"id": "use", "label": "Benutzen", "kind": "key", "key": KEY_E, "r": 60.0},
-	{"id": "reel", "label": "Einholen", "kind": "rmb", "r": 40.0},
-	{"id": "duck", "label": "Ducken", "kind": "hold", "key": KEY_C, "r": 40.0},
-	{"id": "throw", "label": "Werfen", "kind": "key", "key": KEY_G, "r": 40.0},
-	{"id": "more", "label": "Mehr", "kind": "more", "r": 34.0},
+	{"id": "act", "label": "Aktion", "kind": "lmb", "r": 74.0},
+	{"id": "jump", "label": "Springen", "kind": "hold", "key": KEY_SPACE, "r": 52.0},
+	{"id": "use", "label": "Benutzen", "kind": "key", "key": KEY_E, "r": 58.0},
+	{"id": "reel", "label": "Einholen", "kind": "rmb", "r": 48.0},
+	{"id": "duck", "label": "Ducken", "kind": "hold", "key": KEY_C, "r": 46.0},
+	{"id": "throw", "label": "Werfen", "kind": "key", "key": KEY_G, "r": 46.0},
+	{"id": "more", "label": "Mehr", "kind": "more", "r": 42.0},
 ]
 var more_buttons: Array = [
 	{"label": "Trinken", "kind": "key", "key": KEY_F},
@@ -88,13 +92,19 @@ func _process(_delta: float) -> void:
 				reel_vis = true
 			Fisher.S.FIGHT:
 				act = "KURBELN"
+	var gun := _player.held != null and _player.held.item_name == "Luftgewehr"
+	var reel_label := "Schnur ein"
+	if gun:
+		act = "Schießen"
+		reel_vis = true
+		reel_label = "Zielen"
 	var use := "Benutzen"
 	if _player.fire_bowl != null:
 		use = "Funken!"
 	elif _player.stir_oven != null:
 		use = "Rühren!"
 	var throw_vis := _player.held != null
-	var sig := "%s|%s|%s|%s" % [act, use, reel_vis, throw_vis]
+	var sig := "%s|%s|%s|%s|%s" % [act, use, reel_vis, throw_vis, reel_label]
 	if sig == _sig:
 		return
 	_sig = sig
@@ -106,7 +116,7 @@ func _process(_delta: float) -> void:
 				b["dyn"] = use
 			"reel":
 				b["hidden"] = not reel_vis
-				b["dyn"] = "Schnur ein"
+				b["dyn"] = reel_label
 			"throw":
 				b["hidden"] = not throw_vis
 	pad.queue_redraw()
@@ -118,21 +128,25 @@ func _size() -> Vector2:
 
 func _layout() -> void:
 	var s := _size()
+	# Daumen-Bogen: Aktion unten rechts, die anderen Knöpfe im Viertelkreis darum
+	var hub := Vector2(s.x - 150.0, s.y - 135.0)
+	var ring := 178.0
+	var at := func(deg: float, rr: float) -> Vector2: return hub + Vector2(cos(deg_to_rad(deg)), sin(deg_to_rad(deg))) * rr
 	var pos := {
-		"act": Vector2(s.x - 115, s.y - 125),
-		"jump": Vector2(s.x - 255, s.y - 80),
-		"use": Vector2(s.x - 125, s.y - 280),
-		"reel": Vector2(s.x - 250, s.y - 215),
-		"duck": Vector2(s.x - 370, s.y - 70),
-		"throw": Vector2(s.x - 270, s.y - 330),
-		"more": Vector2(s.x - 60, s.y - 395),
+		"act": hub,
+		"jump": at.call(180.0, ring),
+		"reel": at.call(218.0, ring),
+		"use": at.call(256.0, ring),
+		"throw": at.call(294.0, ring),
+		"duck": at.call(188.0, ring + 128.0),
+		"more": Vector2(s.x - 62.0, s.y - 440.0),
 	}
 	for b in main_buttons:
 		b["pos"] = pos[b["id"]]
 		b["r2"] = b["r"]
-	# "Mehr"-Feld: 5 Spalten in der Bildschirmmitte
-	var cols := 5
-	var bw := 128.0
+	# "Mehr"-Feld: 4 x 4 Knöpfe in der Bildschirmmitte
+	var cols := 4
+	var bw := 140.0
 	var bh := 64.0
 	var gap := 12.0
 	var rows := int(ceil(float(more_buttons.size()) / cols))
@@ -147,7 +161,7 @@ func _layout() -> void:
 
 
 func _joy_home() -> Vector2:
-	return Vector2(300, _size().y - 260)
+	return Vector2(190, _size().y - 190)
 
 
 # --- Eingabe -----------------------------------------------------------------
@@ -174,24 +188,39 @@ func _input(event: InputEvent) -> void:
 
 func _touch_down(f: int, p: Vector2) -> void:
 	if more_open:
+		var s := _size()
+		pad.draw_rect(Rect2(Vector2.ZERO, s), Color(0, 0, 0, 0.35))
+		_label(Vector2(s.x / 2.0, (more_buttons[-1]["rect"] as Rect2).end.y + 34.0), "Daneben tippen zum Schließen", 15, 400.0)
 		for b in more_buttons:
 			if (b["rect"] as Rect2).has_point(p):
 				held[f] = b
 				_press(b, true)
+				_buzz()
 				if b["kind"] == "key":
 					more_open = false   # einmalige Aktion: Feld wieder schließen
 				pad.queue_redraw()
 				return
+	var best: Dictionary = {}
+	var best_d := INF
 	for b in main_buttons:
 		if b.get("hidden", false):
 			continue
-		if p.distance_to(b["pos"]) <= float(b["r2"]) + 12.0:
-			held[f] = b
-			_press(b, true)
-			pad.queue_redraw()
-			return
+		var d := p.distance_to(b["pos"]) - float(b["r2"])
+		if d <= HIT_SLOP and d < best_d:
+			best = b
+			best_d = d
+	if not best.is_empty():
+		held[f] = best
+		_press(best, true)
+		_buzz()
+		pad.queue_redraw()
+		return
+	if more_open:
+		more_open = false     # Tipp neben das Mehr-Feld schließt es
+		pad.queue_redraw()
+		return
 	var s := _size()
-	if joy_finger == -1 and p.x < s.x * 0.4 and p.y > s.y * 0.35:
+	if joy_finger == -1 and p.x < s.x * 0.45 and p.y > s.y * 0.2:
 		joy_finger = f
 		joy_center = p
 		joy_vec = Vector2.ZERO
@@ -202,14 +231,20 @@ func _touch_down(f: int, p: Vector2) -> void:
 
 func _touch_move(f: int, p: Vector2) -> void:
 	if f == joy_finger:
-		var v := (p - joy_center) / JOY_RADIUS
+		var off := p - joy_center
+		if off.length() > JOY_RADIUS * 1.35:
+			# Joystick folgt dem Daumen, wenn er weit hinausrutscht
+			joy_center = p - off.normalized() * JOY_RADIUS * 1.35
+			off = p - joy_center
+		var v := off / JOY_RADIUS
 		if v.length() > 1.0:
 			v = v.normalized()
 		joy_vec = v
 		_apply_joy()
 		pad.queue_redraw()
 	elif look_fingers.has(f):
-		var rel: Vector2 = (p - look_fingers[f]) * LOOK_SPEED
+		var raw: Vector2 = p - look_fingers[f]
+		var rel: Vector2 = raw * LOOK_SPEED * (1.0 + raw.length() * LOOK_ACCEL)
 		look_fingers[f] = p
 		var mm := InputEventMouseMotion.new()
 		mm.relative = rel
@@ -236,11 +271,20 @@ func _touch_up(f: int) -> void:
 
 func _apply_joy() -> void:
 	var v := joy_vec
+	var l := v.length()
+	# Analoge Richtung für die Figur (Totzone abgezogen, 0..1), Tasten nur noch für Stellen,
+	# die auf "irgendeine Laufrichtung gedrückt" reagieren (z. B. Aufstehen vom Stuhl)
+	Game.touch_move = Vector2.ZERO if l < JOY_DEAD else v.normalized() * clampf((l - JOY_DEAD) / (1.0 - JOY_DEAD), 0.0, 1.0)
 	_set_key(KEY_W, v.y < -0.35)
 	_set_key(KEY_S, v.y > 0.35)
 	_set_key(KEY_A, v.x < -0.35)
 	_set_key(KEY_D, v.x > 0.35)
-	_set_key(KEY_SHIFT, v.length() > 0.92)
+	_set_key(KEY_SHIFT, l > JOY_SPRINT)
+
+
+## Kurzes Vibrieren als Rückmeldung (Android-Browser; iOS ignoriert es).
+func _buzz() -> void:
+	Input.vibrate_handheld(12)
 
 
 # --- Künstliche Tasten / Mausklicks -------------------------------------------
@@ -309,6 +353,7 @@ func _exit_tree() -> void:
 		e.set_meta("touch", true)
 		Input.parse_input_event(e)
 	Game.touch_reel = false
+	Game.touch_move = Vector2.ZERO
 
 
 # --- Zeichnen -----------------------------------------------------------------
@@ -329,7 +374,12 @@ func _draw_pad() -> void:
 	# Joystick
 	var c := joy_center if joy_finger != -1 else _joy_home()
 	pad.draw_circle(c, JOY_RADIUS, Color(0, 0, 0, 0.22))
-	pad.draw_arc(c, JOY_RADIUS, 0, TAU, 48, Color(1, 1, 1, 0.45), 3.0)
+	var sprint := joy_finger != -1 and joy_vec.length() > JOY_SPRINT
+	pad.draw_arc(c, JOY_RADIUS, 0, TAU, 48, Color(1.0, 0.75, 0.3, 0.9) if sprint else Color(1, 1, 1, 0.45), 5.0 if sprint else 3.0)
+	if joy_finger == -1:
+		_label(c + Vector2(0, JOY_RADIUS + 18), "Laufen", 14, 160.0)
+	elif sprint:
+		_label(c + Vector2(0, -JOY_RADIUS - 18), "RENNEN", 15, 160.0)
 	pad.draw_circle(c + joy_vec * JOY_RADIUS, 42.0, Color(1, 1, 1, 0.45 if joy_finger != -1 else 0.3))
 	# Hauptknöpfe
 	for b in main_buttons:
@@ -339,9 +389,12 @@ func _draw_pad() -> void:
 		var r: float = b["r2"]
 		pad.draw_circle(b["pos"], r, Color(1, 1, 1, 0.42) if on else Color(0, 0, 0, 0.32))
 		pad.draw_arc(b["pos"], r, 0, TAU, 40, Color(1, 1, 1, 0.55), 2.5)
-		_label(b["pos"], b.get("dyn", b["label"]), 17 if r > 45.0 else 15, r * 2.4)
+		_label(b["pos"], b.get("dyn", b["label"]), 19 if r > 60.0 else (17 if r > 47.0 else 15), r * 2.4)
 	# Mehr-Feld
 	if more_open:
+		var s := _size()
+		pad.draw_rect(Rect2(Vector2.ZERO, s), Color(0, 0, 0, 0.35))
+		_label(Vector2(s.x / 2.0, (more_buttons[-1]["rect"] as Rect2).end.y + 34.0), "Daneben tippen zum Schließen", 15, 400.0)
 		for b in more_buttons:
 			var rc: Rect2 = b["rect"]
 			pad.draw_rect(rc, Color(1, 1, 1, 0.45) if _is_held(b) else Color(0, 0, 0, 0.5))
