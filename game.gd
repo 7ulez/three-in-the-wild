@@ -37,6 +37,8 @@ static var rain_fire_t: float = 0.0
 static var joint_smoked: bool = false
 static var goals_done_prev: Array = []
 static var stashes_opened: Dictionary = {}
+static var flag_hoisted: bool = false        # Gipfelfahne gehisst (geteilt)
+static var bench_owner: int = 0              # Peer-ID, die auf der Gipfelbank sitzt (0 = frei, 1... = Spieler; -1 = ich selbst)
 static var cars_state: Dictionary = {}       # Auto-Index -> Heckklappe offen (nur Autos, die schon ausgeladen wurden)
 static var goal_shared: Dictionary = {}     # Ziel-Index -> Name des Spielers, der es fuer alle geschafft hat
 static var all_done_shown: bool = false

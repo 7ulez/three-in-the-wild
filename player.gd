@@ -2003,6 +2003,9 @@ func sit(chair: PlacedItem) -> void:
 		return
 	seat = chair
 	chair.seated_by = self
+	if chair.is_in_group("summit_bench") and Net.instance != null:
+		Game.bench_owner = -1
+		Net.instance.send_bench(true)
 	collision_layer = 0
 	collision_mask = 0
 	global_position = chair.global_position + Vector3(0, 0.45, 0)
@@ -2099,6 +2102,9 @@ func stand_up() -> void:
 	seat = null
 	if is_instance_valid(chair):
 		chair.seated_by = null
+		if chair.is_in_group("summit_bench") and Net.instance != null:
+			Game.bench_owner = 0
+			Net.instance.send_bench(false)
 		var fwd := -transform.basis.z
 		global_position = chair.global_position + fwd * 0.9 + Vector3(0, 0.1, 0)
 	head.position.y = 1.6

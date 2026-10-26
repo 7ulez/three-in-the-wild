@@ -316,6 +316,9 @@ func _admit(id: int) -> void:
 
 func _on_peer_disconnected(id: int) -> void:
 	_release_items_of(id)
+	if Game.bench_owner == id:
+		Game.bench_owner = 0
+		_apply_bench()
 	if nutria_puppet != null and is_instance_valid(nutria_puppet):
 		nutria_puppet.queue_free()
 	nutria_puppet = null
@@ -373,7 +376,8 @@ func _snapshot() -> Dictionary:
 	return {"hour": Game.hour, "day": Game.day_count, "camp": Game.camp_name if Game.camp_claimed else "",
 		"placed": pl, "tents": tents, "cars": cars, "goals": Game.goal_shared.duplicate(),
 		"items": item_db.values(), "stashes": Game.stashes_opened.keys(),
-		"stats": Game.stats_all.duplicate(true), "finale": Game.all_done_shown}
+		"stats": Game.stats_all.duplicate(true), "finale": Game.all_done_shown,
+		"flag": Game.flag_hoisted, "bench": maxi(Game.bench_owner, 0)}
 
 
 @rpc("authority", "reliable")
@@ -398,6 +402,11 @@ func assign_slot(s: int, snap: Dictionary) -> void:
 				c.restore_emptied(bool(cd["o"]))
 	for si in snap.get("stashes", []):
 		_open_stash(int(si))
+	Game.flag_hoisted = bool(snap.get("flag", false))
+	for f in main.get_tree().get_nodes_in_group("flagpole"):
+		f.set_hoisted(Game.flag_hoisted, false)
+	Game.bench_owner = int(snap.get("bench", 0))
+	_apply_bench()
 	for d in snap.get("items", []):
 		item_db[int(d["id"])] = d
 		_item_create(d)
@@ -533,6 +542,40 @@ func remote_trunk(i: int, open: bool) -> void:
 	for c in main.get_tree().get_nodes_in_group("cars"):
 		if c.car_index == i:
 			c.set_trunk(open, true)
+
+
+func send_flag(h: bool) -> void:
+	rpc("remote_flag", h)
+
+
+@rpc("any_peer", "reliable")
+func remote_flag(h: bool) -> void:
+	Game.flag_hoisted = h
+	if main == null or Game.dedicated:
+		return
+	for f in main.get_tree().get_nodes_in_group("flagpole"):
+		f.set_hoisted(h, true)
+
+
+func send_bench(taken: bool) -> void:
+	rpc("remote_bench", taken)
+
+
+@rpc("any_peer", "reliable")
+func remote_bench(taken: bool) -> void:
+	Game.bench_owner = multiplayer.get_remote_sender_id() if taken else 0
+	_apply_bench()
+
+
+## Gipfelbank bei allen als besetzt/frei markieren (besetzt = seated_by zeigt auf die Bank selbst).
+func _apply_bench() -> void:
+	if main == null or Game.dedicated:
+		return
+	for b in main.get_tree().get_nodes_in_group("summit_bench"):
+		if Game.bench_owner > 0:
+			b.seated_by = b
+		elif Game.bench_owner == 0 and b.seated_by == b:
+			b.seated_by = null
 
 
 func send_goal(i: int, who: String) -> void:

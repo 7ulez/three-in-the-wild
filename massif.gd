@@ -1029,6 +1029,7 @@ func _build_summit() -> void:
 	bcs.shape = bbs
 	bcs.position.y = 0.3
 	bench.add_child(bcs)
+	bench.add_to_group("summit_bench")
 	add_child(bench)
 	Util.add_box(bench, Vector3(1.6, 0.1, 0.5), Color(0.5, 0.34, 0.2), Vector3(0, 0.45, 0))
 	Util.add_box(bench, Vector3(1.6, 0.4, 0.08), Color(0.45, 0.3, 0.17), Vector3(0, 0.75, 0.24))
@@ -1053,6 +1054,8 @@ func _build_summit() -> void:
 		Util.add_box(flag, Vector3(1.05, 0.2, 0.03), stripe_cols[i] as Color, Vector3(0.55, 0.2 - 0.2 * float(i), 0))
 	pole.flag = flag
 	flag.position = Vector3(0, 0.45, 0)
+	if Game.flag_hoisted:
+		pole.set_hoisted(true, false)
 	# Steinhaufen (Gipfelmarke)
 	for i in range(9):
 		var a := TAU * float(i) / 9.0
@@ -1234,10 +1237,27 @@ class Flagpole:
 		interact(player)
 		return true
 
-	func interact(player: Node) -> void:
-		hoisted = not hoisted
+	func _ready() -> void:
+		add_to_group("flagpole")
+		if Game.flag_hoisted:
+			set_hoisted(true, false)
+
+	## Zustand setzen (lokal oder durch Mitspieler); animate = false: sofort oben/unten (Beitritt).
+	func set_hoisted(h: bool, animate: bool = true) -> void:
+		hoisted = h
+		if flag == null:
+			return
 		var ty: float = 2.55 if hoisted else 0.45
-		create_tween().tween_property(flag, "position:y", ty, 2.4 if hoisted else 1.6).set_trans(Tween.TRANS_SINE)
+		if animate:
+			create_tween().tween_property(flag, "position:y", ty, 2.4 if hoisted else 1.6).set_trans(Tween.TRANS_SINE)
+		else:
+			flag.position.y = ty
+
+	func interact(player: Node) -> void:
+		Game.flag_hoisted = not hoisted
+		set_hoisted(Game.flag_hoisted)
+		if Net.instance != null:
+			Net.instance.send_flag(Game.flag_hoisted)
 		if hoisted:
 			player.toast("Die Fahne weht! Schwarz-Rot-Gold über dem Gipfel.", 3.0)
 
