@@ -2641,7 +2641,11 @@ func strike() -> void:
 			_ember_light.light_energy = float(strike_hits) * 0.9
 		if character_name == "Marian":
 			var curses := ["Verdammte Axt!", "Scheiße, warum zündet das nicht?!", "Komm schon, du blödes Ding!", "Himmel, Arsch und Zwirn!"]
-			toast("Marian: " + curses.pick_random(), 2.0)
+			var ci := randi() % curses.size()
+			toast("Marian: " + curses[ci], 2.5)
+			# Marians eigene Stimme (VoiceStudio): fluch1..4.ogg passend zur Zeile
+			if Sfx.has_file("fluch%d" % (ci + 1)):
+				Sfx.play("fluch%d" % (ci + 1), global_position, 2.0)
 	_update_strike_ui()
 
 
