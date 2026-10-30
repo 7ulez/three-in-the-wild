@@ -10,6 +10,8 @@ var clients: Array = []   # {peer: StreamPeerTCP, buf: PackedByteArray}
 var root: String = ""
 var running: bool = false
 
+const MAX_CLIENTS: int = 64        # gleichzeitige Anfragen
+const MAX_HEADER: int = 16384      # Bytes pro Anfrage-Kopf
 const MIME := {
 	"html": "text/html; charset=utf-8", "js": "application/javascript", "wasm": "application/wasm",
 	"pck": "application/octet-stream", "png": "image/png", "ico": "image/x-icon",
@@ -40,7 +42,11 @@ func _process(_d: float) -> void:
 	if not running:
 		return
 	while server.is_connection_available():
-		clients.append({"peer": server.take_connection(), "buf": PackedByteArray(), "t": 0.0})
+		var np := server.take_connection()
+		if clients.size() >= MAX_CLIENTS:
+			np.disconnect_from_host()     # Schutz vor Überflutung
+			continue
+		clients.append({"peer": np, "buf": PackedByteArray(), "t": 0.0})
 	for c in clients.duplicate():
 		var p: StreamPeerTCP = c["peer"]
 		p.poll()
@@ -52,6 +58,10 @@ func _process(_d: float) -> void:
 			var r: Array = p.get_data(n)
 			if r[0] == OK:
 				c["buf"].append_array(r[1])
+			if c["buf"].size() > MAX_HEADER:
+				_send(p, 431, "text/plain", "zu gross".to_utf8_buffer(), false)
+				clients.erase(c)
+				continue
 		var text: String = c["buf"].get_string_from_ascii()
 		if text.contains("\r\n\r\n"):
 			_respond(p, text)
@@ -82,15 +92,18 @@ func _respond(p: StreamPeerTCP, req: String) -> void:
 			if hl.to_lower().begins_with("x-game-pw:"):
 				pw = hl.substr(10).strip_edges().uri_decode()
 		var answer := "ok"
-		if Game.password == "":
+		if Net.throttle_check() != "":
+			answer = "wait"
+		elif Game.password == "":
 			answer = "nopw"
-		elif pw != Game.password:
+		elif not Net.password_ok(pw):
 			answer = "no"
+			Net.note_failure()
 		if answer != "ok":
 			await get_tree().create_timer(1.0).timeout    # bremst Raten
 		_send(p, 200, "text/plain", answer.to_utf8_buffer(), false)
 		return
-	if path.contains(".."):
+	if path.contains("..") or path.contains("\\") or path.contains(char(0)) or not path.begins_with("/"):
 		_send(p, 403, "text/plain", "no".to_utf8_buffer(), false)
 		return
 	var accepts_gz: bool = req.to_lower().contains("accept-encoding") and req.to_lower().contains("gzip")
@@ -129,7 +142,7 @@ func _respond(p: StreamPeerTCP, req: String) -> void:
 
 
 func _send(p: StreamPeerTCP, code: int, mime: String, body: PackedByteArray, gz: bool) -> void:
-	var h: String = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nAccept-Ranges: bytes\r\nConnection: close\r\nCache-Control: no-cache\r\n" % [code, "OK" if code == 200 else "Error", mime, body.size()]
+	var h: String = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nAccept-Ranges: bytes\r\nConnection: close\r\nCache-Control: no-cache\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n" % [code, "OK" if code == 200 else "Error", mime, body.size()]
 	if gz:
 		h += "Content-Encoding: gzip\r\n"
 	h += "\r\n"

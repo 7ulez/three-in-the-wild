@@ -186,6 +186,13 @@ func start(p_main: Node) -> void:
 	if err != OK:
 		status = "Netzwerkfehler %d" % err
 		return
+	# Anmeldung VOR dem eigentlichen Verbinden (SceneMultiplayer-Auth): Solange ein Gerät das
+	# Passwort nicht bewiesen hat, bekommt es keine RPCs, keine Positionen und der Server leitet
+	# nichts von ihm an die anderen weiter.
+	var sm := multiplayer as SceneMultiplayer
+	sm.auth_timeout = 15.0
+	sm.auth_callback = _on_auth
+	sm.peer_authenticating.connect(_on_peer_authenticating)
 	multiplayer.multiplayer_peer = peer
 	if Game.net_mode == "host":
 		Leaderboard.load_file()
@@ -197,10 +204,93 @@ func start(p_main: Node) -> void:
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected)
-	multiplayer.connection_failed.connect(func() -> void: status = "Verbindung fehlgeschlagen")
+	multiplayer.connection_failed.connect(func() -> void:
+		if not _auth_denied:
+			status = "Verbindung fehlgeschlagen")
 	multiplayer.server_disconnected.connect(func() -> void:
 		if not (status.begins_with("Falsches") or status.begins_with("Das Spiel ist voll") or status.begins_with("Der Server ist noch nicht")):
 			status = "Host hat das Spiel verlassen")
+
+
+# ---------- Anmeldung (Passwort) ----------
+
+var _auth_denied: bool = false
+var _fail_times: Array = []      # Zeitpunkte der letzten Fehlversuche (Server)
+var _lock_until: float = 0.0
+const FAIL_MAX: int = 15          # so viele Fehlversuche pro Minute ...
+const LOCK_S: float = 30.0       # ... dann ist die Anmeldung kurz gesperrt
+
+
+## Passwortvergleich in konstanter Zeit (verrät über die Antwortzeit nichts).
+static func password_ok(pw: String) -> bool:
+	if Game.password == "":
+		return false
+	var a := pw.sha256_buffer()
+	var b := Game.password.sha256_buffer()
+	var diff := 0
+	for i in range(a.size()):
+		diff |= a[i] ^ b[i]
+	return diff == 0
+
+
+## Bremse gegen Passwort-Raten (für Spiel-Anmeldung und die Prüfung im Menü).
+## Gibt "" zurück, wenn geprüft werden darf, sonst den Grund.
+static func throttle_check() -> String:
+	if instance == null:
+		return ""
+	var now := Time.get_ticks_msec() / 1000.0
+	if now < instance._lock_until:
+		return "Zu viele Fehlversuche - bitte eine halbe Minute warten."
+	return ""
+
+
+static func note_failure() -> void:
+	if instance == null:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	instance._fail_times.append(now)
+	while not instance._fail_times.is_empty() and now - float(instance._fail_times[0]) > 60.0:
+		instance._fail_times.pop_front()
+	if instance._fail_times.size() >= FAIL_MAX:
+		instance._lock_until = now + LOCK_S
+		instance._fail_times.clear()
+		push_warning("Anmeldung für %d s gesperrt (zu viele Fehlversuche)" % int(LOCK_S))
+
+
+func _on_peer_authenticating(id: int) -> void:
+	if is_host():
+		return     # der Server wartet auf das Passwort des Neuen
+	if id == 1:
+		(multiplayer as SceneMultiplayer).send_auth(1, Game.password.to_utf8_buffer())
+
+
+func _on_auth(id: int, data: PackedByteArray) -> void:
+	var sm := multiplayer as SceneMultiplayer
+	if is_host():
+		var msg := throttle_check()
+		if msg == "" and Game.password == "":
+			msg = "Der Server ist noch nicht eingerichtet (kein Passwort gesetzt)."
+		if msg == "" and data.size() > 256:
+			msg = "Falsches Passwort."
+		if msg == "" and not password_ok(data.get_string_from_utf8()):
+			msg = "Falsches Passwort."
+			note_failure()
+		if msg != "":
+			sm.send_auth(id, ("denied:" + msg).to_utf8_buffer())
+			get_tree().create_timer(0.6).timeout.connect(func() -> void:
+				if multiplayer.multiplayer_peer != null:
+					sm.disconnect_peer(id))
+			return
+		sm.send_auth(id, "ok".to_utf8_buffer())
+		sm.complete_auth(id)
+		return
+	# Client: Antwort des Servers
+	var t := data.get_string_from_utf8()
+	if t == "ok":
+		sm.complete_auth(id)
+	elif t.begins_with("denied:"):
+		_auth_denied = true
+		denied(t.substr(7))
 
 
 @rpc("any_peer", "reliable")
@@ -278,7 +368,7 @@ func login(pw: String) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
-	if Game.password == "" or pw != Game.password:
+	if not password_ok(pw):
 		rpc_id(id, "denied", "Falsches Passwort." if Game.password != "" else "Der Server ist noch nicht eingerichtet (kein Passwort gesetzt).")
 		get_tree().create_timer(0.5).timeout.connect(func() -> void:
 			if multiplayer.multiplayer_peer != null:

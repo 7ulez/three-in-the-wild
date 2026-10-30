@@ -37,3 +37,11 @@ Ergebnis: Deine Freunde öffnen `https://spiel.DEINE-DOMAIN` im Browser, geben d
 - Der Workflow `.github/workflows/docker.yml` baut bei jedem Upload auf `main` das Image `ghcr.io/7ulez/three-in-the-wild:latest`.
 - Einmalig auf GitHub: Profil > Packages > das Paket öffnen > Package settings > Sichtbarkeit auf **Public** (im Image stehen keine Geheimnisse, das Passwort kommt erst auf dem Server dazu). Sonst muss Unraid sich bei ghcr.io anmelden.
 - Auf Unraid dann `docker-compose.unraid.yml` statt `docker-compose.yml` verwenden. Update: `docker compose pull && docker compose up -d`.
+
+## Sicherheit
+
+- **Passwort zuerst:** Ein Gerät muss das Passwort beweisen, bevor es überhaupt als verbunden gilt. Vorher bekommt es keine Spieldaten und der Server leitet nichts von ihm weiter.
+- **Bremse gegen Raten:** Nach 15 falschen Passwörtern innerhalb einer Minute ist die Anmeldung 30 Sekunden gesperrt (gilt auch für die Prüfung im Anmeldemenü).
+- **Kein root:** Der Container startet den Server als Benutzer `99:100` (Unraid „nobody:users“) und passt die Rechte von `/data` beim Start an. Andere IDs über `PUID` / `PGID` setzen.
+- **Geprüfter Download:** Die Godot-Engine im Image wird gegen die offizielle SHA512-Prüfsumme geprüft.
+- Ein langes, nicht erratbares `GAME_PASSWORD` verwenden und den `TUNNEL_TOKEN` nie ins Repo schreiben.

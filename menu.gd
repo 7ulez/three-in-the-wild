@@ -737,6 +737,8 @@ func _on_checked(_r: int, code: int, _h: PackedStringArray, body: PackedByteArra
 	elif t == "ok":
 		_set_status("Willkommen!", false)
 		_start("join")
+	elif t == "wait":
+		_check_failed("Zu viele Fehlversuche - bitte eine halbe Minute warten.")
 	elif t == "nopw":
 		_check_failed("Der Server ist noch nicht eingerichtet (kein Passwort gesetzt).")
 	else:
