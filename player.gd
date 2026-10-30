@@ -1823,16 +1823,13 @@ func _start_placement() -> void:
 		toast("Das kannst du nicht aufstellen.", 2.0)
 		return
 	if held.item_name == "Hängematte":
-		toast("Die Hängematte hängst du an zwei Bäumen im Lager auf: vor einen der dicken Bäume stellen, E.", 4.0)
+		toast("Die Hängematte hängst du zwischen zwei Bäume: vor einen der dicken Bäume stellen, E.", 4.0)
 		return
 	if held.item_name == "Hammer":
 		toast("Den Hammer brauchst du für die Zeltheringe - der bleibt in der Hand.", 3.0)
 		return
 	if held.item_name == "Joint" or held.item_name == "Luftgewehr" or held.item_name == "Radio":
 		toast("Das stellt man nicht auf - einfach in der Hand behalten.", 2.5)
-		return
-	if not Game.camp_claimed and held.item_name != "Zeltpaket":
-		toast("Stell zuerst das Zelt auf - dort ist dann dein Lager (Angelplatz ist überall).", 4.0)
 		return
 	if held.item_name != "Zeltpaket":
 		_start_item_placement()
@@ -1877,7 +1874,6 @@ func _update_placement() -> void:
 		if c != null and (c.is_in_group("ground") or c is Pickup):
 			ghost.visible = true
 			ghost.global_position = p
-			var d := Vector2(p.x - Game.camp_center.x, p.z - Game.camp_center.z).length()
 			var in_water := false
 			var mn := get_parent()
 			if mn.get("lake_root") != null:
@@ -1887,10 +1883,8 @@ func _update_placement() -> void:
 				ghost_reason = "zu weit weg"
 			elif in_water:
 				ghost_reason = "nicht im Wasser"
-			elif Game.camp_claimed and d > Game.camp_radius:
-				ghost_reason = "außerhalb des Lagerbereichs (grüner Ring)"
 			else:
-				ghost_valid = true
+				ghost_valid = true       # Zelte gehen überall (das erste legt das Lager fest)
 				for t in Game.tents:
 					if t.global_position.distance_to(p) < 3.6:
 						ghost_valid = false
@@ -1988,7 +1982,7 @@ func _sync_ghost() -> void:
 func _update_item_placement() -> void:
 	ghost_valid = false
 	item_snap = null
-	ghost_reason = "Ziele auf den Boden im Lagerbereich"
+	ghost_reason = "Ziele auf den Boden"
 	if ray.is_colliding():
 		var c := ray.get_collider() as Node
 		var p := ray.get_collision_point()
@@ -2005,11 +1999,16 @@ func _update_item_placement() -> void:
 		elif c != null and (c.is_in_group("ground") or c is Pickup):
 			item_ghost.visible = true
 			item_ghost.global_position = p
-			var d := Vector2(p.x - Game.camp_center.x, p.z - Game.camp_center.z).length()
+			# Aufstellen geht überall auf der Karte (auch ohne Zelt), nur nicht im See
+			var in_water := false
+			var mn := get_parent()
+			if mn.get("lake_root") != null:
+				var lq: Vector3 = p - (mn.lake_root as Node3D).global_position
+				in_water = LakeShape.contains(Vector2(lq.x, lq.z))
 			if head.global_position.distance_to(p) > 7.5:
 				ghost_reason = "zu weit weg"
-			elif d > Game.camp_radius:
-				ghost_reason = "außerhalb des Lagerbereichs (grüner Ring)"
+			elif in_water:
+				ghost_reason = "nicht im Wasser"
 			else:
 				ghost_valid = true
 				for t in Game.tents:

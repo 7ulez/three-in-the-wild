@@ -83,7 +83,7 @@ Angeln: **Linksklick** auswerfen und anschlagen, **Linksklick halten** einholen,
 
 ## Spielablauf im Detail
 1. **Autos ausladen**: Heckklappe von Lupo, Passat und Polo öffnen (E). Das Gepäck purzelt heraus.
-2. **Lager**: Angelplatz ist überall. Dort, wo du das Zelt aufstellst (Zeltpaket, R), ist euer Lager. Grüner Ring = Lagerbereich (kein Zelt im Wasser).
+2. **Lager**: Angelplatz ist überall. Dort, wo du das erste Zelt aufstellst (Zeltpaket, R), ist euer Lager (grüner Ring). Gegenstände lassen sich aber überall auf der Karte aufstellen, auch ohne Zelt (nur nicht im Wasser).
 3. **Aufbauen** (Gegenstand tragen, R): Zelt (Hammer in die Hand, 4 Heringe), Feuerschale, Grill, Dutch Oven (auf den Grill zielen), Stühle, Kühlbox, Bierkasten, Wasserkanister, Brennholz, Rucksack. X baut ab.
 4. **Feuer**: Zunder (gelbe Büschel) und Äste im Wald einsammeln (E), in die Feuerschale legen (Zunder 3, Äste 4), Feuerstahl in die Hand, E. Dann läuft ein **Treffer-Balken**: E drücken, wenn der Strich im grünen Feld ist (4 Treffer, Fehlschlag kostet einen Treffer). Marians grünes Feld ist 20 % kleiner, er flucht bei Fehlschlägen, sein Feuer brennt dafür länger. Holzscheite vom Brennholz-Bündel nachlegen.
 5. **Angeln (vom Ufer, kein Steg mehr)**: Jeder hat eine eigene Rute (Marian grün, Steffen rot, Julian blau, Gast gelb). Rute in die Hand. T = Methode (Grund / Pose / Spinn), Linksklick = auswerfen, bei Biss Linksklick = anschlagen, dann Linksklick halten zum Einholen (bei Fluchten loslassen, sonst reißt die Schnur). Karpfen beißen nachts am Grund (Bissanzeiger piept), Hecht beim Spinnangeln. Rechtsklick = Schnur einholen. Nicht in den See pinkeln!
