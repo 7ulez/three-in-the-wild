@@ -7,6 +7,7 @@ uniform vec3 sun_dir = vec3(0.0, 1.0, 0.0);
 uniform vec3 sun_col : source_color = vec3(1.0, 0.95, 0.85);
 uniform vec3 moon_dir = vec3(0.0, -1.0, 0.0);
 uniform float night = 0.0;
+uniform float moon_phase = 0.5;   // 0 Neumond, 0.5 Vollmond
 uniform float cloud_amt = 0.5;
 uniform vec3 cloud_lit : source_color = vec3(1.0, 0.97, 0.92);
 uniform vec3 cloud_shade : source_color = vec3(0.62, 0.68, 0.78);
@@ -31,8 +32,18 @@ void sky() {
 	col = mix(col, sun_col * 3.0, disc * (1.0 - night));
 	// Mond
 	float md = max(dot(d, normalize(moon_dir)), 0.0);
-	col = mix(col, vec3(0.92, 0.95, 1.0), smoothstep(0.9993, 0.9996, md) * night);
-	col += vec3(0.3, 0.4, 0.7) * pow(md, 60.0) * 0.25 * night;
+	vec3 mn = normalize(moon_dir);
+	vec3 mr = normalize(cross(mn, vec3(0.0, 1.0, 0.0)));
+	vec3 mu = cross(mr, mn);
+	vec2 mp = vec2(dot(d - mn, mr), dot(d - mn, mu)) / 0.036;     // Mondscheibe: Radius 1
+	float mdisc = (1.0 - smoothstep(0.85, 1.0, length(mp))) * step(0.0, dot(d, mn));
+	float illum = 0.5 - 0.5 * cos(moon_phase * 6.2831853);
+	float side = moon_phase < 0.5 ? 1.0 : -1.0;                       // zunehmend rechts, abnehmend links hell
+	float lit_m = smoothstep(0.9, 1.1, length(mp - vec2(side * 2.2 * illum, 0.0)));
+	if (illum > 0.97) { lit_m = 1.0; }
+	vec3 mcol = mix(vec3(0.05, 0.06, 0.1), vec3(0.92, 0.95, 1.0), lit_m);
+	col = mix(col, mcol, mdisc * night);
+	col += vec3(0.3, 0.4, 0.7) * pow(md, 60.0) * 0.25 * night * illum;
 	// Sterne
 	if (h > 0.02 && night > 0.05) {
 		vec2 sp = d.xz / (d.y + 0.4) * 90.0;

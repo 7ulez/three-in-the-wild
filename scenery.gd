@@ -92,6 +92,7 @@ static func update_sky(top: Color, hor: Color, ground: Color, sun_dir: Vector3, 
 		m.set_shader_parameter("sun_col", sun_col)
 		m.set_shader_parameter("moon_dir", moon_dir)
 		m.set_shader_parameter("night", night)
+		m.set_shader_parameter("moon_phase", Game.moon_phase())
 		m.set_shader_parameter("cloud_lit", Color(1.0, 0.97, 0.92).lerp(sun_col, 0.3))
 	if water_mat != null:
 		water_mat.set_shader_parameter("sky_col", top.lerp(hor, 0.5))

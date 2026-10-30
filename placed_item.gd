@@ -133,7 +133,8 @@ func build(p_name: String, p_weight: float, p_size: Vector3, p_color: Color, sta
 		light = OmniLight3D.new()
 		light.light_color = Color(1.0, 0.55, 0.2)
 		light.light_energy = 0.0
-		light.omni_range = 14.0
+		light.omni_range = 16.0
+		light.omni_attenuation = 1.15
 		light.position = Vector3(0, 0.75, 0)
 		light.shadow_enabled = not Game.low
 		add_child(light)
@@ -921,7 +922,7 @@ func _update_fire_visual() -> void:
 	if fire_glow != null:
 		fire_glow.visible = burning
 	if light != null and item_name == "Feuerschale":
-		light.light_energy = 3.0 if burning else 0.0
+		light.light_energy = 3.4 if burning else 0.0
 
 
 # ---------- Kochen ----------
@@ -1178,7 +1179,10 @@ func _process(delta: float) -> void:
 		if fl != null:
 			fl.scale = Vector3(1, 1, 1) * frac * (1.0 + sin(_flicker * 13.0) * 0.12 + sin(_flicker * 7.3) * 0.1)
 		if light != null:
-			light.light_energy = (2.5 + sin(_flicker * 17.0) * 0.5 + sin(_flicker * 9.1) * 0.4) * frac
+			# Lebendiges Flackern: Helligkeit, leichte Farbwanderung und kleines Zittern der Lichtquelle
+			light.light_energy = (3.4 + sin(_flicker * 17.0) * 0.6 + sin(_flicker * 9.1) * 0.5 + sin(_flicker * 31.0) * 0.25) * frac
+			light.light_color = Color(1.0, 0.52, 0.18).lerp(Color(1.0, 0.68, 0.32), 0.5 + 0.5 * sin(_flicker * 5.3))
+			light.position = Vector3(sin(_flicker * 11.0) * 0.06, 0.75 + sin(_flicker * 7.0) * 0.05, cos(_flicker * 13.0) * 0.06)
 		if burn_left <= 0.0:
 			burning = false
 			if _fire_snd != null:

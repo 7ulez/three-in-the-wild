@@ -122,6 +122,19 @@ static func now() -> float:
 	return Time.get_ticks_msec() / 1000.0
 
 
+const MOON_DAYS: float = 8.0      # Mondzyklus in Spieltagen (Neumond -> Vollmond -> Neumond)
+
+
+## Mondphase 0..1 (0 = Neumond, 0.5 = Vollmond).
+static func moon_phase() -> float:
+	return fposmod((float(day_count) + hour / 24.0) / MOON_DAYS + 0.38, 1.0)
+
+
+## Mondhelligkeit 0 (Neumond) .. 1 (Vollmond).
+static func moon_light() -> float:
+	return 0.5 - 0.5 * cos(moon_phase() * TAU)
+
+
 static func is_night() -> bool:
 	return hour >= 20.0 or hour < 5.5
 

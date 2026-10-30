@@ -142,17 +142,54 @@ const NIGHT_MOON: float = 0.12      # Mondlicht
 const NIGHT_EXPOSURE: float = 0.7    # Belichtung nachts (Tag 0.82)
 
 
+var _adapt_glare: float = 0.0
+## Wie hell ist es direkt beim Spieler durch Feuer oder Kopflampe? 0..1
+func _local_light() -> float:
+	if player == null:
+		return 0.0
+	var l := 0.0
+	if player.lamp != null and player.lamp.visible:
+		l = 0.55
+	for p in Game.placed:
+		if is_instance_valid(p) and p.item_name == "Feuerschale" and p.burning:
+			var d: float = p.global_position.distance_to(player.global_position)
+			l = maxf(l, clampf(1.0 - (d - 2.0) / 9.0, 0.0, 1.0))
+	return l
+
+
+## Blick direkt in ein brennendes Feuer in der Nähe -> 0..1
+func _glare_amount() -> float:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return 0.0
+	var fwd := -cam.global_transform.basis.z
+	var g := 0.0
+	for p in Game.placed:
+		if is_instance_valid(p) and p.item_name == "Feuerschale" and p.burning:
+			var to: Vector3 = p.global_position + Vector3(0, 0.6, 0) - cam.global_position
+			var d := to.length()
+			if d < 0.1 or d > 14.0:
+				continue
+			var dot := fwd.dot(to / d)
+			g = maxf(g, clampf((dot - 0.88) / 0.1, 0.0, 1.0) * clampf(1.0 - (d - 2.0) / 12.0, 0.0, 1.0))
+	return g
+
+
 func _update_sky() -> void:
 	var a := (Game.hour - 6.0) / 24.0 * TAU
 	var elev := sin(a)               # +1 Mittag, -1 Mitternacht
-	var day := clampf(elev * 2.5 + 0.35, 0.0, 1.0)
+	# Lange blaue Stunde: Himmel und Umgebung dimmen sanft bis die Sonne gut 20° unter dem
+	# Horizont steht, das direkte Sonnenlicht geht dagegen kurz nach Sonnenuntergang aus.
+	var day := smoothstep(-0.42, 0.32, elev)
+	var sun_k := smoothstep(-0.04, 0.3, elev)
 	var night := 1.0 - day
+	var mk := Game.moon_light()
 	sun.rotation = Vector3(-asin(clampf(elev, -1.0, 1.0)) - 0.12, deg_to_rad(40.0) + cos(a) * 0.9, 0)
-	sun.light_energy = lerpf(0.0, 0.82, day)
+	sun.light_energy = lerpf(0.0, 0.82, sun_k)
 	sun.shadow_enabled = elev > 0.02 and not Game.low
 	var warm := clampf(1.0 - absf(elev) * 2.5, 0.0, 1.0)   # Abend-/Morgenrot
 	sun.light_color = Color(1.0, 0.95, 0.85).lerp(Color(1.0, 0.55, 0.3), warm)
-	moon.light_energy = lerpf(0.0, NIGHT_MOON, night)
+	moon.light_energy = lerpf(0.0, NIGHT_MOON * lerpf(0.25, 1.4, mk), night)
 	var top := Color(0.25, 0.55, 0.85).lerp(Color(0.02, 0.03, 0.1), night)
 	var hor := Color(0.95, 0.8, 0.62).lerp(Color(1.0, 0.45, 0.25), warm * day).lerp(Color(0.06, 0.07, 0.16), night)
 	# Wetter: Wolken grauen den Himmel ein und dimmen die Sonne, Blitze erhellen alles kurz
@@ -175,11 +212,20 @@ func _update_sky() -> void:
 	# nicht laufend neu berechnet und blieb nachts taghell. Nachts: wenig, kühles Mondlicht.
 	var amb_day := Color(0.62, 0.68, 0.78).lerp(Color(0.85, 0.6, 0.45), warm * day * 0.6)
 	env.ambient_light_color = amb_day.lerp(Color(0.16, 0.2, 0.34), night)
-	env.ambient_light_energy = lerpf(NIGHT_AMBIENT, 0.62, day) * (1.0 - 0.5 * dk) + Weather.flash * 1.6
+	env.ambient_light_energy = lerpf(NIGHT_AMBIENT * lerpf(0.55, 1.25, mk), 0.62, day) * (1.0 - 0.5 * dk) + Weather.flash * 1.6
 	if _in_cave:
 		env.ambient_light_energy = 0.04
 	env.fog_light_color = Color(0.95, 0.82, 0.65).lerp(Color(0.05, 0.06, 0.12), night).lerp(Color(lum * 1.1, lum * 1.12, lum * 1.16), clampf(grey, 0.0, 0.85))
-	env.tonemap_exposure = lerpf(0.82, NIGHT_EXPOSURE, night) * (1.0 - 0.18 * dk) + Weather.flash * 0.5
+	# Nachtsicht: im Dunkeln blassere Farben (wie das Auge), am Feuer / mit Lampe kommen sie zurück;
+	# wer ins Feuer schaut, wird geblendet - die Umgebung wirkt dunkler und erholt sich langsam.
+	var near_l := _local_light()
+	var glare := _glare_amount() * night
+	if glare > _adapt_glare:
+		_adapt_glare = lerpf(_adapt_glare, glare, minf(get_process_delta_time() * 6.0, 1.0))
+	else:
+		_adapt_glare = move_toward(_adapt_glare, glare, get_process_delta_time() * 0.35)
+	env.adjustment_saturation = lerpf(0.98, 0.5, night * (1.0 - near_l))
+	env.tonemap_exposure = lerpf(0.82, NIGHT_EXPOSURE, night) * (1.0 - 0.18 * dk) * (1.0 - 0.45 * _adapt_glare) + Weather.flash * 0.5
 	env.fog_density = 0.002 + 0.0015 * night + Weather.fog * 0.014 + Weather.rain * 0.0035
 
 
