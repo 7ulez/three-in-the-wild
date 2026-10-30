@@ -137,6 +137,11 @@ func _process(delta: float) -> void:
 
 
 ## Sonne, Mond, Himmel und Nebel je nach Uhrzeit
+const NIGHT_AMBIENT: float = 0.22   # Umgebungslicht nachts (Tag 0.62)
+const NIGHT_MOON: float = 0.12      # Mondlicht
+const NIGHT_EXPOSURE: float = 0.7    # Belichtung nachts (Tag 0.82)
+
+
 func _update_sky() -> void:
 	var a := (Game.hour - 6.0) / 24.0 * TAU
 	var elev := sin(a)               # +1 Mittag, -1 Mitternacht
@@ -147,7 +152,7 @@ func _update_sky() -> void:
 	sun.shadow_enabled = elev > 0.02 and not Game.low
 	var warm := clampf(1.0 - absf(elev) * 2.5, 0.0, 1.0)   # Abend-/Morgenrot
 	sun.light_color = Color(1.0, 0.95, 0.85).lerp(Color(1.0, 0.55, 0.3), warm)
-	moon.light_energy = lerpf(0.0, 0.35, night)
+	moon.light_energy = lerpf(0.0, NIGHT_MOON, night)
 	var top := Color(0.25, 0.55, 0.85).lerp(Color(0.02, 0.03, 0.1), night)
 	var hor := Color(0.95, 0.8, 0.62).lerp(Color(1.0, 0.45, 0.25), warm * day).lerp(Color(0.06, 0.07, 0.16), night)
 	# Wetter: Wolken grauen den Himmel ein und dimmen die Sonne, Blitze erhellen alles kurz
@@ -166,11 +171,15 @@ func _update_sky() -> void:
 		Scenery.sky_shader_mat.set_shader_parameter("cloud_amt", Weather.cloud)
 		Scenery.sky_shader_mat.set_shader_parameter("cloud_shade", Color(0.62, 0.68, 0.78).lerp(Color(0.26, 0.28, 0.33), dk))
 		Scenery.sky_shader_mat.set_shader_parameter("cloud_lit", Color(1.0, 0.97, 0.92).lerp(sun.light_color, 0.3).lerp(Color(0.55, 0.58, 0.63), dk * 1.2))
-	env.ambient_light_energy = lerpf(0.25, 0.6, day) * (1.0 - 0.5 * dk) + Weather.flash * 1.6
+	# Umgebungslicht als feste Farbe: Das Himmels-Umgebungslicht wird im Browser (GL Compatibility)
+	# nicht laufend neu berechnet und blieb nachts taghell. Nachts: wenig, kühles Mondlicht.
+	var amb_day := Color(0.62, 0.68, 0.78).lerp(Color(0.85, 0.6, 0.45), warm * day * 0.6)
+	env.ambient_light_color = amb_day.lerp(Color(0.16, 0.2, 0.34), night)
+	env.ambient_light_energy = lerpf(NIGHT_AMBIENT, 0.62, day) * (1.0 - 0.5 * dk) + Weather.flash * 1.6
 	if _in_cave:
 		env.ambient_light_energy = 0.04
 	env.fog_light_color = Color(0.95, 0.82, 0.65).lerp(Color(0.05, 0.06, 0.12), night).lerp(Color(lum * 1.1, lum * 1.12, lum * 1.16), clampf(grey, 0.0, 0.85))
-	env.tonemap_exposure = 0.82 * (1.0 - 0.18 * dk) + Weather.flash * 0.5
+	env.tonemap_exposure = lerpf(0.82, NIGHT_EXPOSURE, night) * (1.0 - 0.18 * dk) + Weather.flash * 0.5
 	env.fog_density = 0.002 + 0.0015 * night + Weather.fog * 0.014 + Weather.rain * 0.0035
 
 
@@ -191,7 +200,8 @@ func _setup_environment() -> void:
 	env = Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_sky_contribution = 0.0
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
 	env.fog_light_color = Color(1.0, 0.85, 0.65)
