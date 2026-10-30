@@ -35,6 +35,7 @@ func build(p_name: String, color: Color, length: float, width: float, p_loot: Ar
 	if model_scene != null:
 		var m := model_scene.instantiate()
 		add_child(m)
+		_lights_off(m)
 		trunk_pivot = m.find_child("*Heckklappe*", true, false) as Node3D
 		_add_collision(width, length)
 	else:
@@ -52,6 +53,23 @@ func build(p_name: String, color: Color, length: float, width: float, p_loot: Ar
 	button.position = Vector3(0, 0.65, length / 2.0 + 0.3)
 	add_child(button)
 
+
+
+## Scheinwerfer und Rücklichter sind aus (auch nachts): Emission der Lampen-Materialien abschalten.
+func _lights_off(root: Node) -> void:
+	for n in root.find_children("*", "", true, false):
+		if n is Light3D:
+			n.queue_free()
+		elif n is MeshInstance3D:
+			var mi := n as MeshInstance3D
+			if mi.mesh == null:
+				continue
+			for i in range(mi.mesh.get_surface_count()):
+				var mat := mi.get_active_material(i) as BaseMaterial3D
+				if mat != null and mat.emission_enabled:
+					var m2 := mat.duplicate() as BaseMaterial3D
+					m2.emission_enabled = false
+					mi.set_surface_override_material(i, m2)
 
 
 func _build_boxes(color: Color, length: float, width: float) -> void:

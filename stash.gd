@@ -123,7 +123,7 @@ func interact(player: Node) -> void:
 func _spawn_item(player: Node, item_name: String, weight: float, size: Vector3, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
 	var it := Item.new().setup(item_name, weight, size, color)
 	player.get_parent().add_child(it)
-	it.global_position = global_position + (Vector3(0, 0.75, 0.45) + offset).rotated(Vector3.UP, global_rotation.y)
+	it.global_position = global_position + (Vector3(0, 0.75, -0.5) + offset).rotated(Vector3.UP, global_rotation.y)
 	it.linear_velocity = Vector3(0, 1.5, 0)
 
 

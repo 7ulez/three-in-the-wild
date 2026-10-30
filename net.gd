@@ -1192,6 +1192,20 @@ func _authority_tick(delta: float) -> void:
 var _nutria_was_on: bool = false
 
 
+## Ein Mitspieler hat das Nutria (bei ihm nur eine Puppe) erschossen: der Verantwortliche lässt es sterben.
+func send_nutria_hit() -> void:
+	rpc("remote_nutria_hit")
+
+
+@rpc("any_peer", "reliable")
+func remote_nutria_hit() -> void:
+	if Game.dedicated or main == null or not is_world_authority():
+		return
+	var nv: Variant = main.get("nutria_active")
+	if nv != null and is_instance_valid(nv) and not (nv as Nutria).dead:
+		(nv as Nutria).die()
+
+
 @rpc("any_peer", "unreliable_ordered")
 func remote_fauna(list: Array) -> void:
 	if Game.dedicated or main == null or is_world_authority():

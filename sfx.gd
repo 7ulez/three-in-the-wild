@@ -38,7 +38,7 @@ func _ready() -> void:
 		_amb_birdloop.play()
 	_amb_wind = AudioStreamPlayer.new()
 	_amb_wind.stream = get_stream("wind")
-	_amb_wind.volume_db = -22.0
+	_amb_wind.volume_db = -34.0
 	add_child(_amb_wind)
 	_amb_wind.play()
 	for k in VARIANTS:
@@ -76,7 +76,7 @@ func _process(delta: float) -> void:
 			play("cricket", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * randf_range(4.0, 20.0), -13.0)
 			if randf() < 0.12:
 				play("owl", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * 30.0 + Vector3(0, 5, 0), -6.0)
-	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -22.0 if not night else -27.0, 0.02)
+	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -34.0 if not night else -39.0, 0.02)
 	if _amb_birdloop != null:
 		# Vogelgezwitscher: nur tagsueber und ohne Regen, weich ein-/ausgeblendet
 		var bird_on := not night and Weather.rain < 0.15
@@ -368,7 +368,7 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 				s = _add(s, _env(_nf(_white(0.02), 1, randf_range(2500.0, 3500.0), 1.5), 0.0003, 200.0, 0.5), 0.45 + k * 0.1)
 			s = _add(s, _env(_nf(_white(0.07), 1, 2200.0, 1.0), 0.0005, 70.0, 0.9), 1.15)
 			s = _add(s, _env(_nf(_white(0.08), 0, 500.0, 0.9), 0.0008, 60.0, 0.9), 1.15)
-			return _wav(s, 0.8)
+			return _wav(s, 0.45)
 		"airgun":
 			# Luftgewehr: scharfes Pfff, kurzer Knack und metallisches Nachklingen
 			var s := _env(_nf(_white(0.18), 1, randf_range(3500.0, 5000.0), 0.9), 0.0008, 32.0, 1.0)

@@ -24,6 +24,36 @@ var puppet: bool = false
 var net_pos: Vector3 = Vector3.ZERO
 var net_yaw: float = 0.0
 var net_anim: String = ""
+var dead: bool = false
+
+
+## Trefferzone fuer das Luftgewehr
+func hit_center_y() -> float:
+	return 0.3
+
+
+func hit_radius() -> float:
+	return 0.4
+
+
+## Erschossen: faellt um, laesst die Beute fallen und verschwindet nach ein paar Sekunden.
+## Beim Mitspieler (Puppe) ist es nur die Anzeige; der Welt-Verantwortliche meldet "Dead" ueber die Anim.
+func die() -> void:
+	if dead:
+		return
+	dead = true
+	_cur_anim = "Dead"
+	if not puppet:
+		_drop_loot(global_position)
+		if main != null and main.get("nutria_timer") != null:
+			main.nutria_timer = randf_range(120.0, 200.0)
+	if _ap != null:
+		_ap.pause()
+	Sfx.play("thunk", global_position, -2.0, 1.4)
+	var tw := create_tween()
+	tw.tween_property(_body, "rotation_degrees:z", 90.0, 0.35).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(3.5 if puppet else 2.5)
+	tw.tween_callback(queue_free)
 
 
 func setup(p_main: Node, pos: Vector3) -> void:
@@ -124,11 +154,17 @@ func _nearest_player_pos() -> Vector3:
 
 func _process(delta: float) -> void:
 	if puppet:
+		if net_anim == "Dead" and not dead:
+			die()
+		if dead:
+			return
 		if net_pos != Vector3.ZERO:
 			global_position = global_position.lerp(net_pos, minf(delta * 10.0, 1.0))
 			rotation.y = lerp_angle(rotation.y, net_yaw, minf(delta * 10.0, 1.0))
 		if net_anim != "":
 			_play(net_anim)
+		return
+	if dead:
 		return
 	life += delta
 	_anim += delta * 9.0

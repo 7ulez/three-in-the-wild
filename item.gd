@@ -233,6 +233,8 @@ func setup(p_name: String, p_weight: float, size: Vector3, color: Color) -> Item
 
 	var shape := BoxShape3D.new()
 	shape.size = size
+	if p_name == "Jack-Cola-Dose":
+		shape.size = size.max(Vector3(0.18, 0.18, 0.18))     # Dose ist winzig: grosszuegig zielbar
 	var col := CollisionShape3D.new()
 	col.shape = shape
 	add_child(col)

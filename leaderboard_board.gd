@@ -11,6 +11,9 @@ const WOOD: Color = Color(0.36, 0.24, 0.13)
 var _labels: Array[Label3D] = []
 var _icons: Array[Sprite3D] = []
 var _ver: int = -1
+var _panel_mat: StandardMaterial3D = null
+var _head_mat: StandardMaterial3D = null
+var _glow: float = -1.0
 
 
 func build() -> void:
@@ -18,8 +21,8 @@ func build() -> void:
 	for sx in [-2.25, 2.25]:
 		Util.add_box(self, Vector3(0.16, 3.0, 0.16), WOOD, Vector3(sx, 1.5, -0.14))   # Pfosten hinter der Tafel
 	Util.add_box(self, Vector3(4.2, 2.45, 0.1), WOOD, Vector3(0, 2.0, 0))
-	Util.add_box(self, Vector3(3.95, 2.2, 0.12), PANEL, Vector3(0, 2.0, 0))
-	Util.add_box(self, Vector3(3.95, 0.42, 0.14), FIRE, Vector3(0, 2.9, 0))
+	_panel_mat = _glow_mat(Util.add_box(self, Vector3(3.95, 2.2, 0.12), PANEL, Vector3(0, 2.0, 0)), PANEL.lightened(0.35))
+	_head_mat = _glow_mat(Util.add_box(self, Vector3(3.95, 0.42, 0.14), FIRE, Vector3(0, 2.9, 0)), FIRE.lightened(0.2))
 	Util.add_box(self, Vector3(4.5, 0.12, 0.45), WOOD, Vector3(0, 3.22, 0))
 	# Nur eine Seite beschriftet: zum Parkplatz (+Z)
 	for side in [1.0]:
@@ -72,9 +75,25 @@ func build() -> void:
 	_refresh()
 
 
+## Eigenes Material mit Emission (anfangs aus): nachts leuchtet die Vorderseite leicht.
+func _glow_mat(mi: MeshInstance3D, glow: Color) -> StandardMaterial3D:
+	var m := (mi.material_override as StandardMaterial3D).duplicate() as StandardMaterial3D
+	m.emission_enabled = true
+	m.emission = glow
+	m.emission_energy_multiplier = 0.0
+	mi.material_override = m
+	return m
+
+
 func _process(_delta: float) -> void:
 	if _ver != Leaderboard.version:
 		_refresh()
+	# Nachtstärke wie in main.gd::_update_sky
+	var night := 1.0 - smoothstep(-0.42, 0.32, sin((Game.hour - 6.0) / 24.0 * TAU))
+	if absf(night - _glow) > 0.01:
+		_glow = night
+		_panel_mat.emission_energy_multiplier = 0.32 * night
+		_head_mat.emission_energy_multiplier = 0.45 * night
 
 
 func _refresh() -> void:

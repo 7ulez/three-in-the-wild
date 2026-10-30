@@ -1396,8 +1396,8 @@ func _drink_message() -> String:
 
 
 func _carry_factor() -> float:
-	if held == null:
-		return 1.0
+	if held == null or held.item_name == "Luftgewehr":
+		return 1.0      # Luftgewehr ist leicht: normal schnell laufen
 	# Jedes Teil bremst, schwere Teile mehr (Bierkasten ca. 45 %, Grill ca. 35 %)
 	return clampf(0.8 - held.weight / 40.0, 0.2, 0.8)
 
@@ -1551,6 +1551,22 @@ func _shoot() -> void:
 					target_animal = null
 					target_name = (av.label as Label3D).text
 					dmg = 35.0 if h > 1.4 else 16.0
+	var target_nutria: Nutria = null
+	var cand: Nutria = null
+	if Net.instance != null and is_instance_valid(Net.instance.nutria_puppet):
+		cand = Net.instance.nutria_puppet
+	else:
+		var nv: Variant = get_parent().get("nutria_active")
+		if nv != null and is_instance_valid(nv):
+			cand = nv as Nutria
+	if cand != null and not cand.dead and not cand.is_queued_for_deletion():
+		var nc: Vector3 = cand.global_position + Vector3(0, cand.hit_center_y(), 0)
+		var nt := (nc - origin).dot(dir)
+		if nt > 0.5 and nt < best and (origin + dir * nt).distance_to(nc) < cand.hit_radius():
+			best = nt
+			target_nutria = cand
+			target_animal = null
+			target_name = ""
 	end = origin + dir * best
 	var muzzle := origin + dir * 0.7 + cb.x * 0.2 - cb.y * 0.18
 	Sfx.play("airgun", muzzle, 0.0)
@@ -1568,6 +1584,12 @@ func _shoot() -> void:
 		an.die()
 		if Net.instance != null:
 			Net.instance.send_kill(ak, apos)
+	elif target_nutria != null:
+		toast("Nutria getroffen!", 2.0)
+		var was_puppet := target_nutria.puppet
+		target_nutria.die()
+		if was_puppet and Net.instance != null:
+			Net.instance.send_nutria_hit()
 	elif target_name != "":
 		Net.instance.send_hit(target_name, dmg, Game.player_name)
 		toast("Treffer: %s%s" % [target_name, " (Kopf!)" if dmg > 20.0 else ""], 2.0)
@@ -1582,7 +1604,7 @@ func _reload() -> void:
 		return
 	_reload_t = GUN_RELOAD
 	_gun_cd = maxf(_gun_cd, GUN_RELOAD)
-	Sfx.play("reload", global_position, -2.0)
+	Sfx.play("reload", global_position, -12.0)
 	toast("Nachladen...", GUN_RELOAD)
 	var weak: WeakRef = weakref(held)
 	get_tree().create_timer(GUN_RELOAD).timeout.connect(func() -> void:
@@ -1691,6 +1713,8 @@ func _update_prompt() -> void:
 				text += "   F: Bier trinken (%d übrig)" % held.drinks_left()
 			elif held.drink_kind() == "water":
 				text += "   F: Wasser trinken (%d Schluck)" % held.drinks_left()
+			elif held.drink_kind() == "jack":
+				text += "   F: Jack-Cola trinken" if held.item_name == "Jack-Cola-Dose" else "   F: Dose trinken (%d übrig)" % held.drinks_left()
 			if c != null and c.has_method("get_held_prompt"):
 				var hp: String = c.get_held_prompt(held)
 				if hp != "":

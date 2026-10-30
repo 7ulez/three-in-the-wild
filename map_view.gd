@@ -164,11 +164,13 @@ func _draw() -> void:
 		if is_instance_valid(s) and (s as Stash).opened:
 			found += 1
 			var sp := _wv((s as Node3D).global_position)
-			draw_rect(Rect2(sp - Vector2(6, 5), Vector2(12, 10)), Color(0.55, 0.36, 0.18))
-			draw_rect(Rect2(sp - Vector2(6, 5), Vector2(12, 10)), C_INK, false, 1.2)
-			draw_line(sp + Vector2(-3, 0), sp + Vector2(-1, 2), Color(0.9, 1.0, 0.6), 2.0)
-			draw_line(sp + Vector2(-1, 2), sp + Vector2(4, -3), Color(0.9, 1.0, 0.6), 2.0)
-			_label(f_lab, sp + Vector2(0, 19), (s as Stash).label, 12, true)
+			draw_circle(sp, 13.0, Color(1.0, 0.85, 0.3, 0.35))
+			draw_rect(Rect2(sp - Vector2(9, 7), Vector2(18, 14)), Color(0.55, 0.36, 0.18))
+			draw_rect(Rect2(sp - Vector2(9, 7), Vector2(18, 14)), C_INK, false, 1.6)
+			draw_line(sp + Vector2(-9, -2), sp + Vector2(9, -2), C_INK, 1.2)
+			draw_line(sp + Vector2(-4, 1), sp + Vector2(-1, 4), Color(0.9, 1.0, 0.6), 2.4)
+			draw_line(sp + Vector2(-1, 4), sp + Vector2(5, -1), Color(0.9, 1.0, 0.6), 2.4)
+			_label(f_lab, sp + Vector2(0, 24), (s as Stash).label, 12, true)
 
 	# Schatzkarte: rotes X am geheimen Schießstand
 	if Game.map_found:
