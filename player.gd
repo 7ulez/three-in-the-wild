@@ -185,6 +185,10 @@ func _ready() -> void:
 	lamp.spot_attenuation = 0.6
 	lamp.light_energy = 7.0
 	lamp.shadow_enabled = not Game.low
+	lamp.shadow_bias = 0.06
+	lamp.shadow_normal_bias = 1.5
+	lamp.light_cull_mask = 0xFFFFF & ~OWN_BODY_LAYER   # die eigene Figur wirft keinen Lampenschatten
+	lamp.position = Vector3(0, 0.05, -0.3)              # vor der Stirn, nicht im Kopf
 	lamp.visible = false
 	head.add_child(lamp)
 
@@ -207,8 +211,19 @@ func _build_visual() -> void:
 	for c in body_visual.get_children():
 		c.queue_free()
 	Player.build_body(body_visual, character_name)
+	call_deferred("_mark_own_body")
 	call_deferred("_apply_view")
 	vm_hand = null
+
+
+const OWN_BODY_LAYER: int = 1 << 9     # Render-Ebene 10: nur die eigene Figur
+
+
+## Die eigene Figur auf eine eigene Render-Ebene legen: Die Kopflampe beleuchtet sie nicht
+## und sie wirft im Lampenlicht keine großen Schatten nach vorn (Ansicht von außen).
+func _mark_own_body() -> void:
+	for n in body_visual.find_children("*", "GeometryInstance3D", true, false):
+		(n as GeometryInstance3D).layers = OWN_BODY_LAYER
 
 
 ## Baut die Figur (auch für die Avatare der Mitspieler).
