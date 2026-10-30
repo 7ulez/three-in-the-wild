@@ -115,6 +115,7 @@ class RemoteAvatar:
 			Player.animate_body(self, minf(sp, 9.0), (anim & 1) != 0, (anim & 2) != 0, (anim >> 2) & 3, (anim & 16) != 0, (anim & 32) != 0, (anim & 64) != 0, 1 if (anim & 256) != 0 else (2 if (anim & 512) != 0 else 0), (anim & 128) != 0)
 		# Kotzen der anderen: gebeugte Haltung, Strahl, Lache
 		Player.set_pants(self, 1 if (anim & 4096) != 0 else (2 if (anim & 8192) != 0 else 0))
+		Player.set_headlamp(self, (anim & 16384) != 0, true)
 		var vom_now := (anim & 1024) != 0
 		Player.vomit_pose(self, vom_now, delta)
 		if vom_now != _vom_on:

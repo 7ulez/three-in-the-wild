@@ -249,6 +249,8 @@ static func build_body(parent: Node3D, char_name: String) -> void:
 				Util.add_cylinder(bt, 0.0135, 0.012, Color(0.85, 0.7, 0.2), Vector3(0, 0.236, 0.0))
 				Util.add_cylinder(bt, 0.031, 0.05, Color(0.93, 0.88, 0.7), Vector3(0, 0.06, 0.0))
 				parent.set_meta("bottle", bt)
+			if sk != null and sk.find_bone("Head") >= 0:
+				_build_headlamp(sk, parent)
 			if sk != null and sk.find_bone("Hips") >= 0:
 				# Po mit Ritze: nur sichtbar, solange die Hose beim Gross-Geschaeft unten ist
 				var hatt := BoneAttachment3D.new()
@@ -636,7 +638,85 @@ func anim_flags() -> int:
 		f |= 256 if drink_kind == 1 else 512
 	if is_lying():
 		f |= 2048
+	if lamp != null and lamp.visible:
+		f |= 16384
 	return f
+
+
+## Kopflampe am Kopf-Knochen: Gummiband, Gehäuse vorn, Batteriefach hinten. Die Linse leuchtet,
+## wenn die Lampe an ist; bei Mitspielern strahlt zusätzlich ein Lichtkegel nach vorn.
+static func _build_headlamp(sk: Skeleton3D, parent: Node3D) -> void:
+	var att := BoneAttachment3D.new()
+	att.bone_name = "Head"
+	sk.add_child(att)
+	var hl := Node3D.new()
+	hl.name = "Kopflampe"
+	att.add_child(hl)
+	var y := 0.31          # Stirnhöhe über dem Kopf-Knochen (Modell schaut nach +Z)
+	var band := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.188
+	tm.outer_radius = 0.204
+	tm.rings = 24
+	tm.ring_segments = 6
+	band.mesh = tm
+	band.material_override = Util.mat(Color(0.12, 0.12, 0.14), 0.8)
+	band.position = Vector3(0, y, 0.012)
+	band.scale = Vector3(1.0, 1.0, 1.12)
+	hl.add_child(band)
+	var housing := Util.add_box(hl, Vector3(0.075, 0.05, 0.035), Color(0.85, 0.35, 0.1), Vector3(0, y, 0.228))
+	housing.material_override = Util.mat(Color(0.85, 0.35, 0.1), 0.5)
+	Util.add_box(hl, Vector3(0.02, 0.012, 0.012), Color(0.15, 0.15, 0.16), Vector3(0.026, y + 0.03, 0.228))    # Schalter
+	Util.add_box(hl, Vector3(0.06, 0.045, 0.025), Color(0.15, 0.15, 0.16), Vector3(0, y, -0.222))             # Batteriefach
+	var lens := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.019
+	cm.bottom_radius = 0.019
+	cm.height = 0.008
+	cm.radial_segments = 16
+	lens.mesh = cm
+	lens.rotation_degrees.x = 90.0
+	lens.position = Vector3(0, y, 0.247)
+	var lm := StandardMaterial3D.new()
+	lm.albedo_color = Color(0.55, 0.58, 0.62)
+	lm.roughness = 0.2
+	lm.emission_enabled = true
+	lm.emission = Color(1.0, 0.95, 0.82)
+	lm.emission_energy_multiplier = 0.0
+	lens.material_override = lm
+	hl.add_child(lens)
+	parent.set_meta("headlamp_lens", lm)
+	parent.set_meta("headlamp_root", hl)
+
+
+## Kopflampe an/aus. with_light = true: echter Lichtkegel (für Mitspieler-Figuren).
+static func set_headlamp(parent: Node3D, on: bool, with_light: bool) -> void:
+	if not parent.has_meta("headlamp_lens"):
+		return
+	var lm: StandardMaterial3D = parent.get_meta("headlamp_lens")
+	lm.emission_energy_multiplier = 4.0 if on else 0.0
+	lm.albedo_color = Color(1.0, 0.97, 0.88) if on else Color(0.55, 0.58, 0.62)
+	if not with_light:
+		return
+	var sl: SpotLight3D = parent.get_meta("headlamp_light") if parent.has_meta("headlamp_light") else null
+	if on and sl == null:
+		var hl: Node3D = parent.get_meta("headlamp_root")
+		sl = SpotLight3D.new()
+		sl.light_color = Color(1.0, 0.95, 0.85)
+		sl.light_energy = 4.0
+		sl.spot_range = 18.0
+		sl.spot_angle = 26.0
+		sl.spot_attenuation = 0.7
+		sl.shadow_enabled = false
+		sl.distance_fade_enabled = true
+		sl.distance_fade_begin = 40.0
+		sl.distance_fade_length = 10.0
+		sl.position = Vector3(0, 0.31, 0.26)
+		sl.rotation_degrees = Vector3(-8.0, 180.0, 0.0)    # Licht zeigt nach -Z, das Modell schaut nach +Z
+		hl.add_child(sl)
+		parent.set_meta("headlamp_light", sl)
+	if sl != null:
+		sl.visible = on
 
 
 func _fish_anim() -> int:
@@ -944,6 +1024,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismantle()
 			KEY_L:
 				lamp.visible = not lamp.visible
+				Player.set_headlamp(body_visual, lamp.visible, false)
 			KEY_H:
 				needs.try_big_business()
 			KEY_Q:
