@@ -260,6 +260,9 @@ func setup(p_name: String, p_weight: float, size: Vector3, color: Color) -> Item
 	if p_name == "Jack-Cola-Kiste":
 		water_left = 3
 		label.text = "Jack Daniel's Cola (3 Dosen)"
+	if p_name == "Jack-Cola-Dose":
+		water_left = 1
+		label.text = "Jack-Cola"
 	return self
 
 
@@ -310,7 +313,7 @@ func drink_kind() -> String:
 		return "beer"
 	if item_name == "Wasserflasche":
 		return "water"
-	if item_name == "Jack-Cola-Kiste":
+	if item_name == "Jack-Cola-Kiste" or item_name == "Jack-Cola-Dose":
 		return "jack"
 	return ""
 
@@ -327,7 +330,7 @@ func take_drink() -> bool:
 		if ok:
 			net_state_changed()
 		return ok
-	if item_name == "Wasserflasche" or item_name == "Jack-Cola-Kiste":
+	if item_name == "Wasserflasche" or item_name == "Jack-Cola-Kiste" or item_name == "Jack-Cola-Dose":
 		if water_left <= 0:
 			return false
 		water_left -= 1
@@ -357,6 +360,8 @@ func get_prompt() -> String:
 		return "E: Wasserflasche aufheben (%d kg)   F: Wasser trinken (%d Schluck)" % [int(weight), water_left]
 	if item_name == "Jack-Cola-Kiste":
 		return "E: Kiste aufheben (%d kg)   F: Dose trinken (%d übrig)" % [int(weight), water_left]
+	if item_name == "Jack-Cola-Dose":
+		return "E: Dose Jack Daniel's Cola aufheben   F: trinken"
 	if item_name == "Radio":
 		return "E: Radio aufheben   F: an/aus   Z: Sender  +/- Lautstärke  [%s]" % (Radio.station_name() if Radio.on else "aus")
 	return "E: %s aufheben (%d kg)" % [display_name(), int(weight)]

@@ -1184,7 +1184,7 @@ func _drink() -> void:
 		if c != null and c.has_method("drink_kind") and c.drink_kind() != "":
 			src = c
 	if src == null:
-		toast("Zum Trinken: Bierkasten oder Wasserflasche anschauen oder tragen, dann F.", 2.5)
+		toast("Zum Trinken: Bierkasten, Wasserflasche oder Dose anschauen oder tragen, dann F.", 2.5)
 		return
 	var kind: String = src.drink_kind()
 	if not src.take_drink():
@@ -1226,7 +1226,15 @@ func _drink() -> void:
 	tw.tween_property(self, "drink_tilt", 0.55, 0.35)
 	tw.tween_interval(0.5)
 	tw.tween_property(self, "drink_tilt", 0.0, 0.35)
-	toast("%s  (noch %d)" % [msg, src.drinks_left()], 3.0)
+	if src is Item and (src as Item).item_name == "Jack-Cola-Dose":
+		# Einzelne Dose: ausgetrunken und weg
+		var can := src as Item
+		if held == can:
+			_drop()
+		can.queue_free()
+		toast(msg + "  (Dose leer)", 3.0)
+	else:
+		toast("%s  (noch %d)" % [msg, src.drinks_left()], 3.0)
 	_update_help()
 
 

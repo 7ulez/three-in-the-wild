@@ -36,6 +36,9 @@ static func add_visual(parent: Node3D, kind: String, size: Vector3, color: Color
 			return _beer_crate(parent, size, color)
 		"Jack-Cola-Kiste":
 			return _jack_crate(parent, size)
+		"Jack-Cola-Dose":
+			_jack_can(parent, Vector3.ZERO)
+			return {}
 		"Hammer":
 			return _hammer(parent)
 		"Joint":

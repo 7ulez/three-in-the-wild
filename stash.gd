@@ -3,7 +3,7 @@ extends StaticBody3D
 ## Ein Versteck mit Beute (Kiste, Baumhöhle, ...). Jedes Versteck zählt für das Ziel "Verstecke finden".
 
 ## Inhalt der 5 Verstecke (Reihenfolge = Reihenfolge, in der sie gebaut werden).
-## Das letzte Versteck enthält die Jack-Daniel's-Cola-Kiste (3 Dosen, eine Dose = sehr betrunken).
+## Das letzte Versteck enthält drei einzelne Dosen Jack Daniel's Cola (eine Dose = sehr betrunken).
 const LOOT: Array = ["Bierkiste", "Joint", "Luftgewehr", "Notration", "Jack-Cola"]
 static var count: int = 0
 static var all: Array = []
@@ -99,8 +99,9 @@ func interact(player: Node) -> void:
 				n.eat(0.5)
 			msg = "Eine Notration Dosenbrot und Würstchen! Hunger gestillt."
 		"Jack-Cola":
-			_spawn_item(player, "Jack-Cola-Kiste", 4.0, Vector3(0.5, 0.3, 0.35), Color(0.12, 0.1, 0.09))
-			msg = "Eine Kiste Jack Daniel's Cola, 3 Dosen. Vorsicht: eine reicht für den ganzen Abend."
+			for k in range(3):
+				_spawn_item(player, "Jack-Cola-Dose", 0.35, Vector3(0.07, 0.12, 0.07), Color(0.12, 0.1, 0.09), Vector3((k - 1) * 0.32, 0.0, 0.0))
+			msg = "Drei Dosen Jack Daniel's Cola. Vorsicht: eine reicht für den ganzen Abend."
 		"Verbandskasten":
 			if n != null:
 				n.health = minf(n.health + 60.0, 100.0)
@@ -119,10 +120,10 @@ func interact(player: Node) -> void:
 
 
 ## Der Inhalt liegt als echter Gegenstand auf der Kiste und fällt von dort herunter.
-func _spawn_item(player: Node, item_name: String, weight: float, size: Vector3, color: Color) -> void:
+func _spawn_item(player: Node, item_name: String, weight: float, size: Vector3, color: Color, offset: Vector3 = Vector3.ZERO) -> void:
 	var it := Item.new().setup(item_name, weight, size, color)
 	player.get_parent().add_child(it)
-	it.global_position = global_position + Vector3(0, 0.75, 0.45).rotated(Vector3.UP, global_rotation.y)
+	it.global_position = global_position + (Vector3(0, 0.75, 0.45) + offset).rotated(Vector3.UP, global_rotation.y)
 	it.linear_velocity = Vector3(0, 1.5, 0)
 
 
