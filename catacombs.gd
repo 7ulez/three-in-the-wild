@@ -14,6 +14,17 @@ const MID: int = 9                 # Hub-Mitte (Zellindex)
 const CATA_LAYER: int = 1 << 10    # Render-Ebene 11: Sonne und Mond beleuchten die Katakomben nicht
 const SHAFT_HALF: float = 0.7      # halbe Schachtbreite
 
+# Zweiter Ausgang: langer Tunnel nach Süden zur Tropfsteinhöhle (Schacht EXIT_X/EXIT_Z)
+const TUNNEL_X: float = 93.0       # Tunnel-Mitte (Spalte 16 des Labyrinths)
+const EXIT_X: float = 94.0
+const EXIT_Z: float = 56.5
+const ROOM_X0: float = 91.0
+const ROOM_X1: float = 97.0
+const ROOM_Z0: float = 52.0
+const ROOM_Z1: float = 59.0
+
+var under_rects: Array = []           # Grundrisse (Rect2 x,z) aller unterirdischen Bereiche
+var extra_aabbs: Array = []           # Dunkelzonen ausser dem Labyrinth (Tunnel, Raum)
 var center: Vector3 = Vector3.ZERO     # Boden unter dem Schacht (Mitte des Hubs)
 var east: PackedByteArray = PackedByteArray()    # 1 = Durchgang von Zelle (i,j) nach (i+1,j)
 var south: PackedByteArray = PackedByteArray()   # 1 = Durchgang von Zelle (i,j) nach (i,j+1)
@@ -185,7 +196,12 @@ func build(p_center: Vector3, seed_v: int = 4711) -> void:
 	var wy := FLOOR_Y + H / 2.0
 	# Aussenwand rundum
 	_box(st, Vector3(center.x, wy, center.z - half - 0.5), Vector3(ext * 2.0, H, 1.0), stone, 0.1, rng)
-	_box(st, Vector3(center.x, wy, center.z + half + 0.5), Vector3(ext * 2.0, H, 1.0), stone, 0.1, rng)
+	var dx0 := TUNNEL_X - (PITCH - WALL_T) / 2.0         # Türöffnung im Südwall (zwischen zwei Pfeilern)
+	var dx1 := TUNNEL_X + (PITCH - WALL_T) / 2.0
+	var sx0 := center.x - ext
+	var sx1 := center.x + ext
+	_box(st, Vector3((sx0 + dx0) / 2.0, wy, center.z + half + 0.5), Vector3(dx0 - sx0, H, 1.0), stone, 0.1, rng)
+	_box(st, Vector3((dx1 + sx1) / 2.0, wy, center.z + half + 0.5), Vector3(sx1 - dx1, H, 1.0), stone, 0.1, rng)
 	_box(st, Vector3(center.x - half - 0.5, wy, center.z), Vector3(1.0, H, ext * 2.0), stone, 0.1, rng)
 	_box(st, Vector3(center.x + half + 0.5, wy, center.z), Vector3(1.0, H, ext * 2.0), stone, 0.1, rng)
 	# Pfeiler an jeder Gitterecke (im Hub werden das Säulen)
@@ -222,6 +238,8 @@ func build(p_center: Vector3, seed_v: int = 4711) -> void:
 	add_child(body)
 	_build_shaft_cage()
 	_build_deco(rng)
+	under_rects.append(Rect2(center.x - half - 1.0, center.z - half - 1.0, half * 2.0 + 2.0, half * 2.0 + 2.0))
+	_build_tunnel(rng)
 
 
 ## Fügt eine Box mit leichter Farbstreuung in den SurfaceTool-Mesh ein.
@@ -361,3 +379,118 @@ func _build_deco(rng: RandomNumberGenerator) -> void:
 	hub_l.shadow_enabled = false
 	hub_l.position = center + Vector3(0, 2.6, 3.0)
 	add_child(hub_l)
+
+
+# ---------- Tunnel zum zweiten Ausgang ----------
+
+func _mm_instance(mesh: Mesh, mat: Material, xf: Array) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = xf.size()
+	for i in range(xf.size()):
+		mm.set_instance_transform(i, xf[i])
+	var mi := MultiMeshInstance3D.new()
+	mi.multimesh = mm
+	mi.material_override = mat
+	mi.layers = 1 | CATA_LAYER
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	return mi
+
+
+## Langer gerader Gang von der Südtür des Labyrinths bis unter die Tropfsteinhöhle, dort ein Raum mit Leiterkäfig.
+func _build_tunnel(rng: RandomNumberGenerator) -> void:
+	var half := float(N) * PITCH / 2.0
+	var tz0 := center.z + half            # Innenkante der Südwand des Labyrinths
+	var tz1 := ROOM_Z0 - 1.0              # bis zur Nordwand des Raums
+	var tlen := tz1 - tz0
+	var tmid := (tz0 + tz1) / 2.0
+	var wy := FLOOR_Y + H / 2.0
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var stone := Color(0.28, 0.26, 0.23)
+	var flo := Color(0.19, 0.17, 0.15)
+	var cei := Color(0.2, 0.19, 0.17)
+	_box(st, Vector3(TUNNEL_X, FLOOR_Y - 0.5, tmid), Vector3(5.0, 1.0, tlen), flo, 0.0, rng)
+	_box(st, Vector3(TUNNEL_X, CEIL_Y + 0.5, tmid), Vector3(5.0, 1.0, tlen), cei, 0.0, rng)
+	_box(st, Vector3(TUNNEL_X - 2.0, wy, tmid), Vector3(1.0, H, tlen), stone, 0.12, rng)
+	_box(st, Vector3(TUNNEL_X + 2.0, wy, tmid), Vector3(1.0, H, tlen), stone, 0.12, rng)
+	# Stützbalken-Pfeiler alle 16 m (Abwechslung für den langen Gang)
+	var zz := tz0 + 12.0
+	while zz < tz1 - 6.0:
+		_box(st, Vector3(TUNNEL_X - 1.35, wy, zz), Vector3(0.3, H, 0.4), Color(0.3, 0.2, 0.12), 0.1, rng)
+		_box(st, Vector3(TUNNEL_X + 1.35, wy, zz), Vector3(0.3, H, 0.4), Color(0.3, 0.2, 0.12), 0.1, rng)
+		_box(st, Vector3(TUNNEL_X, CEIL_Y - 0.15, zz), Vector3(3.0, 0.3, 0.4), Color(0.3, 0.2, 0.12), 0.1, rng)
+		zz += 16.0
+	# Raum unter der Höhle
+	var rcx := (ROOM_X0 + ROOM_X1) / 2.0
+	var rcz := (ROOM_Z0 + ROOM_Z1) / 2.0
+	_box(st, Vector3(rcx, FLOOR_Y - 0.5, rcz), Vector3(8.0, 1.0, 9.0), flo, 0.0, rng)
+	var hs := SHAFT_HALF
+	var hx0 := EXIT_X - hs
+	var hx1 := EXIT_X + hs
+	var hz0 := EXIT_Z - hs
+	var hz1 := EXIT_Z + hs
+	var cy := CEIL_Y + 0.5
+	_box(st, Vector3(rcx, cy, (ROOM_Z0 - 1.0 + hz0) / 2.0), Vector3(8.0, 1.0, hz0 - (ROOM_Z0 - 1.0)), cei, 0.0, rng)
+	_box(st, Vector3(rcx, cy, (hz1 + ROOM_Z1 + 1.0) / 2.0), Vector3(8.0, 1.0, ROOM_Z1 + 1.0 - hz1), cei, 0.0, rng)
+	_box(st, Vector3((ROOM_X0 - 1.0 + hx0) / 2.0, cy, EXIT_Z), Vector3(hx0 - (ROOM_X0 - 1.0), 1.0, hs * 2.0), cei, 0.0, rng)
+	_box(st, Vector3((hx1 + ROOM_X1 + 1.0) / 2.0, cy, EXIT_Z), Vector3(ROOM_X1 + 1.0 - hx1, 1.0, hs * 2.0), cei, 0.0, rng)
+	_box(st, Vector3(ROOM_X0 - 0.5, wy, rcz), Vector3(1.0, H, 9.0), stone, 0.12, rng)
+	_box(st, Vector3(ROOM_X1 + 0.5, wy, rcz), Vector3(1.0, H, 9.0), stone, 0.12, rng)
+	_box(st, Vector3(rcx, wy, ROOM_Z1 + 0.5), Vector3(8.0, H, 1.0), stone, 0.12, rng)
+	var ox0 := TUNNEL_X - (PITCH - WALL_T) / 2.0
+	var ox1 := TUNNEL_X + (PITCH - WALL_T) / 2.0
+	_box(st, Vector3((ROOM_X0 - 1.0 + ox0) / 2.0, wy, ROOM_Z0 - 0.5), Vector3(ox0 - (ROOM_X0 - 1.0), H, 1.0), stone, 0.12, rng)
+	_box(st, Vector3((ox1 + ROOM_X1 + 1.0) / 2.0, wy, ROOM_Z0 - 0.5), Vector3((ROOM_X1 + 1.0) - ox1, H, 1.0), stone, 0.12, rng)
+	# Leiterkäfig: Westen, Osten, Süden (Norden zum Tunnel hin offen), Leiter an der Südwand
+	var steel := Color(0.28, 0.27, 0.26)
+	_box(st, Vector3(hx0 + 0.05, wy, EXIT_Z), Vector3(0.1, H, hs * 2.0), steel, 0.05, rng)
+	_box(st, Vector3(hx1 - 0.05, wy, EXIT_Z), Vector3(0.1, H, hs * 2.0), steel, 0.05, rng)
+	_box(st, Vector3(EXIT_X, wy, hz1 - 0.05), Vector3(hs * 2.0, H, 0.1), steel, 0.05, rng)
+	st.generate_normals()
+	var mesh := st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 1.0
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.layers = 1 | CATA_LAYER
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	cs.shape = mesh.create_trimesh_shape()
+	body.add_child(cs)
+	add_child(body)
+	# Fackeln im Tunnel (leuchtende Flammen als ein MultiMesh) und ein paar Knochen
+	var torches: Array = []
+	var tz := tz0 + 9.0
+	var side := 1.0
+	while tz < tz1 - 3.0:
+		torches.append(Transform3D(Basis(), Vector3(TUNNEL_X + side * 1.38, FLOOR_Y + 2.1, tz)))
+		side = -side
+		tz += 14.0
+	torches.append(Transform3D(Basis(), Vector3(ROOM_X0 + 0.3, FLOOR_Y + 2.1, ROOM_Z0 + 1.5)))
+	torches.append(Transform3D(Basis(), Vector3(ROOM_X1 - 0.3, FLOOR_Y + 2.1, ROOM_Z1 - 1.5)))
+	var fm := BoxMesh.new()
+	fm.size = Vector3(0.16, 0.26, 0.16)
+	var flame := StandardMaterial3D.new()
+	flame.albedo_color = Color(1.0, 0.55, 0.15)
+	flame.emission_enabled = true
+	flame.emission = Color(1.0, 0.5, 0.12)
+	flame.emission_energy_multiplier = 3.0
+	flame.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_mm_instance(fm, flame, torches)
+	var bones: Array = []
+	for k in range(28):
+		var bx := TUNNEL_X + rng.randf_range(-1.2, 1.2)
+		var bz := rng.randf_range(tz0 + 3.0, tz1 - 2.0)
+		bones.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(bx, FLOOR_Y + 0.05, bz)))
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.45, 0.07, 0.07)
+	_mm_instance(bm, Util.mat(Color(0.78, 0.74, 0.62)), bones)
+	under_rects.append(Rect2(ROOM_X0 - 1.0, tz0 - 0.5, (ROOM_X1 - ROOM_X0) + 2.0, ROOM_Z1 + 1.0 - tz0 + 0.5))
+	extra_aabbs.append(AABB(Vector3(ROOM_X0 - 1.0, FLOOR_Y - 1.0, tz0 - 0.5), Vector3(ROOM_X1 - ROOM_X0 + 2.0, H + 2.0, ROOM_Z1 + 1.0 - tz0 + 0.5)))

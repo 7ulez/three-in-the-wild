@@ -297,18 +297,18 @@ func _build_ground() -> void:
 	ground.add_to_group("ground")
 	add_child(ground)
 	# 20 m dick (Oberkante bleibt bei y=0): bei ruckeliger Bildrate fiel man sonst durch die 1-m-Platte.
-	# Vier Platten rund um das Schachtloch des Bunkers (Leiter zu den Katakomben).
-	var hole := Bunker.hole_rect()
-	var hx0 := hole.position.x
-	var hx1 := hole.end.x
-	var hz0 := hole.position.y
-	var hz1 := hole.end.y
+	# Platten rund um die Schachtlöcher (Bunker und Tropfsteinhöhle), von West nach Ost
 	var gmat := Scenery.ground_material()
-	for r in [
-		Rect2(-700.0, -700.0, 700.0 + hx0, 1400.0),
-		Rect2(hx1, -700.0, 700.0 - hx1, 1400.0),
-		Rect2(hx0, -700.0, hx1 - hx0, 700.0 + hz0),
-		Rect2(hx0, hz1, hx1 - hx0, 700.0 - hz1)]:
+	var slabs: Array = []
+	var prev_x := -700.0
+	for h in Bunker.holes():
+		var hr := h as Rect2
+		slabs.append(Rect2(prev_x, -700.0, hr.position.x - prev_x, 1400.0))
+		slabs.append(Rect2(hr.position.x, -700.0, hr.size.x, 700.0 + hr.position.y))
+		slabs.append(Rect2(hr.position.x, hr.end.y, hr.size.x, 700.0 - hr.end.y))
+		prev_x = hr.end.x
+	slabs.append(Rect2(prev_x, -700.0, 700.0 - prev_x, 1400.0))
+	for r in slabs:
 		var rr := r as Rect2
 		var gsize := Vector3(rr.size.x, 20.0, rr.size.y)
 		var gc := Vector3(rr.position.x + rr.size.x / 2.0, -10.0, rr.position.y + rr.size.y / 2.0)

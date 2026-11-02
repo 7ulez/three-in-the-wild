@@ -1139,9 +1139,11 @@ func _physics_process(delta: float) -> void:
 			up = -Game.touch_move.y
 		velocity.y = up * 2.6
 		_peak_y = global_position.y
-		if up > 0.0 and global_position.y > -0.05:
-			teleport_to(Bunker.exit_pos())     # oben angekommen: aus dem Loch steigen
-			velocity = Vector3.ZERO
+		if up > 0.0:
+			var ex := Bunker.ladder_climb(global_position)     # öffnet ggf. die Bodenluke
+			if ex != Vector3.INF:
+				teleport_to(ex)                                  # oben angekommen: aus dem Loch steigen
+				velocity = Vector3.ZERO
 	elif not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	elif Input.is_physical_key_pressed(KEY_SPACE) and water_d < 0.6:

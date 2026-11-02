@@ -468,7 +468,7 @@ func _snapshot() -> Dictionary:
 		"placed": pl, "tents": tents, "cars": cars, "goals": Game.goal_shared.duplicate(),
 		"items": item_db.values(), "stashes": Game.stashes_opened.keys(),
 		"stats": Game.stats_all.duplicate(true), "finale": Game.all_done_shown,
-		"flag": Game.flag_hoisted, "bench": maxi(Game.bench_owner, 0), "bunker": Bunker.open}
+		"flag": Game.flag_hoisted, "bench": maxi(Game.bench_owner, 0), "bunker": Bunker.open, "exit": Bunker.exit_open}
 
 
 @rpc("authority", "reliable")
@@ -500,6 +500,8 @@ func assign_slot(s: int, snap: Dictionary) -> void:
 	_apply_bench()
 	if bool(snap.get("bunker", false)):
 		Bunker.set_open(true, false)
+	if bool(snap.get("exit", false)):
+		Bunker.set_exit_open(true, false)
 	for d in snap.get("items", []):
 		item_db[int(d["id"])] = d
 		_item_create(d)
@@ -1335,6 +1337,15 @@ func send_bunker_open() -> void:
 @rpc("any_peer", "reliable")
 func remote_bunker_open() -> void:
 	Bunker.set_open(true, false)
+
+
+func send_exit_open() -> void:
+	rpc("remote_exit_open")
+
+
+@rpc("any_peer", "reliable")
+func remote_exit_open() -> void:
+	Bunker.set_exit_open(true, false)
 
 
 func send_stash(i: int) -> void:

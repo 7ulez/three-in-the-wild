@@ -11,7 +11,11 @@ const CODE: Array = [3, 7, 1, 9, 4]                   # Ziffer des Verstecks 0..
 const WALL_C: Color = Color(0.40, 0.40, 0.37)
 const CATA: int = Catacombs.CATA_LAYER
 
+const EXIT: Vector3 = Vector3(Catacombs.EXIT_X, 0.0, Catacombs.EXIT_Z)      # zweiter Schacht in der Tropfsteinhöhle
+const EXIT_OUT: Vector3 = Vector3(95.8, 0.05, 56.1)                           # hier steigt man in der Höhle aus dem Loch
+
 static var open: bool = false
+static var exit_open: bool = false       # Bodenluke in der Tropfsteinhöhle offen?
 static var instance: Bunker = null
 static var pad: Node = null              # Zahlenfeld, an dem gerade der Code getippt wird
 static var typed: String = ""
@@ -19,6 +23,9 @@ static var typed: String = ""
 var main: Node
 var cata: Catacombs
 var lurker: Lurker = null
+var _exit_root: Node3D
+var lid: StaticBody3D
+var lid_col: CollisionShape3D
 var door: StaticBody3D
 var door_col: CollisionShape3D
 var led: MeshInstance3D
@@ -32,20 +39,50 @@ static func hole_rect() -> Rect2:
 	return Rect2(Vector2(SHAFT.x - SHAFT_HALF, SHAFT.z - SHAFT_HALF), Vector2(SHAFT_HALF * 2.0, SHAFT_HALF * 2.0))
 
 
+static func holes() -> Array:
+	return [hole_rect(), Rect2(Vector2(EXIT.x - SHAFT_HALF, EXIT.z - SHAFT_HALF), Vector2(SHAFT_HALF * 2.0, SHAFT_HALF * 2.0))]
+
+
 static func in_zone(p: Vector3) -> bool:
 	return Vector2(p.x - POS.x, p.z - POS.z).length() < 9.0
 
 
+## 0 = Bunker-Schacht, 1 = Schacht in der Tropfsteinhöhle, -1 = an keiner Leiter
+static func ladder_id(p: Vector3) -> int:
+	if p.y < Catacombs.FLOOR_Y - 0.1 or p.y > 0.7:
+		return -1
+	if absf(p.x - SHAFT.x) < 0.5 and absf(p.z - SHAFT.z) < 0.5:
+		return 0
+	if absf(p.x - EXIT.x) < 0.5 and absf(p.z - EXIT.z) < 0.5:
+		return 1
+	return -1
+
+
 static func on_ladder(p: Vector3) -> bool:
-	return absf(p.x - SHAFT.x) < 0.5 and absf(p.z - SHAFT.z) < 0.5 and p.y > Catacombs.FLOOR_Y - 0.1 and p.y < 0.7
+	return ladder_id(p) >= 0
+
+
+## Beim Hochklettern: gibt die Ausstiegsposition zurück, sobald man oben ist (sonst Vector3.INF).
+## Die Bodenluke der Höhle öffnet sich, wenn man von unten dagegen klettert.
+static func ladder_climb(p: Vector3) -> Vector3:
+	var id := ladder_id(p)
+	if id == 1 and not exit_open and p.y > -2.6:
+		set_exit_open(true)
+	if p.y > -0.05 and (id == 0 or (id == 1 and exit_open)):
+		return exit_pos() if id == 0 else EXIT_OUT
+	return Vector3.INF
 
 
 ## Ist die Position in den Katakomben (Grundriss unter dem Labyrinth, nicht tiefer als der Boden)?
 static func in_underground(p: Vector3) -> bool:
 	if instance == null or not is_instance_valid(instance) or instance.cata == null:
 		return false
-	var a: AABB = instance.cata.aabb
-	return p.y > Catacombs.FLOOR_Y - 2.0 and p.x > a.position.x and p.x < a.end.x and p.z > a.position.z and p.z < a.end.z
+	if p.y <= Catacombs.FLOOR_Y - 2.0:
+		return false
+	for r in instance.cata.under_rects:
+		if (r as Rect2).has_point(Vector2(p.x, p.z)):
+			return true
+	return false
 
 
 ## Wohin man oben aus dem Schacht steigt (in der Hütte, Richtung Tür)
@@ -71,6 +108,16 @@ static func set_open(v: bool, send: bool = true) -> void:
 		Net.instance.send_bunker_open()
 
 
+static func set_exit_open(v: bool, send: bool = true) -> void:
+	if exit_open == v:
+		return
+	exit_open = v
+	if instance != null and is_instance_valid(instance):
+		instance._apply_exit(true)
+	if send and v and Net.instance != null and is_instance_valid(Net.instance):
+		Net.instance.send_exit_open()
+
+
 ## Wesen, das ich gerade sehe (selbst simuliert oder Puppe vom Verantwortlichen)
 static func active_lurker() -> Lurker:
 	if instance == null or not is_instance_valid(instance):
@@ -87,13 +134,13 @@ static func underground_targets() -> Array:
 	if instance == null or not is_instance_valid(instance) or instance.main == null:
 		return out
 	var pl: Node3D = instance.main.get("player")
-	if pl != null and pl.global_position.y < -10.0:
+	if pl != null and pl.global_position.y < -10.0 and instance.cata.cell_of(pl.global_position) >= 0:
 		var lamp: bool = pl.get("lamp") != null and (pl.get("lamp") as Light3D).visible
 		out.append({"p": pl.global_position, "lamp": lamp})
 	if Net.instance != null and is_instance_valid(Net.instance):
 		for k in Net.instance.avatars.keys():
 			var av: Node3D = Net.instance.avatars[k]
-			if is_instance_valid(av) and av.global_position.y < -10.0:
+			if is_instance_valid(av) and av.global_position.y < -10.0 and instance.cata.cell_of(av.global_position) >= 0:
 				out.append({"p": av.global_position, "lamp": false})
 	return out
 
@@ -139,15 +186,20 @@ func build(p_main: Node) -> void:
 	# Schacht und Hütteninnenraum sind "Höhle": dunkel, kein Wetter
 	main.cave_boxes.append(AABB(Vector3(SHAFT.x - 0.8, Catacombs.CEIL_Y, SHAFT.z - 0.8), Vector3(1.6, -Catacombs.CEIL_Y + 1.0, 1.6)))
 	main.cave_boxes.append(AABB(Vector3(POS.x - 2.7, 0.0, POS.z - 2.3), Vector3(5.4, 2.7, 4.6)))
+	for ab in cata.extra_aabbs:
+		main.cave_boxes.append(ab)
+	main.cave_boxes.append(AABB(Vector3(EXIT.x - 0.8, Catacombs.CEIL_Y, EXIT.z - 0.8), Vector3(1.6, -Catacombs.CEIL_Y + 1.0, 1.6)))
 	_build_hut()
-	_build_shaft()
+	_build_shaft(SHAFT, false, self)
+	_build_exit()
 	_apply_door(false)
+	_apply_exit(false)
 
 
-func _solid(size: Vector3, pos: Vector3, col: Color, layers: int = 1) -> StaticBody3D:
+func _solid(size: Vector3, pos: Vector3, col: Color, layers: int = 1, parent: Node = null) -> StaticBody3D:
 	var b := StaticBody3D.new()
 	b.position = pos
-	add_child(b)
+	(parent if parent != null else self).add_child(b)
 	var cs := CollisionShape3D.new()
 	var bs := BoxShape3D.new()
 	bs.size = size
@@ -222,28 +274,29 @@ func _build_hut() -> void:
 	_solid(Vector3(0.7, 0.6, 0.6), Vector3(x + 2.2, 0.3, z + 1.3), Color(0.3, 0.22, 0.14), CATA)
 
 
-func _build_shaft() -> void:
+## Schachtwände von der Decke der Katakomben bis zum Boden, dazu die Leiter (ein Mesh)
+func _build_shaft(sp: Vector3, ladder_south: bool, parent: Node) -> void:
 	var y1 := Catacombs.CEIL_Y
 	var h := -y1
 	var cy := y1 / 2.0
 	var hs := SHAFT_HALF
 	var col := Color(0.26, 0.26, 0.25)
-	_solid(Vector3(hs * 2.0, h, 0.1), Vector3(SHAFT.x, cy, SHAFT.z - hs + 0.05), col, CATA)
-	_solid(Vector3(hs * 2.0, h, 0.1), Vector3(SHAFT.x, cy, SHAFT.z + hs - 0.05), col, CATA)
-	_solid(Vector3(0.1, h, hs * 2.0), Vector3(SHAFT.x - hs + 0.05, cy, SHAFT.z), col, CATA)
-	_solid(Vector3(0.1, h, hs * 2.0), Vector3(SHAFT.x + hs - 0.05, cy, SHAFT.z), col, CATA)
+	_solid(Vector3(hs * 2.0, h, 0.1), Vector3(sp.x, cy, sp.z - hs + 0.05), col, CATA, parent)
+	_solid(Vector3(hs * 2.0, h, 0.1), Vector3(sp.x, cy, sp.z + hs - 0.05), col, CATA, parent)
+	_solid(Vector3(0.1, h, hs * 2.0), Vector3(sp.x - hs + 0.05, cy, sp.z), col, CATA, parent)
+	_solid(Vector3(0.1, h, hs * 2.0), Vector3(sp.x + hs - 0.05, cy, sp.z), col, CATA, parent)
 	# Leiter: zwei Holme und Sprossen als ein einziges Mesh, von der Hub-Sohle bis kurz über den Boden
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var rng := RandomNumberGenerator.new()
-	var lz := SHAFT.z - hs + 0.16
+	var lz := sp.z + hs - 0.16 if ladder_south else sp.z - hs + 0.16
 	var y0 := Catacombs.FLOOR_Y
-	var top := 0.9
-	cata._box(st, Vector3(SHAFT.x - 0.42, (y0 + top) / 2.0, lz), Vector3(0.06, top - y0, 0.06), Color(0.4, 0.28, 0.16), 0.0, rng)
-	cata._box(st, Vector3(SHAFT.x + 0.42, (y0 + top) / 2.0, lz), Vector3(0.06, top - y0, 0.06), Color(0.4, 0.28, 0.16), 0.0, rng)
+	var top := -0.12 if ladder_south else 0.9      # in der Höhle endet die Leiter unter der Luke
+	cata._box(st, Vector3(sp.x - 0.42, (y0 + top) / 2.0, lz), Vector3(0.06, top - y0, 0.06), Color(0.4, 0.28, 0.16), 0.0, rng)
+	cata._box(st, Vector3(sp.x + 0.42, (y0 + top) / 2.0, lz), Vector3(0.06, top - y0, 0.06), Color(0.4, 0.28, 0.16), 0.0, rng)
 	var y := y0 + 0.3
 	while y < top:
-		cata._box(st, Vector3(SHAFT.x, y, lz), Vector3(0.84, 0.04, 0.04), Color(0.45, 0.32, 0.18), 0.0, rng)
+		cata._box(st, Vector3(sp.x, y, lz), Vector3(0.84, 0.04, 0.04), Color(0.45, 0.32, 0.18), 0.0, rng)
 		y += 0.35
 	st.generate_normals()
 	var mi := MeshInstance3D.new()
@@ -254,7 +307,53 @@ func _build_shaft() -> void:
 	mi.material_override = mat
 	mi.layers = CATA
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(mi)
+	parent.add_child(mi)
+
+
+## Zweiter Ausgang: Schacht mit Leiter im Boden der Tropfsteinhöhle, oben unter einer Holzluke
+func _build_exit() -> void:
+	_exit_root = Node3D.new()
+	_exit_root.name = "ExitRoot"
+	add_child(_exit_root)
+	_build_shaft(EXIT, true, _exit_root)
+	Util.add_box(_exit_root, Vector3(1.4, 0.01, 1.4), Color(0.015, 0.015, 0.015), Vector3(EXIT.x, 0.067, EXIT.z))     # schwarzes Loch
+	var l := Lid.new()
+	l.position = Vector3(EXIT.x, 0.1, EXIT.z - 0.75)        # Scharnier am Nordrand
+	_exit_root.add_child(l)
+	lid = l
+	lid_col = CollisionShape3D.new()
+	var lbs := BoxShape3D.new()
+	lbs.size = Vector3(1.5, 0.14, 1.5)
+	lid_col.shape = lbs
+	lid_col.position = Vector3(0, -0.02, 0.75)
+	l.add_child(lid_col)
+	var wood := Color(0.34, 0.22, 0.12)
+	Util.add_box(l, Vector3(1.5, 0.07, 1.5), wood, Vector3(0, -0.03, 0.75))
+	for bz in [0.35, 1.15]:
+		Util.add_box(l, Vector3(1.5, 0.03, 0.1), wood.darkened(0.3), Vector3(0, 0.02, bz))
+	Util.add_box(l, Vector3(0.18, 0.04, 0.05), Color(0.35, 0.3, 0.25), Vector3(0, 0.03, 1.25))      # Griff
+
+
+class Lid extends StaticBody3D:
+	func get_prompt() -> String:
+		if Bunker.exit_open:
+			return ""
+		return "E: Bodenluke öffnen"
+
+	func interact(_player: Node) -> void:
+		Bunker.set_exit_open(true)
+
+
+func _apply_exit(animate: bool) -> void:
+	if lid == null:
+		return
+	var rot := -105.0 if exit_open else 0.0
+	if animate:
+		create_tween().tween_property(lid, "rotation_degrees:x", rot, 0.9).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		Sfx.play("trunk_close", lid.global_position, 0.0, 0.7)
+	else:
+		lid.rotation_degrees.x = rot
+	lid_col.set_deferred("disabled", exit_open)
 
 
 func _apply_door(animate: bool) -> void:
@@ -352,7 +451,8 @@ func _process(delta: float) -> void:
 		cata.visible = pl.global_position.y < -6.0
 		for c in get_children():
 			if c != cata and c is Node3D:
-				(c as Node3D).visible = pl.global_position.distance_to(POS) < 80.0
+				var cc: Vector3 = EXIT if c == _exit_root else POS
+				(c as Node3D).visible = pl.global_position.distance_to(cc) < 80.0
 	_lurker_logic(delta)
 
 

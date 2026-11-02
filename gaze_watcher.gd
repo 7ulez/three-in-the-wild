@@ -14,6 +14,7 @@ var _mat: ShaderMaterial
 var _hb: float = 0.0
 var _cd: float = 0.0
 var _flash: float = 0.0
+var _lamp_base: float = -1.0
 
 const SHADER: String = """
 shader_type canvas_item;
@@ -51,6 +52,7 @@ func _process(delta: float) -> void:
 	var lu := Bunker.active_lurker()
 	if lu == null or player == null or player.camera == null or player.global_position.y > -10.0 or not lu.is_visible_in_tree():
 		gaze = move_toward(gaze, 0.0, delta)
+		_lamp_flicker(0.0)
 		_apply()
 		return
 	var cam := player.camera
@@ -75,6 +77,7 @@ func _process(delta: float) -> void:
 	gaze = clampf(gaze, 0.0, 1.0)
 	# Herzschlag: je näher das Wesen (auch ohne Blick) und je voller der Balken, desto schneller
 	var prox := clampf(1.0 - d / 18.0, 0.0, 1.0)
+	_lamp_flicker(prox)
 	var pulse := maxf(prox * 0.8, gaze)
 	if pulse > 0.05:
 		_hb -= delta
@@ -85,6 +88,18 @@ func _process(delta: float) -> void:
 	if _cd <= 0.0 and (gaze >= 1.0 or d < CATCH_DIST):
 		_caught()
 	_apply()
+
+
+## Je näher das Wesen, desto öfter flackert die Kopflampe
+func _lamp_flicker(prox: float) -> void:
+	if player == null or player.lamp == null:
+		return
+	if _lamp_base < 0.0:
+		_lamp_base = player.lamp.light_energy
+	if prox > 0.3 and player.lamp.visible:
+		player.lamp.light_energy = _lamp_base * (0.1 if randf() < prox * 0.3 else 1.0)
+	else:
+		player.lamp.light_energy = _lamp_base
 
 
 func _apply() -> void:

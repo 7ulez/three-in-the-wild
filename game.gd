@@ -178,6 +178,7 @@ static func reset() -> void:
 	cars_state = {}
 	stashes_opened = {}
 	Bunker.open = false
+	Bunker.exit_open = false
 	Bunker.pad = null
 	Bunker.typed = ""
 	all_done_shown = false
