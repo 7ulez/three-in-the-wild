@@ -190,10 +190,13 @@ func build(p_main: Node) -> void:
 		main.cave_boxes.append(ab)
 	main.cave_boxes.append(AABB(Vector3(EXIT.x - 0.8, Catacombs.CEIL_Y, EXIT.z - 0.8), Vector3(1.6, -Catacombs.CEIL_Y + 1.0, 1.6)))
 	_build_hut()
+	_build_hut_details()
 	_build_shaft(SHAFT, false, self)
 	_build_exit()
 	_apply_door(false)
 	_apply_exit(false)
+	_exit_sign(Vector3(SHAFT.x, Catacombs.FLOOR_Y + 2.9, SHAFT.z + 0.9), 0.0, self)
+	_exit_sign(Vector3(EXIT.x, Catacombs.FLOOR_Y + 2.9, EXIT.z - 0.9), PI, _exit_root)
 
 
 func _solid(size: Vector3, pos: Vector3, col: Color, layers: int = 1, parent: Node = null) -> StaticBody3D:
@@ -285,13 +288,14 @@ func _build_shaft(sp: Vector3, ladder_south: bool, parent: Node) -> void:
 	_solid(Vector3(hs * 2.0, h, 0.1), Vector3(sp.x, cy, sp.z + hs - 0.05), col, CATA, parent)
 	_solid(Vector3(0.1, h, hs * 2.0), Vector3(sp.x - hs + 0.05, cy, sp.z), col, CATA, parent)
 	_solid(Vector3(0.1, h, hs * 2.0), Vector3(sp.x + hs - 0.05, cy, sp.z), col, CATA, parent)
+	_shaft_details(sp, ladder_south, parent)
 	# Leiter: zwei Holme und Sprossen als ein einziges Mesh, von der Hub-Sohle bis kurz über den Boden
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var rng := RandomNumberGenerator.new()
 	var lz := sp.z + hs - 0.16 if ladder_south else sp.z - hs + 0.16
 	var y0 := Catacombs.FLOOR_Y
-	var top := -0.12 if ladder_south else 0.9      # in der Höhle endet die Leiter unter der Luke
+	var top := -0.12 if ladder_south else 1.1      # in der Höhle endet die Leiter unter der Luke
 	cata._box(st, Vector3(sp.x - 0.42, (y0 + top) / 2.0, lz), Vector3(0.06, top - y0, 0.06), Color(0.4, 0.28, 0.16), 0.0, rng)
 	cata._box(st, Vector3(sp.x + 0.42, (y0 + top) / 2.0, lz), Vector3(0.06, top - y0, 0.06), Color(0.4, 0.28, 0.16), 0.0, rng)
 	var y := y0 + 0.3
@@ -475,3 +479,184 @@ func _lurker_logic(delta: float) -> void:
 		cata.add_child(lurker)
 		lurker.setup(cata)
 		lurker.place_far_from(targets[0]["p"])
+
+
+# ---------- Verschönerung: Eingang, Innenraum, Schacht ----------
+
+var _vcmat: StandardMaterial3D = null
+
+
+## Viele Boxen als ein einziges Mesh (Vertexfarben): parts = [[Mitte, Grösse, Farbe, Streuung]]
+func _merged(parts: Array, parent: Node, layers: int = 1) -> MeshInstance3D:
+	if _vcmat == null:
+		_vcmat = StandardMaterial3D.new()
+		_vcmat.vertex_color_use_as_albedo = true
+		_vcmat.roughness = 1.0
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	for p in parts:
+		cata._box(st, p[0], p[1], p[2], p[3] if p.size() > 3 else 0.0, rng)
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _vcmat
+	mi.layers = layers
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	return mi
+
+
+func _emissive(col: Color, energy: float = 2.5) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = col
+	m.emission_enabled = true
+	m.emission = col
+	m.emission_energy_multiplier = energy
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return m
+
+
+func _build_hut_details() -> void:
+	var x := POS.x
+	var z := POS.z
+	var green := Color(0.2, 0.33, 0.14)
+	var concrete := Color(0.45, 0.44, 0.40)
+	# --- außen: Vorplatz, Moos, Efeu (alles ein Mesh)
+	var ext: Array = [
+		[Vector3(x, 0.03, z + 3.8), Vector3(3.4, 0.06, 2.6), concrete, 0.08],
+		[Vector3(x - 1.8, 0.2, z + 2.46), Vector3(1.4, 0.4, 0.05), green, 0.15],
+		[Vector3(x + 1.9, 0.15, z + 2.46), Vector3(1.1, 0.3, 0.05), green, 0.15],
+		[Vector3(x - 3.03, 0.25, z + 0.5), Vector3(0.05, 0.5, 1.8), green, 0.15],
+		[Vector3(x + 3.03, 0.3, z - 0.5), Vector3(0.05, 0.6, 2.2), green, 0.15],
+		[Vector3(x - 1.0, 0.3, z - 2.53), Vector3(2.4, 0.6, 0.05), green, 0.15],
+	]
+	for vx in [2.0, 2.25, 2.5, 2.9, -2.0, -2.3, -2.6]:
+		var vl := 1.1 + fmod(absf(vx) * 7.3, 1.0)
+		ext.append([Vector3(x + vx, 2.8 - vl / 2.0, z + 2.47), Vector3(0.05, vl, 0.02), green.darkened(0.15 + fmod(absf(vx), 0.3)), 0.2])
+	_merged(ext, self, 1)
+	# Flügelwände links und rechts vom Vorplatz (mit Moos oben)
+	for sx in [-1.0, 1.0]:
+		_solid(Vector3(0.35, 1.3, 1.8), Vector3(x + sx * 1.9, 0.65, z + 3.4), concrete.darkened(0.08))
+		Util.add_box(self, Vector3(0.42, 0.09, 1.86), green, Vector3(x + sx * 1.9, 1.33, z + 3.4))
+	# Tür: Warnstreifen, Handrad und Nummer
+	for k in range(6):
+		Util.add_box(door, Vector3(0.12, 0.2, 0.02), Color(0.92, 0.75, 0.1) if k % 2 == 0 else Color(0.08, 0.08, 0.08), Vector3(-0.55 + k * 0.22, -0.9, 0.085))
+	var wheel := Util.add_cylinder(door, 0.17, 0.04, Color(0.18, 0.18, 0.18), Vector3(0, 0.05, 0.1))
+	wheel.rotation_degrees.x = 90.0
+	Util.add_box(door, Vector3(0.36, 0.04, 0.03), Color(0.18, 0.18, 0.18), Vector3(0, 0.05, 0.12))
+	Util.add_box(door, Vector3(0.04, 0.36, 0.03), Color(0.18, 0.18, 0.18), Vector3(0, 0.05, 0.12))
+	# Käfiglampe neben der Tür (leuchtet nur schwach)
+	var lamp := Util.add_box(self, Vector3(0.22, 0.14, 0.14), Color(1.0, 0.7, 0.3), Vector3(x + 1.9, 2.5, z + 2.58))
+	lamp.material_override = _emissive(Color(1.0, 0.68, 0.28), 2.0)
+	for bx in [-0.09, 0.0, 0.09]:
+		Util.add_box(self, Vector3(0.015, 0.17, 0.17), Color(0.12, 0.12, 0.12), Vector3(x + 1.9 + bx, 2.5, z + 2.58))
+	# --- innen (Ebene der Katakomben: Sonne und Mond erreichen den Raum nicht)
+	var slab := Color(0.33, 0.33, 0.31)
+	var yel := Color(0.9, 0.72, 0.08)
+	var steel := Color(0.3, 0.3, 0.28)
+	var inner: Array = [
+		# Betonboden mit Loch für den Schacht
+		[Vector3(x - 1.75, 0.03, z), Vector3(2.1, 0.06, 4.6), slab, 0.06],
+		[Vector3(x + 1.75, 0.03, z), Vector3(2.1, 0.06, 4.6), slab, 0.06],
+		[Vector3(x, 0.03, z - 2.0), Vector3(1.4, 0.06, 0.6), slab, 0.06],
+		[Vector3(x, 0.03, z + 1.0), Vector3(1.4, 0.06, 2.6), slab, 0.06],
+		# gelber Rahmen um das Loch, schwarz-gelbe Warnmarkierung
+		[Vector3(x, 0.066, SHAFT.z - 0.76), Vector3(1.64, 0.012, 0.12), yel],
+		[Vector3(x, 0.066, SHAFT.z + 0.76), Vector3(1.64, 0.012, 0.12), yel],
+		[Vector3(x - 0.76, 0.066, SHAFT.z), Vector3(0.12, 0.012, 1.4), yel],
+		[Vector3(x + 0.76, 0.066, SHAFT.z), Vector3(0.12, 0.012, 1.4), yel],
+		# Rohre, Kabel und Sicherungskasten an der Rückwand
+		[Vector3(x, 2.35, z - 2.06), Vector3(5.0, 0.08, 0.08), Color(0.36, 0.26, 0.18)],
+		[Vector3(x, 2.1, z - 2.06), Vector3(5.0, 0.06, 0.06), Color(0.25, 0.27, 0.3)],
+		[Vector3(x + 1.9, 1.2, z - 2.06), Vector3(0.08, 2.5, 0.08), Color(0.36, 0.26, 0.18)],
+		[Vector3(x - 2.0, 1.5, z - 2.08), Vector3(0.5, 0.7, 0.12), Color(0.4, 0.4, 0.38)],
+		[Vector3(x - 2.0, 1.78, z - 2.0), Vector3(0.07, 0.07, 0.03), Color(0.8, 0.15, 0.1)],
+		[Vector3(x - 2.0, 2.15, z - 2.06), Vector3(0.03, 0.8, 0.03), Color(0.05, 0.05, 0.05)],
+	]
+	for k in range(5):      # schwarze Streifen der Warnmarkierung
+		inner.append([Vector3(x - 0.6 + k * 0.3, 0.07, SHAFT.z - 0.76), Vector3(0.07, 0.014, 0.12), Color(0.06, 0.06, 0.06)])
+		inner.append([Vector3(x - 0.6 + k * 0.3, 0.07, SHAFT.z + 0.76), Vector3(0.07, 0.014, 0.12), Color(0.06, 0.06, 0.06)])
+	# Geländer um das Loch (Süden offen): Pfosten und zwei Stangen
+	for px in [-0.9, 0.9]:
+		for pz in [-1.0, 0.8]:
+			inner.append([Vector3(x + px, 0.5, SHAFT.z + pz), Vector3(0.05, 1.0, 0.05), yel.darkened(0.1)])
+	for ry in [1.0, 0.55]:
+		inner.append([Vector3(x - 0.9, ry, SHAFT.z - 0.1), Vector3(0.04, 0.04, 1.8), yel.darkened(0.1)])
+		inner.append([Vector3(x + 0.9, ry, SHAFT.z - 0.1), Vector3(0.04, 0.04, 1.8), yel.darkened(0.1)])
+		inner.append([Vector3(x, ry, SHAFT.z - 1.0), Vector3(1.8, 0.04, 0.04), yel.darkened(0.1)])
+	_merged(inner, self, CATA)
+	for rs in [[Vector3(-0.9, 0.5, -0.1), Vector3(0.08, 1.0, 1.8)], [Vector3(0.9, 0.5, -0.1), Vector3(0.08, 1.0, 1.8)], [Vector3(0.0, 0.5, -1.0), Vector3(1.8, 1.0, 0.08)]]:
+		var rb := StaticBody3D.new()
+		rb.position = Vector3(x + rs[0].x, rs[0].y, SHAFT.z + rs[0].z)
+		var rc := CollisionShape3D.new()
+		var rbx := BoxShape3D.new()
+		rbx.size = rs[1]
+		rc.shape = rbx
+		rb.add_child(rc)
+		add_child(rb)
+
+
+## Betonringe, Tiefenschilder und kleine Lampen im Schacht
+func _shaft_details(sp: Vector3, ladder_south: bool, parent: Node) -> void:
+	var hs := SHAFT_HALF
+	var y1 := Catacombs.CEIL_Y
+	var band := Color(0.19, 0.19, 0.18)
+	var parts: Array = []
+	var yy := -4.0
+	while yy > y1 + 1.0:
+		parts.append([Vector3(sp.x - hs + 0.12, yy, sp.z), Vector3(0.04, 0.26, 1.2), band, 0.1])
+		parts.append([Vector3(sp.x + hs - 0.12, yy, sp.z), Vector3(0.04, 0.26, 1.2), band, 0.1])
+		var fz: float = (sp.z - hs + 0.12) if ladder_south else (sp.z + hs - 0.12)       # Wand gegenüber der Leiter
+		parts.append([Vector3(sp.x, yy, fz), Vector3(1.2, 0.26, 0.04), band, 0.1])
+		yy -= 4.0
+	_merged(parts, parent, CATA)
+	# Tiefenschilder an der Wand gegenüber der Leiter
+	for d in [6, 12, 18, 24]:
+		var lb := Label3D.new()
+		lb.text = "- %d m" % d
+		lb.font_size = 40
+		lb.pixel_size = 0.0035
+		lb.modulate = Color(0.85, 0.8, 0.45, 0.85)
+		lb.outline_size = 0
+		lb.layers = CATA
+		if ladder_south:
+			lb.position = Vector3(sp.x, -float(d), sp.z - hs + 0.115)
+		else:
+			lb.position = Vector3(sp.x, -float(d), sp.z + hs - 0.115)
+			lb.rotation.y = PI
+		parent.add_child(lb)
+	# Kleine Wandlampen (nur leuchtende Boxen, ein MultiMesh)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.09, 0.14, 0.09)
+	mm.mesh = bm
+	var lamps: Array = [-3.0, -9.0, -15.0, -21.0]
+	mm.instance_count = lamps.size()
+	for i in range(lamps.size()):
+		mm.set_instance_transform(i, Transform3D(Basis(), Vector3(sp.x - hs + 0.16, lamps[i], sp.z + 0.2)))
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.material_override = _emissive(Color(1.0, 0.62, 0.2), 2.5)
+	mmi.layers = CATA
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mmi)
+
+
+## Grünes "AUSGANG"-Schild über dem Leiterkäfig im Hub / im Raum unter der Höhle
+func _exit_sign(pos: Vector3, yaw: float, parent: Node) -> void:
+	var lb := Label3D.new()
+	lb.text = "AUSGANG"
+	lb.font_size = 44
+	lb.pixel_size = 0.0045
+	lb.modulate = Color(0.35, 1.0, 0.45)
+	lb.outline_size = 0
+	lb.layers = CATA
+	lb.position = pos
+	lb.rotation.y = yaw
+	parent.add_child(lb)
+	var bar := Util.add_box(parent, Vector3(0.85, 0.02, 0.02), Color(0.3, 1.0, 0.4), pos + Vector3(0, -0.14, 0))
+	bar.material_override = _emissive(Color(0.3, 1.0, 0.4), 2.0)
+	bar.layers = CATA
