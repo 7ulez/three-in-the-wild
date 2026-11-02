@@ -48,6 +48,10 @@ func _ready() -> void:
 	range_node.name = "ShootingRange"
 	add_child(range_node)
 	range_node.build(self)
+	var bunker := Bunker.new()
+	bunker.name = "Bunker"
+	add_child(bunker)
+	bunker.build(self)
 	_build_piers()
 	_build_cars()
 	_build_signs()
@@ -69,6 +73,10 @@ func _ready() -> void:
 	player.character_name = Game.start_char
 	add_child(player)
 	player.global_position = Vector3(0, 1.0, 10)
+	var gaze := GazeWatcher.new()
+	gaze.name = "GazeWatcher"
+	player.add_child(gaze)
+	gaze.setup(player)
 	weather = Weather.new()
 	weather.name = "Weather"
 	add_child(weather)
@@ -270,8 +278,10 @@ func _setup_environment() -> void:
 	sun.directional_shadow_max_distance = 45.0
 	sun.shadow_blur = 1.6
 	sun.light_angular_distance = 0.5
+	sun.light_cull_mask = 0xFFFFF & ~Catacombs.CATA_LAYER      # die Katakomben beleuchtet die Sonne nicht
 	add_child(sun)
 	moon = DirectionalLight3D.new()
+	moon.light_cull_mask = 0xFFFFF & ~Catacombs.CATA_LAYER
 	moon.light_color = Color(0.55, 0.65, 1.0)
 	moon.light_energy = 0.0
 	moon.rotation_degrees = Vector3(-50, -120, 0)
@@ -286,16 +296,31 @@ func _build_ground() -> void:
 	var ground := StaticBody3D.new()
 	ground.add_to_group("ground")
 	add_child(ground)
-	var cs := CollisionShape3D.new()
-	var bs := BoxShape3D.new()
-	# 20 m dick (Oberkante bleibt bei y=0): bei ruckeliger Bildrate fiel man sonst durch die 1-m-Platte
-	bs.size = Vector3(1400, 20, 1400)
-	cs.shape = bs
-	cs.position = Vector3(0, -10.0, 0)
-	ground.add_child(cs)
-	var gm := Util.add_box(ground, Vector3(1400, 20, 1400), Color(0.36, 0.55, 0.22), Vector3(0, -10.0, 0))
-	gm.material_override = Scenery.ground_material()
-	gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# 20 m dick (Oberkante bleibt bei y=0): bei ruckeliger Bildrate fiel man sonst durch die 1-m-Platte.
+	# Vier Platten rund um das Schachtloch des Bunkers (Leiter zu den Katakomben).
+	var hole := Bunker.hole_rect()
+	var hx0 := hole.position.x
+	var hx1 := hole.end.x
+	var hz0 := hole.position.y
+	var hz1 := hole.end.y
+	var gmat := Scenery.ground_material()
+	for r in [
+		Rect2(-700.0, -700.0, 700.0 + hx0, 1400.0),
+		Rect2(hx1, -700.0, 700.0 - hx1, 1400.0),
+		Rect2(hx0, -700.0, hx1 - hx0, 700.0 + hz0),
+		Rect2(hx0, hz1, hx1 - hx0, 700.0 - hz1)]:
+		var rr := r as Rect2
+		var gsize := Vector3(rr.size.x, 20.0, rr.size.y)
+		var gc := Vector3(rr.position.x + rr.size.x / 2.0, -10.0, rr.position.y + rr.size.y / 2.0)
+		var cs := CollisionShape3D.new()
+		var bs := BoxShape3D.new()
+		bs.size = gsize
+		cs.shape = bs
+		cs.position = gc
+		ground.add_child(cs)
+		var gm := Util.add_box(ground, gsize, Color(0.36, 0.55, 0.22), gc)
+		gm.material_override = gmat
+		gm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Kiesfläche als Parkplatz
 	var lot := MeshInstance3D.new()
 	var lot_mesh := PlaneMesh.new()
@@ -501,6 +526,8 @@ func _tree_blocked(pos: Vector3) -> bool:
 	if Hideouts.in_zone(pos):
 		return true
 	if ShootingRange.in_zone(pos):
+		return true
+	if Bunker.in_zone(pos):
 		return true
 	for hp in HAMMOCK_PAIRS:
 		if Vector2(pos.x - hp.x, pos.z - hp.y).length() < 5.0:

@@ -170,7 +170,15 @@ func _draw() -> void:
 			draw_line(sp + Vector2(-9, -2), sp + Vector2(9, -2), C_INK, 1.2)
 			draw_line(sp + Vector2(-4, 1), sp + Vector2(-1, 4), Color(0.9, 1.0, 0.6), 2.4)
 			draw_line(sp + Vector2(-1, 4), sp + Vector2(5, -1), Color(0.9, 1.0, 0.6), 2.4)
-			_label(f_lab, sp + Vector2(0, 24), (s as Stash).label, 12, true)
+			_label(f_lab, sp + Vector2(0, 24), (s as Stash).label + "  [%d]" % Bunker.CODE[(s as Stash).index % Bunker.CODE.size()], 12, true)
+
+	# Bunker: erscheint auf der Karte, sobald alle Verstecke gefunden sind (oder die Tür offen ist)
+	if Stash.found() >= 5 or Bunker.open:
+		var bp := _wv(Bunker.POS)
+		draw_rect(Rect2(bp - Vector2(9, 6), Vector2(18, 12)), Color(0.4, 0.4, 0.37))
+		draw_rect(Rect2(bp - Vector2(9, 6), Vector2(18, 12)), C_INK, false, 1.6)
+		draw_rect(Rect2(bp - Vector2(3, 0), Vector2(6, 6)), C_INK)
+		_label(f_lab, bp + Vector2(0, 24), "Bunker", 13, true)
 
 	# Schatzkarte: rotes X am geheimen Schießstand
 	if Game.map_found:

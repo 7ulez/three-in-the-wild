@@ -1011,6 +1011,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_shoot()
 	elif event is InputEventKey and event.pressed and not event.echo:
 		var key := event as InputEventKey
+		if Bunker.pad != null and Bunker.pad_key(key, self):
+			return
 		match key.keycode:
 			KEY_ESCAPE:
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -1129,7 +1131,18 @@ func _physics_process(delta: float) -> void:
 			unlie_tent()
 		_update_prompt()
 		return
-	if not is_on_floor():
+	var on_ladder := Bunker.on_ladder(global_position) and not placing
+	if on_ladder:
+		# Schacht im Bunker: W/Leertaste hoch, S runter, keine Schwerkraft
+		var up := (1.0 if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_SPACE) else 0.0) - (1.0 if Input.is_physical_key_pressed(KEY_S) else 0.0)
+		if Game.touch and Game.touch_move != Vector2.ZERO:
+			up = -Game.touch_move.y
+		velocity.y = up * 2.6
+		_peak_y = global_position.y
+		if up > 0.0 and global_position.y > -0.05:
+			teleport_to(Bunker.exit_pos())     # oben angekommen: aus dem Loch steigen
+			velocity = Vector3.ZERO
+	elif not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	elif Input.is_physical_key_pressed(KEY_SPACE) and water_d < 0.6:
 		velocity.y = JUMP_VELOCITY
@@ -1177,6 +1190,8 @@ func _physics_process(delta: float) -> void:
 	speed *= 1.0 - 0.25 * minf(drunk, 1.0)
 	speed *= 1.0 - 0.4 * _aim_f
 	var target := dir * speed
+	if on_ladder and not is_on_floor():
+		target = Vector3.ZERO      # an der Leiter nur hoch und runter
 	if vomit_t > 0.0:
 		target = Vector3.ZERO
 		velocity.x = 0.0
@@ -2340,7 +2355,8 @@ func _rescue_check(delta: float) -> void:
 		if _safe_t > 1.0:
 			_safe_t = 0.0
 			_safe_pos = global_position + Vector3(0, 0.3, 0)
-	if global_position.y < -1.2 or not is_finite(global_position.y) or not is_finite(global_position.x) or not is_finite(global_position.z):
+	var fell := global_position.y < -1.2 and not Bunker.in_underground(global_position)    # Katakomben sind erlaubt
+	if fell or not is_finite(global_position.y) or not is_finite(global_position.x) or not is_finite(global_position.z):
 		teleport_to(_safe_pos)
 		_peak_y = _safe_pos.y
 		_airborne = false

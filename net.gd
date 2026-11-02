@@ -468,7 +468,7 @@ func _snapshot() -> Dictionary:
 		"placed": pl, "tents": tents, "cars": cars, "goals": Game.goal_shared.duplicate(),
 		"items": item_db.values(), "stashes": Game.stashes_opened.keys(),
 		"stats": Game.stats_all.duplicate(true), "finale": Game.all_done_shown,
-		"flag": Game.flag_hoisted, "bench": maxi(Game.bench_owner, 0)}
+		"flag": Game.flag_hoisted, "bench": maxi(Game.bench_owner, 0), "bunker": Bunker.open}
 
 
 @rpc("authority", "reliable")
@@ -498,6 +498,8 @@ func assign_slot(s: int, snap: Dictionary) -> void:
 		f.set_hoisted(Game.flag_hoisted, false)
 	Game.bench_owner = int(snap.get("bench", 0))
 	_apply_bench()
+	if bool(snap.get("bunker", false)):
+		Bunker.set_open(true, false)
 	for d in snap.get("items", []):
 		item_db[int(d["id"])] = d
 		_item_create(d)
@@ -1187,9 +1189,29 @@ func _authority_tick(delta: float) -> void:
 		elif _nutria_was_on:
 			rpc("remote_nutria", false, Vector3.ZERO, 0.0, "")
 		_nutria_was_on = on
+	# Wesen der Katakomben (wie das Nutria: nur der Verantwortliche simuliert)
+	_lurker_t += delta
+	if _lurker_t > 0.1:
+		_lurker_t = 0.0
+		var lu := Bunker.active_lurker()
+		var lon := lu != null and not lu.puppet
+		if lon:
+			rpc("remote_lurker", true, lu.global_position, lu.rotation.y, lu.anim)
+		elif _lurker_was_on:
+			rpc("remote_lurker", false, Vector3.ZERO, 0.0, "")
+		_lurker_was_on = lon
 
 
 var _nutria_was_on: bool = false
+var _lurker_t: float = 0.0
+var _lurker_was_on: bool = false
+
+
+@rpc("any_peer", "unreliable_ordered")
+func remote_lurker(on: bool, pos: Vector3, yaw: float, anim: String) -> void:
+	if Game.dedicated or main == null or is_world_authority():
+		return
+	Bunker.net_lurker(on, pos, yaw, anim)
 
 
 ## Ein Mitspieler hat das Nutria (bei ihm nur eine Puppe) erschossen: der Verantwortliche lässt es sterben.
@@ -1305,6 +1327,15 @@ func _set_evening() -> void:
 
 
 # ---------- Verstecke ----------
+
+func send_bunker_open() -> void:
+	rpc("remote_bunker_open")
+
+
+@rpc("any_peer", "reliable")
+func remote_bunker_open() -> void:
+	Bunker.set_open(true, false)
+
 
 func send_stash(i: int) -> void:
 	Game.stashes_opened[i] = true

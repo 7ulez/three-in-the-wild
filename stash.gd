@@ -116,7 +116,11 @@ func interact(player: Node) -> void:
 			if n != null:
 				n.drank_beer()
 			msg = "Zwei vergessene Dosen Bier. Eine trinkst du sofort. Prost!"
-	player.toast("%s: %s  (Verstecke %d/%d)" % [label, msg, found_n + 1 if found_n < all.size() else found_n, all.size()], 7.0)
+	var digit: int = Bunker.CODE[index % Bunker.CODE.size()]
+	msg += "  Auf dem Boden der Kiste ist eine Zahl eingeritzt: %d (Ziffer %d von 5)." % [digit, index % Bunker.CODE.size() + 1]
+	if found_n + 1 >= all.size():
+		msg += " Das ist ein Code! Irgendwo im Nordosten muss ein alter Bunker stehen."
+	player.toast("%s: %s  (Verstecke %d/%d)" % [label, msg, found_n + 1 if found_n < all.size() else found_n, all.size()], 10.0)
 
 
 ## Der Inhalt liegt als echter Gegenstand auf der Kiste und fällt von dort herunter.

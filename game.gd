@@ -177,6 +177,9 @@ static func reset() -> void:
 	Item.registry.clear()
 	cars_state = {}
 	stashes_opened = {}
+	Bunker.open = false
+	Bunker.pad = null
+	Bunker.typed = ""
 	all_done_shown = false
 	stat_beers = 0
 	stat_pants = 0

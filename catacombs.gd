@@ -1,0 +1,363 @@
+class_name Catacombs
+extends Node3D
+## Katakomben tief unter der Map: Hub (3x3 Zellen) direkt unter dem Schacht, darum ein Labyrinth.
+## Alles ist ein paar grosse Meshes (Wände, Böden) plus zwei MultiMeshes (Knochen, Fackeln):
+## wenige Objekte, damit das Limit von 1000 sichtbaren Objekten nie gefährdet ist.
+
+const N: int = 19                  # Zellen pro Seite (ungerade, Hub in der Mitte)
+const PITCH: float = 4.0           # Zellabstand (Gang 3 m + Wand 1 m)
+const WALL_T: float = 1.0
+const FLOOR_Y: float = -30.0
+const H: float = 3.5               # Ganghöhe
+const CEIL_Y: float = FLOOR_Y + H
+const MID: int = 9                 # Hub-Mitte (Zellindex)
+const CATA_LAYER: int = 1 << 10    # Render-Ebene 11: Sonne und Mond beleuchten die Katakomben nicht
+const SHAFT_HALF: float = 0.7      # halbe Schachtbreite
+
+var center: Vector3 = Vector3.ZERO     # Boden unter dem Schacht (Mitte des Hubs)
+var east: PackedByteArray = PackedByteArray()    # 1 = Durchgang von Zelle (i,j) nach (i+1,j)
+var south: PackedByteArray = PackedByteArray()   # 1 = Durchgang von Zelle (i,j) nach (i,j+1)
+var aabb: AABB = AABB()
+var dead_ends: Array = []
+
+
+static func idx(i: int, j: int) -> int:
+	return j * N + i
+
+
+func cell_center(c: int) -> Vector3:
+	return center + Vector3(float(c % N - MID) * PITCH, 0.0, float(c / N - MID) * PITCH)
+
+
+## Zelle unter einer Weltposition (-1 ausserhalb)
+func cell_of(p: Vector3) -> int:
+	var i := int(round((p.x - center.x) / PITCH)) + MID
+	var j := int(round((p.z - center.z) / PITCH)) + MID
+	if i < 0 or j < 0 or i >= N or j >= N:
+		return -1
+	return idx(i, j)
+
+
+func is_hub(c: int) -> bool:
+	var i := c % N
+	var j := c / N
+	return absi(i - MID) <= 1 and absi(j - MID) <= 1
+
+
+## Offene Nachbarzellen
+func links(c: int) -> Array:
+	var i := c % N
+	var j := c / N
+	var r: Array = []
+	if i < N - 1 and east[c] == 1:
+		r.append(c + 1)
+	if i > 0 and east[c - 1] == 1:
+		r.append(c - 1)
+	if j < N - 1 and south[c] == 1:
+		r.append(c + N)
+	if j > 0 and south[c - N] == 1:
+		r.append(c - N)
+	return r
+
+
+func _carve(a: int, b: int) -> void:
+	if b == a + 1:
+		east[a] = 1
+	elif b == a - 1:
+		east[b] = 1
+	elif b == a + N:
+		south[a] = 1
+	elif b == a - N:
+		south[b] = 1
+
+
+## Wachsender Baum (75 % neueste Zelle = lange Gänge): vom Hub aus in alle Richtungen
+func generate(seed_v: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v
+	east = PackedByteArray()
+	south = PackedByteArray()
+	east.resize(N * N)
+	south.resize(N * N)
+	var visited := PackedByteArray()
+	visited.resize(N * N)
+	var active: Array = []
+	for j in range(MID - 1, MID + 2):
+		for i in range(MID - 1, MID + 2):
+			var c := idx(i, j)
+			visited[c] = 1
+			active.append(c)
+			if i < MID + 1:
+				east[c] = 1
+			if j < MID + 1:
+				south[c] = 1
+	while not active.is_empty():
+		var ai: int = active.size() - 1 if rng.randf() < 0.75 else rng.randi() % active.size()
+		var c: int = active[ai]
+		var ci := c % N
+		var cj := c / N
+		var nb: Array = []
+		if ci < N - 1 and visited[c + 1] == 0:
+			nb.append(c + 1)
+		if ci > 0 and visited[c - 1] == 0:
+			nb.append(c - 1)
+		if cj < N - 1 and visited[c + N] == 0:
+			nb.append(c + N)
+		if cj > 0 and visited[c - N] == 0:
+			nb.append(c - N)
+		if nb.is_empty():
+			active.remove_at(ai)
+			continue
+		var n: int = nb[rng.randi() % nb.size()]
+		_carve(c, n)
+		visited[n] = 1
+		active.append(n)
+	# Schleifen: einen Teil der Sackgassen aufbrechen
+	for c in range(N * N):
+		if links(c).size() == 1 and rng.randf() < 0.28:
+			var ci2 := c % N
+			var cj2 := c / N
+			var cand: Array = []
+			if ci2 < N - 1 and east[c] == 0:
+				cand.append(c + 1)
+			if ci2 > 0 and east[c - 1] == 0:
+				cand.append(c - 1)
+			if cj2 < N - 1 and south[c] == 0:
+				cand.append(c + N)
+			if cj2 > 0 and south[c - N] == 0:
+				cand.append(c - N)
+			if not cand.is_empty():
+				_carve(c, cand[rng.randi() % cand.size()])
+	dead_ends.clear()
+	for c in range(N * N):
+		if links(c).size() == 1:
+			dead_ends.append(c)
+
+
+## Kürzester Weg (Zellliste von a nach b, ohne a)
+func path(a: int, b: int) -> Array:
+	if a < 0 or b < 0 or a == b:
+		return []
+	var prev := {}
+	prev[a] = -1
+	var q: Array = [a]
+	var qi := 0
+	while qi < q.size():
+		var c: int = q[qi]
+		qi += 1
+		if c == b:
+			break
+		for n in links(c):
+			if not prev.has(n):
+				prev[n] = c
+				q.append(n)
+	if not prev.has(b):
+		return []
+	var out: Array = []
+	var cur: int = b
+	while cur != a:
+		out.push_front(cur)
+		cur = prev[cur]
+	return out
+
+
+# ---------- Aufbau ----------
+
+func build(p_center: Vector3, seed_v: int = 4711) -> void:
+	center = p_center
+	generate(seed_v)
+	var half := float(N) * PITCH / 2.0
+	aabb = AABB(Vector3(center.x - half, FLOOR_Y - 1.0, center.z - half), Vector3(half * 2.0, H + 2.0, half * 2.0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_v + 7
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var stone := Color(0.30, 0.28, 0.25)
+	# Boden und Decke (Decke mit quadratischem Loch für den Schacht)
+	var ext := half + 1.0
+	_box(st, Vector3(center.x, FLOOR_Y - 0.5, center.z), Vector3(ext * 2.0, 1.0, ext * 2.0), Color(0.19, 0.17, 0.15), 0.0, rng)
+	var ceil_y := CEIL_Y + 0.5
+	var hs := SHAFT_HALF
+	_box(st, Vector3(center.x, ceil_y, center.z - (ext + hs) / 2.0), Vector3(ext * 2.0, 1.0, ext - hs), Color(0.2, 0.19, 0.17), 0.0, rng)
+	_box(st, Vector3(center.x, ceil_y, center.z + (ext + hs) / 2.0), Vector3(ext * 2.0, 1.0, ext - hs), Color(0.2, 0.19, 0.17), 0.0, rng)
+	_box(st, Vector3(center.x - (ext + hs) / 2.0, ceil_y, center.z), Vector3(ext - hs, 1.0, hs * 2.0), Color(0.2, 0.19, 0.17), 0.0, rng)
+	_box(st, Vector3(center.x + (ext + hs) / 2.0, ceil_y, center.z), Vector3(ext - hs, 1.0, hs * 2.0), Color(0.2, 0.19, 0.17), 0.0, rng)
+	var wy := FLOOR_Y + H / 2.0
+	# Aussenwand rundum
+	_box(st, Vector3(center.x, wy, center.z - half - 0.5), Vector3(ext * 2.0, H, 1.0), stone, 0.1, rng)
+	_box(st, Vector3(center.x, wy, center.z + half + 0.5), Vector3(ext * 2.0, H, 1.0), stone, 0.1, rng)
+	_box(st, Vector3(center.x - half - 0.5, wy, center.z), Vector3(1.0, H, ext * 2.0), stone, 0.1, rng)
+	_box(st, Vector3(center.x + half + 0.5, wy, center.z), Vector3(1.0, H, ext * 2.0), stone, 0.1, rng)
+	# Pfeiler an jeder Gitterecke (im Hub werden das Säulen)
+	for j in range(N + 1):
+		for i in range(N + 1):
+			var gx := center.x + (float(i - MID) - 0.5) * PITCH
+			var gz := center.z + (float(j - MID) - 0.5) * PITCH
+			_box(st, Vector3(gx, wy, gz), Vector3(WALL_T, H, WALL_T), stone, 0.12, rng)
+	# Wandstücke zwischen den Pfeilern, wo kein Durchgang ist
+	var seg := PITCH - WALL_T
+	for j in range(N):
+		for i in range(N):
+			var c := idx(i, j)
+			var cc := cell_center(c)
+			if i < N - 1 and east[c] == 0:
+				_box(st, Vector3(cc.x + PITCH / 2.0, wy, cc.z), Vector3(WALL_T, H, seg), stone, 0.12, rng)
+			if j < N - 1 and south[c] == 0:
+				_box(st, Vector3(cc.x, wy, cc.z + PITCH / 2.0), Vector3(seg, H, WALL_T), stone, 0.12, rng)
+	st.generate_normals()
+	var mesh := st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 1.0
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.layers = 1 | CATA_LAYER
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	cs.shape = mesh.create_trimesh_shape()
+	body.add_child(cs)
+	add_child(body)
+	_build_shaft_cage()
+	_build_deco(rng)
+
+
+## Fügt eine Box mit leichter Farbstreuung in den SurfaceTool-Mesh ein.
+func _box(st: SurfaceTool, c: Vector3, size: Vector3, col: Color, jitter: float, rng: RandomNumberGenerator) -> void:
+	var h := size / 2.0
+	var v := [
+		c + Vector3(-h.x, -h.y, -h.z), c + Vector3(h.x, -h.y, -h.z), c + Vector3(h.x, h.y, -h.z), c + Vector3(-h.x, h.y, -h.z),
+		c + Vector3(-h.x, -h.y, h.z), c + Vector3(h.x, -h.y, h.z), c + Vector3(h.x, h.y, h.z), c + Vector3(-h.x, h.y, h.z)]
+	# Flächen (Außenseite zeigt nach außen; gegen den Uhrzeigersinn von außen)
+	var faces := [[0, 3, 2, 1], [5, 6, 7, 4], [4, 7, 3, 0], [1, 2, 6, 5], [3, 7, 6, 2], [4, 0, 1, 5]]
+	for f in faces:
+		var k := 1.0 + rng.randf_range(-jitter, jitter)
+		st.set_smooth_group(-1)         # flache Flächen
+		st.set_color(Color(col.r * k, col.g * k, col.b * k))
+		for t in [0, 2, 1, 0, 3, 2]:    # Godot: Vorderseite im Uhrzeigersinn
+			st.add_vertex(v[f[t]])
+
+
+## Leiterkäfig im Hub: drei Wände (Süden offen), die Leiter hängt an der Nordwand.
+func _build_shaft_cage() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var steel := Color(0.28, 0.27, 0.26)
+	var y0 := FLOOR_Y
+	var y1 := CEIL_Y
+	var hs := SHAFT_HALF
+	var mid := (y0 + y1) / 2.0
+	var hh := y1 - y0
+	_box(st, Vector3(center.x, mid, center.z - hs + 0.05), Vector3(hs * 2.0, hh, 0.1), steel, 0.05, rng)
+	_box(st, Vector3(center.x - hs + 0.05, mid, center.z), Vector3(0.1, hh, hs * 2.0), steel, 0.05, rng)
+	_box(st, Vector3(center.x + hs - 0.05, mid, center.z), Vector3(0.1, hh, hs * 2.0), steel, 0.05, rng)
+	st.generate_normals()
+	var mesh := st.commit()
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 1.0
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.layers = 1 | CATA_LAYER
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	cs.shape = mesh.create_trimesh_shape()
+	body.add_child(cs)
+	add_child(body)
+
+
+func _build_deco(rng: RandomNumberGenerator) -> void:
+	# Knochen und Schädel (zwei MultiMeshes) in Sackgassen und verstreut
+	var spots: Array = []
+	for c in dead_ends:
+		for k in range(4):
+			spots.append(cell_center(c) + Vector3(rng.randf_range(-1.2, 1.2), 0.0, rng.randf_range(-1.2, 1.2)))
+	for c in range(N * N):
+		if rng.randf() < 0.18:
+			spots.append(cell_center(c) + Vector3(rng.randf_range(-1.2, 1.2), 0.0, rng.randf_range(-1.2, 1.2)))
+	for k in range(14):
+		spots.append(center + Vector3(rng.randf_range(-5.5, 5.5), 0.0, rng.randf_range(-5.5, 5.5)))
+	var bone_mm := MultiMesh.new()
+	bone_mm.transform_format = MultiMesh.TRANSFORM_3D
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.45, 0.07, 0.07)
+	bone_mm.mesh = bm
+	bone_mm.instance_count = spots.size()
+	var skull_mm := MultiMesh.new()
+	skull_mm.transform_format = MultiMesh.TRANSFORM_3D
+	var sm := SphereMesh.new()
+	sm.radius = 0.12
+	sm.height = 0.24
+	sm.radial_segments = 7
+	sm.rings = 4
+	skull_mm.mesh = sm
+	var skull_n := 0
+	var skull_t: Array = []
+	for i in range(spots.size()):
+		var p: Vector3 = spots[i]
+		var t := Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, rng.randf_range(-0.2, 0.2)), Vector3(p.x, FLOOR_Y + 0.05, p.z))
+		bone_mm.set_instance_transform(i, t)
+		if rng.randf() < 0.35:
+			skull_t.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU) * Basis.from_scale(Vector3(1.0, 1.1, 1.2)), Vector3(p.x + 0.2, FLOOR_Y + 0.12, p.z + 0.1)))
+	skull_n = skull_t.size()
+	skull_mm.instance_count = skull_n
+	for i in range(skull_n):
+		skull_mm.set_instance_transform(i, skull_t[i])
+	var bone_mat := Util.mat(Color(0.78, 0.74, 0.62))
+	bone_mat.vertex_color_use_as_albedo = false
+	var bmi := MultiMeshInstance3D.new()
+	bmi.multimesh = bone_mm
+	bmi.material_override = bone_mat
+	bmi.layers = 1 | CATA_LAYER
+	bmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(bmi)
+	var smi := MultiMeshInstance3D.new()
+	smi.multimesh = skull_mm
+	smi.material_override = bone_mat
+	smi.layers = 1 | CATA_LAYER
+	smi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(smi)
+	# Fackeln: ein MultiMesh mit leuchtenden Flammen (nur Licht-Optik, keine echten Lichter)
+	var torch_pos: Array = []
+	for k in range(16):
+		var cx := rng.randi_range(0, N - 1)
+		var cy := rng.randi_range(0, N - 1)
+		var cc := cell_center(idx(cx, cy))
+		torch_pos.append(Vector3(cc.x + 1.45, FLOOR_Y + 2.1, cc.z + 1.45))
+	for q in [Vector3(1, 0, 1), Vector3(-1, 0, 1), Vector3(1, 0, -1), Vector3(-1, 0, -1)]:
+		torch_pos.append(center + Vector3(q.x * 5.7, 2.1, q.z * 5.7))
+	var fl_mm := MultiMesh.new()
+	fl_mm.transform_format = MultiMesh.TRANSFORM_3D
+	var fm := BoxMesh.new()
+	fm.size = Vector3(0.16, 0.26, 0.16)
+	fl_mm.mesh = fm
+	fl_mm.instance_count = torch_pos.size()
+	for i in range(torch_pos.size()):
+		fl_mm.set_instance_transform(i, Transform3D(Basis(), torch_pos[i]))
+	var flame := StandardMaterial3D.new()
+	flame.albedo_color = Color(1.0, 0.55, 0.15)
+	flame.emission_enabled = true
+	flame.emission = Color(1.0, 0.5, 0.12)
+	flame.emission_energy_multiplier = 3.0
+	flame.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var fmi := MultiMeshInstance3D.new()
+	fmi.multimesh = fl_mm
+	fmi.material_override = flame
+	fmi.layers = 1 | CATA_LAYER
+	fmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(fmi)
+	# Ein schwaches, warmes Licht in der Hub-Mitte
+	var hub_l := OmniLight3D.new()
+	hub_l.light_color = Color(1.0, 0.6, 0.3)
+	hub_l.light_energy = 0.6
+	hub_l.omni_range = 9.0
+	hub_l.shadow_enabled = false
+	hub_l.position = center + Vector3(0, 2.6, 3.0)
+	add_child(hub_l)
