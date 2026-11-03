@@ -5,8 +5,8 @@ extends Node
 ## Sfx.play("splash", position) spielt 3D, Sfx.play("pop") ohne Position spielt "im Kopf".
 
 static var SR: float = 32000.0
-const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 1, "cast": 1, "drill": 1, "reload": 1, "chest_open": 1, "thunder": 2, "boom": 2}
-const LOWRATE: Array = ["rain", "thunder", "wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit"]
+const VARIANTS: Dictionary = {"step": 4, "step_gravel": 4, "splash": 2, "splash_small": 3, "chirp": 5, "cricket": 3, "crunch": 3, "thunk": 3, "plop": 2, "quack": 3, "croak": 3, "gulp": 2, "burp": 2, "click": 3, "sizzle": 2, "pop": 2, "spark": 2, "crate": 3, "trunk_close": 2, "retch": 2, "vomit": 2, "airgun": 1, "cast": 1, "drill": 1, "reload": 1, "chest_open": 1, "thunder": 2, "boom": 2, "drip": 4, "cata_stone": 3, "cata_creak": 3, "lurker_growl": 3, "lurker_step": 3}
+const LOWRATE: Array = ["rain", "thunder", "wind", "fire", "water", "rumble", "owl", "burp", "plop", "thunk", "ignite", "trickle", "croak", "trunk_open", "trunk_close", "retch", "vomit", "cata_drone", "cata_gust", "cata_creak", "lurker_breath", "lurker_growl", "lurker_step", "lurker_scream", "drip", "cata_stone"]
 var _warm: Array = []
 var _warm_t: float = 2.0
 static var inst: Sfx = null
@@ -16,6 +16,10 @@ var _amb_wind: AudioStreamPlayer
 var _amb_birds_t: float = 4.0
 var _amb_night_t: float = 3.0
 var _amb_water: AudioStreamPlayer
+var _amb_deep: AudioStreamPlayer = null     # Katakomben-Drone
+var _deep_t: float = 3.0
+var _deep_f: float = 0.0                    # 0 = oben, 1 = tief unten
+static var tension: float = 0.0             # 0..1, vom Wesen gesetzt: je näher, desto dünner die Atmosphäre
 var _amb_birdloop: AudioStreamPlayer = null
 var _water_near: float = 0.0
 var _player: Node3D = null
@@ -41,9 +45,14 @@ func _ready() -> void:
 	_amb_wind.volume_db = -34.0
 	add_child(_amb_wind)
 	_amb_wind.play()
+	_amb_deep = AudioStreamPlayer.new()
+	_amb_deep.volume_db = -60.0
+	add_child(_amb_deep)
 	for k in VARIANTS:
 		for v in range(int(VARIANTS[k])):
 			_warm.append([k, v])
+	for k2 in ["lurker_breath", "lurker_scream", "cata_gust", "cata_drone"]:
+		_warm.append([k2, 0])
 
 
 func _exit_tree() -> void:
@@ -62,24 +71,47 @@ func _process(delta: float) -> void:
 		_player = get_tree().get_first_node_in_group("local_player") as Node3D
 		return
 	var night := Game.is_night()
+	# Tief unten (Katakomben): Oberflächen-Atmosphäre aus, Drone und Einzelgeräusche an
+	var deep := _player.global_position.y < -6.0
+	_deep_f = lerpf(_deep_f, 1.0 if deep else 0.0, minf(delta * 0.8, 1.0))
+	tension = move_toward(tension, 0.0, delta * 0.5)
+	if deep and _amb_deep.stream == null:
+		_amb_deep.stream = get_stream("cata_drone")
+		_amb_deep.play()
+	_amb_deep.volume_db = lerpf(-60.0, -15.0 - 9.0 * tension, sqrt(_deep_f))
+	if deep:
+		_deep_t -= delta
+		if _deep_t <= 0.0:
+			_deep_t = randf_range(2.5, 6.5) * lerpf(1.0, 2.2, tension)
+			var da := randf() * TAU
+			var dp := _player.global_position + Vector3(cos(da), 0.0, sin(da)) * randf_range(4.0, 18.0)
+			var r := randf()
+			if r < 0.5:
+				play("drip", dp, -9.0, randf_range(0.8, 1.25))
+			elif r < 0.68:
+				play("cata_creak", dp, -8.0, randf_range(0.7, 1.1))
+			elif r < 0.86:
+				play("cata_stone", dp, -8.0, randf_range(0.8, 1.2))
+			else:
+				play("cata_gust", Vector3.INF, -14.0, randf_range(0.8, 1.1))
 	_amb_birds_t -= delta
 	if _amb_birds_t <= 0.0:
 		_amb_birds_t = randf_range(2.5, 7.0)
-		if _amb_birdloop == null and not night and Weather.rain < 0.15:
+		if _amb_birdloop == null and not night and Weather.rain < 0.15 and not deep:
 			var a := randf() * TAU
 			play("chirp", _player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(8.0, 25.0) + Vector3(0, 6, 0), -6.0, randf_range(0.85, 1.2))
 	_amb_night_t -= delta
 	if _amb_night_t <= 0.0:
 		_amb_night_t = randf_range(3.0, 7.0)
-		if night:
+		if night and not deep:
 			var a2 := randf() * TAU
 			play("cricket", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * randf_range(4.0, 20.0), -13.0)
 			if randf() < 0.12:
 				play("owl", _player.global_position + Vector3(cos(a2), 0, sin(a2)) * 30.0 + Vector3(0, 5, 0), -6.0)
-	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -34.0 if not night else -39.0, 0.02)
+	_amb_wind.volume_db = lerpf(_amb_wind.volume_db, -60.0 if deep else (-34.0 if not night else -39.0), 0.02)
 	if _amb_birdloop != null:
 		# Vogelgezwitscher: nur tagsueber und ohne Regen, weich ein-/ausgeblendet
-		var bird_on := not night and Weather.rain < 0.15
+		var bird_on := not night and Weather.rain < 0.15 and not deep
 		_amb_birdloop.volume_db = lerpf(_amb_birdloop.volume_db, -17.0 if bird_on else -60.0, 0.02)
 	if _amb_water != null:
 		# Wellenplätschern: nur in Ufernähe, mit weichem Ein-/Ausblenden
@@ -94,7 +126,7 @@ func _process(delta: float) -> void:
 					near += 1.0
 			near = clampf(near / 4.0, 0.0, 1.0)
 		_water_near = lerpf(_water_near, near, minf(delta * 1.5, 1.0))
-		_amb_water.volume_db = lerpf(-60.0, -13.0, _water_near)
+		_amb_water.volume_db = lerpf(-60.0, -13.0, _water_near * (1.0 - _deep_f))
 
 
 static func play(sound: String, pos: Vector3 = Vector3.INF, vol_db: float = 0.0, pitch: float = 1.0) -> void:
@@ -174,7 +206,7 @@ static func _variant(sound: String, v: int) -> AudioStreamWAV:
 	var key := "%s#%d" % [sound, v]
 	if cache.has(key):
 		return cache[key]
-	SR = 16000.0 if LOWRATE.has(sound) else 32000.0
+	SR = 8000.0 if sound == "cata_drone" else (16000.0 if LOWRATE.has(sound) else 32000.0)
 	var alias := {"fish_jump": "splash", "bottle": "pop", "bubble": "plop"}
 	var s := _generate(alias.get(sound, sound), v)
 	if s != null:
@@ -625,6 +657,117 @@ static func _generate(sound: String, v: int) -> AudioStreamWAV:
 			var s := _add(f1, f2, 0.0, 0.5)
 			s = _add(s, _env(_nf(_white(0.5), 0, 400.0, 0.7), 0.05, 5.0, 0.3))
 			return _wav(_sat(s, 1.8), 0.8)
+		"cata_drone":
+			# Tiefes, langsam atmendes Dröhnen: drei Töne (Vielfache von 1/8 Hz, damit die Schleife nahtlos ist) + dunkles Rauschen
+			var d := 4.0
+			var n := int(SR * d)
+			var out := PackedFloat32Array()
+			out.resize(n)
+			for i in range(n):
+				var t := float(i) / SR
+				var a := sin(TAU * 40.0 * t) * (0.5 + 0.5 * sin(TAU * 0.25 * t))
+				a += sin(TAU * 55.0 * t + 0.6) * 0.7 * (0.5 + 0.5 * sin(TAU * 0.5 * t + 1.7))
+				a += sin(TAU * 82.5 * t) * 0.35 * (0.5 + 0.5 * sin(TAU * 0.75 * t + 3.1))
+				a += sin(TAU * 312.0 * t) * 0.05 * (0.5 + 0.5 * sin(TAU * 1.0 * t + 0.4)) * (0.5 + 0.5 * sin(TAU * 4.0 * t))
+				out[i] = a
+			var rum := _loopify(_nf(_white(d + 1.0), 0, 140.0, 0.7), 1.0)
+			for i in range(n):
+				out[i] += rum[i] * 0.9 * (0.6 + 0.4 * sin(TAU * 0.5 * float(i) / SR))
+			return _wav(out, 0.8, true)
+		"drip":
+			# Tropfen: kurzes "Plink" mit langem Höhlenhall; vier Varianten
+			var f: float = ([900.0, 1300.0, 1800.0, 2400.0][v % 4] as float) * randf_range(0.95, 1.05)
+			var s := _sine(0.09, f * 1.3, f, 55.0, 0.8, 0.001)
+			s = _add(s, _sine(0.05, f * 2.7, f * 2.1, 90.0, 0.25, 0.001))
+			if randf() < 0.5:
+				s = _add(s, _sine(0.07, f * 1.1, f * 0.8, 60.0, 0.3, 0.001), 0.12, 0.5)
+			return _wav(_reverb(s, 1.1, 1.8), 0.7)
+		"cata_creak":
+			# Ferne Holz-/Balkenknarzen: langsam gleitender Sägezahn, bandgefiltert, mit Zittern
+			var d := 1.6 + 0.4 * float(v)
+			var n := int(SR * d)
+			var raw := PackedFloat32Array()
+			raw.resize(n)
+			var ph := 0.0
+			var f0 := randf_range(70.0, 130.0)
+			for i in range(n):
+				var t := float(i) / SR
+				ph += TAU * (f0 + 30.0 * sin(t * 1.9) + 11.0 * sin(t * 13.0)) / SR
+				var saw := fposmod(ph / TAU, 1.0) * 2.0 - 1.0
+				raw[i] = saw * (0.6 + 0.4 * sin(t * TAU * 22.0)) * sin(PI * t / d)
+			var s := _filt(raw, 1, randf_range(520.0, 900.0), 1.2)
+			return _wav(_reverb(s, 0.8, 1.2), 0.6)
+		"cata_stone":
+			# Steinrieseln: ein paar kleine Klicks und ein Rutschen
+			var s := _env(_nf(_white(0.9), 1, 1400.0, 0.6), 0.02, 4.0, 0.25)
+			for k in range(randi_range(5, 9)):
+				s = _add(s, _env(_nf(_white(0.07), 1, randf_range(900.0, 3200.0), 0.9), 0.001, 55.0, 1.0), randf_range(0.0, 0.8), randf_range(0.4, 1.0))
+			return _wav(_reverb(s, 0.7, 0.9), 0.55)
+		"cata_gust":
+			# Kalter Luftzug durch die Gänge
+			var s := _env(_nf(_white(3.2), 1, 300.0, 0.7), 0.9, 0.9, 1.0)
+			s = _add(s, _env(_sweep(3.0, 220.0, 520.0, 1.4), 1.0, 1.0, 0.8))
+			return _wav(_reverb(s, 0.5, 1.0), 0.5)
+		"lurker_breath":
+			# Rasselndes Atmen (Zyklus 2 s: langsames Einatmen, längeres Ausatmen), nahtlose Schleife
+			var d := 4.0
+			var raw := _white(d + 0.8)
+			var hi := _nf(raw, 1, 900.0, 0.5)
+			var lo := _nf(raw, 0, 180.0, 0.7)
+			var n := hi.size()
+			var out := PackedFloat32Array()
+			out.resize(n)
+			for i in range(n):
+				var t := float(i) / SR
+				var ph := fposmod(t, 2.0) / 2.0
+				var amp := pow(sin(PI * clampf(ph * 1.25, 0.0, 1.0)), 2.0) if ph < 0.8 else 0.0
+				var rasp := 0.6 + 0.4 * sin(TAU * 31.0 * t)
+				out[i] = (hi[i] * 0.7 * rasp + lo[i] * 0.9) * amp
+			return _wav(_loopify(out, 0.8), 0.6, true)
+		"lurker_growl":
+			# Tiefes Knurren, grollend, leicht schwankend
+			var d := 1.6 + 0.4 * float(v)
+			var n := int(SR * d)
+			var raw := PackedFloat32Array()
+			raw.resize(n)
+			var ph := 0.0
+			var f0 := randf_range(48.0, 66.0)
+			for i in range(n):
+				var t := float(i) / SR
+				ph += TAU * (f0 + 7.0 * sin(t * 6.0) + 3.0 * sin(t * 37.0)) / SR
+				var saw := fposmod(ph / TAU, 1.0) * 2.0 - 1.0
+				raw[i] = saw * (0.7 + 0.3 * sin(t * TAU * 24.0)) * sin(PI * t / d)
+			var s := _filt(_sat(raw, 2.5), 0, 420.0, 0.8)
+			s = _add(s, _env(_nf(_white(d), 1, 500.0, 0.6), 0.2, 1.0, 0.4))
+			return _wav(_reverb(s, 0.5, 0.8), 0.85)
+		"lurker_scream":
+			# Schrei, wenn er dich entdeckt: steigender, zerrissener Kreischton über tiefem Grollen
+			var d := 1.7
+			var n := int(SR * d)
+			var raw := PackedFloat32Array()
+			raw.resize(n)
+			var ph := 0.0
+			var ph2 := 0.0
+			for i in range(n):
+				var t := float(i) / SR
+				var u := t / d
+				var f := lerpf(330.0, 920.0, minf(u * 2.5, 1.0)) * (1.0 - 0.45 * maxf(u - 0.5, 0.0) * 2.0) + 22.0 * sin(t * 47.0)
+				ph += TAU * f / SR
+				ph2 += TAU * f * 1.51 / SR
+				var saw := fposmod(ph / TAU, 1.0) * 2.0 - 1.0
+				var sq := signf(sin(ph2))
+				raw[i] = (saw * 0.7 + sq * 0.3) * (0.6 + 0.4 * sin(t * TAU * 31.0)) * minf(t / 0.05, 1.0) * exp(-1.6 * maxf(t - 0.7, 0.0))
+			var s := _sat(_filt(raw, 1, 1500.0, 0.5), 3.0)
+			s = _add(s, _filt(raw, 1, 2800.0, 0.8), 0.0, 0.5)
+			s = _add(s, _env(_nf(_white(d), 1, 700.0, 0.5), 0.05, 1.5, 0.5))
+			s = _add(s, _sine(d, 55.0, 40.0, 1.5, 0.7, 0.02))
+			return _wav(_reverb(s, 0.7, 1.4), 0.9)
+		"lurker_step":
+			# Schwerer, nasser Schritt auf Stein, dumpf mit Nachhall
+			var s := _env(_nf(_white(0.3), 0, randf_range(140.0, 200.0), 0.8), 0.003, 13.0, 1.2)
+			s = _add(s, _sine(0.28, randf_range(62.0, 80.0), 36.0, 12.0, 0.9, 0.002))
+			s = _add(s, _env(_nf(_white(0.12), 1, randf_range(700.0, 1100.0), 0.8), 0.002, 40.0, 0.35), 0.015)
+			return _wav(_reverb(s, 0.6, 0.7), 0.9)
 		"rumble":
 			var s := _env(_nf(_white(2.2), 0, 110.0, 0.7), 0.25, 1.4, 5.0)
 			s = _add(s, _env(_nf(_white(2.0), 0, 260.0, 0.7), 0.1, 2.0, 1.2))

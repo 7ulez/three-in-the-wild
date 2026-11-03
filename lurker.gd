@@ -36,6 +36,9 @@ var _repath: float = 0.0
 var _lose_t: float = 0.0
 var _step_t: float = 0.0
 var _rumble_t: float = 2.0
+var _growl_t: float = 4.0
+var _was_hunt: bool = false
+var _breath: AudioStreamPlayer3D = null
 var _t: float = 0.0
 var _q: float = -1.0          # Zeitstufe: Stop-Motion mit 14 Bildern pro Sekunde
 var _tw_t: float = 0.0
@@ -52,6 +55,9 @@ func setup(p_cata: Catacombs) -> void:
 	cata = p_cata
 	_body = Node3D.new()
 	add_child(_body)
+	_breath = Sfx.loop_at(self, "lurker_breath", -3.0, 5.0)
+	if _breath != null:
+		_breath.max_distance = 45.0
 	_vmat = StandardMaterial3D.new()
 	_vmat.vertex_color_use_as_albedo = true
 	_vmat.roughness = 1.0
@@ -257,7 +263,9 @@ func _process(delta: float) -> void:
 			global_position = global_position.lerp(net_pos, minf(delta * 10.0, 1.0))
 			rotation.y = lerp_angle(rotation.y, net_yaw, minf(delta * 10.0, 1.0))
 		anim = net_anim
-		_animate(delta, global_position.distance_to(net_pos) > 0.05)
+		var pmov := global_position.distance_to(net_pos) > 0.05
+		_animate(delta, pmov)
+		_sounds(delta, pmov)
 		return
 	var targets := Bunker.underground_targets()
 	var near_d := 1e9
@@ -314,16 +322,34 @@ func _process(delta: float) -> void:
 			rotation.y = lerp_angle(rotation.y, atan2(-dir.x, -dir.z), minf(delta * 6.0, 1.0))
 			moving = true
 	_animate(delta, moving)
-	# Geräusche: schwere Schritte und ein tiefes Grollen
+	_sounds(delta, moving)
+
+
+## Geräusche des Wesens (auch bei Mitspieler-Ansicht): schwere Schritte, Knurren, Grollen, Schrei beim Entdecken,
+## Atmen läuft als Schleife. Je näher es kommt, desto dünner wird die Atmosphäre.
+func _sounds(delta: float, moving: bool) -> void:
+	var hunting := anim == "hunt"
 	if moving:
 		_step_t -= delta
 		if _step_t <= 0.0:
-			_step_t = 0.55 if state == S.WANDER else 0.34
-			Sfx.play("step_gravel", global_position, 3.0, 0.5)
+			_step_t = 0.8 if not hunting else 0.34
+			Sfx.play("lurker_step", global_position, 4.0, randf_range(0.85, 1.1))
+	if hunting and not _was_hunt:
+		Sfx.play("lurker_scream", global_position, 3.0, randf_range(0.92, 1.05))
+	_was_hunt = hunting
+	_growl_t -= delta
+	if _growl_t <= 0.0:
+		_growl_t = randf_range(3.0, 7.0) if not hunting else randf_range(1.5, 3.5)
+		Sfx.play("lurker_growl", global_position, 0.0, randf_range(0.85, 1.1))
 	_rumble_t -= delta
 	if _rumble_t <= 0.0:
 		_rumble_t = randf_range(5.0, 11.0)
 		Sfx.play("rumble", global_position, -4.0, 0.7)
+	var lp := get_tree().get_first_node_in_group("local_player") as Node3D
+	if lp != null and lp.global_position.y < -6.0:
+		Sfx.tension = maxf(Sfx.tension, clampf(1.0 - global_position.distance_to(lp.global_position) / 20.0, 0.0, 1.0))
+	if _breath != null:
+		_breath.pitch_scale = 1.0 if not hunting else 1.25
 
 
 func _pick_wander() -> void:
