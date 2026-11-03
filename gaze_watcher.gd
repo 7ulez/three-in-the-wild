@@ -94,8 +94,11 @@ func _process(delta: float) -> void:
 func _lamp_flicker(prox: float) -> void:
 	if player == null or player.lamp == null:
 		return
-	if _lamp_base < 0.0:
-		_lamp_base = player.lamp.light_energy
+	# Unten ist die Stirnlampe schwächer und kürzer: dunkle Gänge statt Flutlicht
+	var deep := player.global_position.y < -6.0
+	_lamp_base = 2.6 if deep else 7.0
+	player.lamp.spot_range = 17.0 if deep else 35.0
+	player.lamp.spot_angle = 30.0 if deep else 38.0
 	if prox > 0.3 and player.lamp.visible:
 		player.lamp.light_energy = _lamp_base * (0.1 if randf() < prox * 0.3 else 1.0)
 	else:

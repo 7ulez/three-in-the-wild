@@ -30,6 +30,7 @@ var east: PackedByteArray = PackedByteArray()    # 1 = Durchgang von Zelle (i,j)
 var south: PackedByteArray = PackedByteArray()   # 1 = Durchgang von Zelle (i,j) nach (i,j+1)
 var aabb: AABB = AABB()
 var dead_ends: Array = []
+var _torch_all: Array = []             # Fackelpositionen (für Halter und Lichtschein)
 
 
 static func idx(i: int, j: int) -> int:
@@ -240,6 +241,7 @@ func build(p_center: Vector3, seed_v: int = 4711) -> void:
 	_build_deco(rng)
 	under_rects.append(Rect2(center.x - half - 1.0, center.z - half - 1.0, half * 2.0 + 2.0, half * 2.0 + 2.0))
 	_build_tunnel(rng)
+	_build_detail()
 
 
 ## Fügt eine Box mit leichter Farbstreuung in den SurfaceTool-Mesh ein.
@@ -351,6 +353,8 @@ func _build_deco(rng: RandomNumberGenerator) -> void:
 		torch_pos.append(Vector3(cc.x + 1.45, FLOOR_Y + 2.1, cc.z + 1.45))
 	for q in [Vector3(1, 0, 1), Vector3(-1, 0, 1), Vector3(1, 0, -1), Vector3(-1, 0, -1)]:
 		torch_pos.append(center + Vector3(q.x * 5.7, 2.1, q.z * 5.7))
+	for tp in torch_pos:
+		_torch_all.append(tp)
 	var fl_mm := MultiMesh.new()
 	fl_mm.transform_format = MultiMesh.TRANSFORM_3D
 	var fm := BoxMesh.new()
@@ -374,7 +378,7 @@ func _build_deco(rng: RandomNumberGenerator) -> void:
 	# Ein schwaches, warmes Licht in der Hub-Mitte
 	var hub_l := OmniLight3D.new()
 	hub_l.light_color = Color(1.0, 0.6, 0.3)
-	hub_l.light_energy = 0.6
+	hub_l.light_energy = 0.4
 	hub_l.omni_range = 9.0
 	hub_l.shadow_enabled = false
 	hub_l.position = center + Vector3(0, 2.6, 3.0)
@@ -475,6 +479,8 @@ func _build_tunnel(rng: RandomNumberGenerator) -> void:
 		tz += 14.0
 	torches.append(Transform3D(Basis(), Vector3(ROOM_X0 + 0.3, FLOOR_Y + 2.1, ROOM_Z0 + 1.5)))
 	torches.append(Transform3D(Basis(), Vector3(ROOM_X1 - 0.3, FLOOR_Y + 2.1, ROOM_Z1 - 1.5)))
+	for tt in torches:
+		_torch_all.append((tt as Transform3D).origin)
 	var fm := BoxMesh.new()
 	fm.size = Vector3(0.16, 0.26, 0.16)
 	var flame := StandardMaterial3D.new()
@@ -494,3 +500,223 @@ func _build_tunnel(rng: RandomNumberGenerator) -> void:
 	_mm_instance(bm, Util.mat(Color(0.78, 0.74, 0.62)), bones)
 	under_rects.append(Rect2(ROOM_X0 - 1.0, tz0 - 0.5, (ROOM_X1 - ROOM_X0) + 2.0, ROOM_Z1 + 1.0 - tz0 + 0.5))
 	extra_aabbs.append(AABB(Vector3(ROOM_X0 - 1.0, FLOOR_Y - 1.0, tz0 - 0.5), Vector3(ROOM_X1 - ROOM_X0 + 2.0, H + 2.0, ROOM_Z1 + 1.0 - tz0 + 0.5)))
+
+
+# ---------- Feinarbeit: Sockel, Gesimse, Fugen, Holzrahmen, Pfützen, Wurzeln, Schutt ----------
+
+const C_PLINTH := Color(0.15, 0.14, 0.125)
+const C_MORTAR := Color(0.1, 0.095, 0.09)
+const C_BLOCK := Color(0.25, 0.23, 0.2)
+const C_TIMBER := Color(0.2, 0.125, 0.07)
+const C_MOSS := Color(0.08, 0.15, 0.06)
+
+
+## Kachel auf einer Wandfläche. u = Versatz entlang der Wand, y = Höhe über dem Boden, side = +1 oder -1 (welche Seite).
+func _fb(st: SurfaceTool, p: Vector3, along_x: bool, side: float, u: float, y: float, w: float, h: float, depth: float, col: Color, rng: RandomNumberGenerator) -> void:
+	var n := WALL_T / 2.0 + depth / 2.0 - 0.004
+	var c := Vector3(0, FLOOR_Y + y, 0)
+	var size := Vector3.ONE
+	if along_x:
+		c.x = p.x + u
+		c.z = p.z + side * n
+		size = Vector3(w, h, depth)
+	else:
+		c.x = p.x + side * n
+		c.z = p.z + u
+		size = Vector3(depth, h, w)
+	_box(st, c, size, col, 0.06, rng)
+
+
+func _tint(c: Color, k: float) -> Color:
+	return Color(c.r * k, c.g * k, c.b * k)
+
+
+func _wall_detail(st: SurfaceTool, p: Vector3, along_x: bool, rng: RandomNumberGenerator, sides: Array) -> void:
+	var seg := PITCH - WALL_T
+	for side in sides:
+		var sd: float = side
+		_fb(st, p, along_x, sd, 0.0, 0.18, seg, 0.36, 0.16, C_PLINTH, rng)
+		_fb(st, p, along_x, sd, 0.0, H - 0.12, seg, 0.24, 0.12, C_PLINTH, rng)
+		_fb(st, p, along_x, sd, 0.0, 1.25, seg, 0.05, 0.03, C_MORTAR, rng)
+		_fb(st, p, along_x, sd, 0.0, 2.35, seg, 0.05, 0.03, C_MORTAR, rng)
+		for k in range(rng.randi_range(1, 3)):
+			_fb(st, p, along_x, sd, rng.randf_range(-1.1, 1.1), rng.randf_range(0.7, 2.9), rng.randf_range(0.5, 1.1), rng.randf_range(0.35, 0.7), 0.05, _tint(C_BLOCK, rng.randf_range(0.75, 1.3)), rng)
+		if rng.randf() < 0.16:
+			_fb(st, p, along_x, sd, rng.randf_range(-1.0, 1.0), rng.randf_range(1.2, 2.6), 0.04, rng.randf_range(0.7, 1.5), 0.035, Color(0.04, 0.04, 0.04), rng)
+		if rng.randf() < 0.32:
+			_fb(st, p, along_x, sd, rng.randf_range(-1.0, 1.0), 0.55, rng.randf_range(0.8, 1.6), rng.randf_range(0.3, 0.7), 0.06, _tint(C_MOSS, rng.randf_range(0.8, 1.4)), rng)
+
+
+## Zackiger Pfützenfleck (glänzend, wirft das Lampenlicht zurück)
+func _puddle(pd: SurfaceTool, c: Vector3, r: float, rng: RandomNumberGenerator) -> void:
+	var n := 9
+	var pts: Array = []
+	for k in range(n):
+		var a := TAU * float(k) / float(n)
+		var rr := r * rng.randf_range(0.7, 1.1)
+		pts.append(Vector3(c.x + cos(a) * rr, FLOOR_Y + 0.02, c.z + sin(a) * rr * 0.8))
+	pd.set_color(Color(0.04, 0.06, 0.08))
+	for k in range(n):
+		var q: Vector3 = pts[k]
+		var q2: Vector3 = pts[(k + 1) % n]
+		for v in [Vector3(c.x, FLOOR_Y + 0.02, c.z), q, q2]:
+			pd.set_normal(Vector3.UP)
+			pd.add_vertex(v)
+
+
+func _build_detail() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9137
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var pd := SurfaceTool.new()
+	pd.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var half := float(N) * PITCH / 2.0
+	var both := [-1.0, 1.0]
+	# Pfeiler: Sockel und Kapitell
+	for j in range(N + 1):
+		for i in range(N + 1):
+			var gx := center.x + (float(i - MID) - 0.5) * PITCH
+			var gz := center.z + (float(j - MID) - 0.5) * PITCH
+			_box(st, Vector3(gx, FLOOR_Y + 0.18, gz), Vector3(WALL_T + 0.2, 0.36, WALL_T + 0.2), C_PLINTH, 0.04, rng)
+			_box(st, Vector3(gx, CEIL_Y - 0.12, gz), Vector3(WALL_T + 0.16, 0.24, WALL_T + 0.16), C_PLINTH, 0.04, rng)
+	for j in range(N):
+		for i in range(N):
+			var c := idx(i, j)
+			var cc := cell_center(c)
+			var hub := is_hub(c)
+			# Innenwände
+			if i < N - 1 and east[c] == 0:
+				_wall_detail(st, Vector3(cc.x + PITCH / 2.0, 0, cc.z), false, rng, both)
+			if j < N - 1 and south[c] == 0:
+				_wall_detail(st, Vector3(cc.x, 0, cc.z + PITCH / 2.0), true, rng, both)
+			# Außenwand, nur die Innenseite
+			if j == 0:
+				_wall_detail(st, Vector3(cc.x, 0, cc.z - PITCH / 2.0), true, rng, [1.0])
+			if j == N - 1 and absf(cc.x - TUNNEL_X) > 0.1:
+				_wall_detail(st, Vector3(cc.x, 0, cc.z + PITCH / 2.0), true, rng, [-1.0])
+			if i == 0:
+				_wall_detail(st, Vector3(cc.x - PITCH / 2.0, 0, cc.z), false, rng, [1.0])
+			if i == N - 1:
+				_wall_detail(st, Vector3(cc.x + PITCH / 2.0, 0, cc.z), false, rng, [-1.0])
+			# Boden: Fugenraster (2-m-Platten), ein paar hellere/dunklere Platten
+			for o in [-1.0, 1.0]:
+				_box(st, Vector3(cc.x, FLOOR_Y + 0.006, cc.z + o), Vector3(PITCH, 0.012, 0.05), C_MORTAR, 0.0, rng)
+				_box(st, Vector3(cc.x + o, FLOOR_Y + 0.006, cc.z), Vector3(0.05, 0.012, PITCH), C_MORTAR, 0.0, rng)
+			if rng.randf() < 0.45:
+				_box(st, Vector3(cc.x, FLOOR_Y + 0.007, cc.z), Vector3(1.9, 0.014, 1.9), _tint(Color(0.19, 0.17, 0.15), rng.randf_range(0.7, 1.35)), 0.0, rng)
+			if hub:
+				continue
+			# Holzrahmen in Durchgängen
+			if i < N - 1 and east[c] == 1 and rng.randf() < 0.3:
+				var fx := cc.x + PITCH / 2.0
+				for o in both:
+					_box(st, Vector3(fx, FLOOR_Y + H / 2.0, cc.z + o * 1.35), Vector3(0.5, H, 0.22), C_TIMBER, 0.12, rng)
+				_box(st, Vector3(fx, CEIL_Y - 0.4, cc.z), Vector3(0.45, 0.3, 3.0), C_TIMBER, 0.12, rng)
+			if j < N - 1 and south[c] == 1 and rng.randf() < 0.3:
+				var fz := cc.z + PITCH / 2.0
+				for o in both:
+					_box(st, Vector3(cc.x + o * 1.35, FLOOR_Y + H / 2.0, fz), Vector3(0.22, H, 0.5), C_TIMBER, 0.12, rng)
+				_box(st, Vector3(cc.x, CEIL_Y - 0.4, fz), Vector3(3.0, 0.3, 0.45), C_TIMBER, 0.12, rng)
+			# Pfütze, Wurzeln, Schutt
+			if rng.randf() < 0.13:
+				_puddle(pd, Vector3(cc.x + rng.randf_range(-0.8, 0.8), 0, cc.z + rng.randf_range(-0.8, 0.8)), rng.randf_range(0.5, 1.1), rng)
+			if rng.randf() < 0.22:
+				for k in range(rng.randi_range(2, 4)):
+					var rl := rng.randf_range(0.5, 1.5)
+					_box(st, Vector3(cc.x + rng.randf_range(-1.3, 1.3), CEIL_Y - rl / 2.0, cc.z + rng.randf_range(-1.3, 1.3)), Vector3(0.05, rl, 0.05), Color(0.17, 0.11, 0.07), 0.2, rng)
+			if rng.randf() < 0.25:
+				for k in range(rng.randi_range(2, 4)):
+					var rs := rng.randf_range(0.12, 0.38)
+					_box(st, Vector3(cc.x + rng.randf_range(-1.3, 1.3), FLOOR_Y + rs / 2.0, cc.z + rng.randf_range(-1.3, 1.3)), Vector3(rs, rs * 0.8, rs * 1.2), _tint(C_BLOCK, rng.randf_range(0.7, 1.1)), 0.1, rng)
+	# Hub: Bodenringe um den Schacht
+	for rd in [3.0, 4.0, 5.0]:
+		var rc := Color(0.1, 0.09, 0.08) if rd != 4.0 else Color(0.27, 0.22, 0.15)
+		var rw := 0.14 if rd != 4.0 else 0.08
+		_box(st, Vector3(center.x, FLOOR_Y + 0.008, center.z - rd), Vector3(rd * 2.0 + rw, 0.016, rw), rc, 0.0, rng)
+		_box(st, Vector3(center.x, FLOOR_Y + 0.008, center.z + rd), Vector3(rd * 2.0 + rw, 0.016, rw), rc, 0.0, rng)
+		_box(st, Vector3(center.x - rd, FLOOR_Y + 0.008, center.z), Vector3(rw, 0.016, rd * 2.0 - rw), rc, 0.0, rng)
+		_box(st, Vector3(center.x + rd, FLOOR_Y + 0.008, center.z), Vector3(rw, 0.016, rd * 2.0 - rw), rc, 0.0, rng)
+	_tunnel_detail(st, pd, rng, center.z + half, ROOM_Z0 - 1.0)
+	# Fackelhalter
+	for tp in _torch_all:
+		var t: Vector3 = tp
+		_box(st, Vector3(t.x, t.y - 0.38, t.z), Vector3(0.07, 0.55, 0.07), Color(0.12, 0.09, 0.07), 0.0, rng)
+		_box(st, Vector3(t.x, t.y - 0.14, t.z), Vector3(0.22, 0.05, 0.22), Color(0.1, 0.1, 0.1), 0.0, rng)
+	st.generate_normals()
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 1.0
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = mat
+	mi.layers = 1 | CATA_LAYER
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+	var pmat := StandardMaterial3D.new()
+	pmat.vertex_color_use_as_albedo = true
+	pmat.roughness = 0.05
+	pmat.metallic_specular = 1.0
+	pmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var pmi := MeshInstance3D.new()
+	pmi.mesh = pd.commit()
+	pmi.material_override = pmat
+	pmi.layers = 1 | CATA_LAYER
+	pmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(pmi)
+	# Lichtschein um die Fackeln (ein MultiMesh, additiv, immer zur Kamera gedreht)
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([Color(0.5, 0.26, 0.09, 1.0), Color(0.0, 0.0, 0.0, 1.0)])
+	grad.offsets = PackedFloat32Array([0.0, 1.0])
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	gt.width = 64
+	gt.height = 64
+	var hm := StandardMaterial3D.new()
+	hm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	hm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	hm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	hm.albedo_texture = gt
+	hm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	hm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var q := QuadMesh.new()
+	q.size = Vector2(3.0, 3.0)
+	var hx: Array = []
+	for tp in _torch_all:
+		hx.append(Transform3D(Basis(), tp))
+	_mm_instance(q, hm, hx)
+
+
+## Tunnel: Sockel, Gesims, Fugen an beiden Wänden, Bodenraster, Pfützen, Wurzeln, Schutt
+func _tunnel_detail(st: SurfaceTool, pd: SurfaceTool, rng: RandomNumberGenerator, tz0: float, tz1: float) -> void:
+	var tlen := tz1 - tz0
+	var tmid := (tz0 + tz1) / 2.0
+	for sx in [-1.0, 1.0]:
+		var sg: float = sx
+		var fx := TUNNEL_X + sg * 1.5
+		_box(st, Vector3(fx - sg * 0.08, FLOOR_Y + 0.18, tmid), Vector3(0.16, 0.36, tlen), C_PLINTH, 0.04, rng)
+		_box(st, Vector3(fx - sg * 0.06, CEIL_Y - 0.12, tmid), Vector3(0.12, 0.24, tlen), C_PLINTH, 0.04, rng)
+		_box(st, Vector3(fx - sg * 0.015, FLOOR_Y + 1.25, tmid), Vector3(0.03, 0.05, tlen), C_MORTAR, 0.0, rng)
+		_box(st, Vector3(fx - sg * 0.015, FLOOR_Y + 2.35, tmid), Vector3(0.03, 0.05, tlen), C_MORTAR, 0.0, rng)
+		var zz := tz0 + 1.0
+		while zz < tz1 - 1.0:
+			if rng.randf() < 0.6:
+				_box(st, Vector3(fx - sg * 0.025, FLOOR_Y + rng.randf_range(0.7, 2.9), zz), Vector3(0.05, rng.randf_range(0.35, 0.7), rng.randf_range(0.5, 1.1)), _tint(C_BLOCK, rng.randf_range(0.75, 1.3)), 0.06, rng)
+			if rng.randf() < 0.18:
+				_box(st, Vector3(fx - sg * 0.03, FLOOR_Y + 0.55, zz + 0.5), Vector3(0.06, rng.randf_range(0.3, 0.7), rng.randf_range(0.8, 1.6)), _tint(C_MOSS, rng.randf_range(0.8, 1.4)), 0.1, rng)
+			zz += 2.2
+	var z := tz0 + 1.0
+	while z < tz1:
+		_box(st, Vector3(TUNNEL_X, FLOOR_Y + 0.006, z), Vector3(3.0, 0.012, 0.05), C_MORTAR, 0.0, rng)
+		if rng.randf() < 0.07:
+			_puddle(pd, Vector3(TUNNEL_X + rng.randf_range(-0.8, 0.8), 0, z), rng.randf_range(0.5, 1.0), rng)
+		if rng.randf() < 0.12:
+			var rl := rng.randf_range(0.5, 1.4)
+			_box(st, Vector3(TUNNEL_X + rng.randf_range(-1.2, 1.2), CEIL_Y - rl / 2.0, z), Vector3(0.05, rl, 0.05), Color(0.17, 0.11, 0.07), 0.2, rng)
+		if rng.randf() < 0.1:
+			var rs := rng.randf_range(0.12, 0.35)
+			_box(st, Vector3(TUNNEL_X + rng.randf_range(-1.2, 1.2), FLOOR_Y + rs / 2.0, z), Vector3(rs, rs * 0.8, rs * 1.2), _tint(C_BLOCK, rng.randf_range(0.7, 1.1)), 0.1, rng)
+		z += 2.0

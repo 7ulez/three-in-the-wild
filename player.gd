@@ -1134,9 +1134,13 @@ func _physics_process(delta: float) -> void:
 	var on_ladder := Bunker.on_ladder(global_position) and not placing
 	if on_ladder:
 		# Schacht im Bunker: W/Leertaste hoch, S runter, keine Schwerkraft
-		var up := (1.0 if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_SPACE) else 0.0) - (1.0 if Input.is_physical_key_pressed(KEY_S) else 0.0)
+		# W = in Blickrichtung klettern: wer nach unten schaut, steigt mit W ab (vorwärts runter), sonst hoch
+		var fwd := (1.0 if Input.is_physical_key_pressed(KEY_W) else 0.0) - (1.0 if Input.is_physical_key_pressed(KEY_S) else 0.0)
+		var up := fwd * (-1.0 if pitch < -0.3 else 1.0)
+		if Input.is_physical_key_pressed(KEY_SPACE):
+			up = 1.0
 		if Game.touch and Game.touch_move != Vector2.ZERO:
-			up = -Game.touch_move.y
+			up = -Game.touch_move.y * (-1.0 if pitch < -0.3 else 1.0)
 		velocity.y = up * 2.6
 		_peak_y = global_position.y
 		if up > 0.0:

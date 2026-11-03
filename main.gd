@@ -235,6 +235,12 @@ func _update_sky() -> void:
 	env.adjustment_saturation = lerpf(0.98, 0.5, night * (1.0 - near_l))
 	env.tonemap_exposure = lerpf(0.82, NIGHT_EXPOSURE, night) * (1.0 - 0.18 * dk) * (1.0 - 0.45 * _adapt_glare) + Weather.flash * 0.5
 	env.fog_density = 0.002 + 0.0015 * night + Weather.fog * 0.014 + Weather.rain * 0.0035
+	# Tief unten (Katakomben): fast kein Umgebungslicht, dunkler Nebel - man sieht nur, was die Lampe trifft
+	if player != null and player.global_position.y < -6.0:
+		env.ambient_light_energy = 0.012
+		env.fog_light_color = Color(0.012, 0.011, 0.014)
+		env.fog_density = 0.045
+		env.tonemap_exposure = 0.8
 
 
 var _in_cave: bool = false
