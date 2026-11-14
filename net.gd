@@ -581,6 +581,14 @@ func remote_night_skipped() -> void:
 		main.player.night_skipped()
 
 
+## Mitspieler in anderer Tiefe (oben/unten in den Katakomben) sieht man nicht: nicht zeichnen (Objektgrenze)
+func _depth_gap(pos: Vector3) -> bool:
+	if main == null or main.player == null:
+		return false
+	var ly: float = (main.player as Node3D).global_position.y
+	return absf(pos.y - ly) > 12.0 and (pos.y < -6.0 or ly < -6.0)
+
+
 @rpc("any_peer", "unreliable_ordered")
 func sync_state(pos: Vector3, yaw: float, char_name: String, p_name: String, sleeping: bool, anim: int = 0) -> void:
 	if not pos.is_finite() or not is_finite(yaw) or pos.length() > 5000.0:
@@ -595,7 +603,7 @@ func sync_state(pos: Vector3, yaw: float, char_name: String, p_name: String, sle
 	av.target_yaw = yaw
 	av.anim = anim
 	av.set_look(char_name, p_name)
-	av.visible = not sleeping
+	av.visible = not sleeping and not _depth_gap(pos)
 
 
 @rpc("authority", "unreliable")

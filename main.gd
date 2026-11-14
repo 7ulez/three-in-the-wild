@@ -98,6 +98,7 @@ func _ready() -> void:
 
 
 var _cull_t: float = 0.0
+var _surface_nodes: Array = []
 var _range_node: Node3D = null
 
 
@@ -110,12 +111,31 @@ func _process(delta: float) -> void:
 		if _range_node != null:
 			# Im Browser ist die Zahl gleichzeitig sichtbarer Objekte begrenzt: Schiessstand nur in der Naehe zeichnen
 			_range_node.visible = player.global_position.distance_to(Vector3(-109.0, 0.0, -10.0)) < 100.0
+		# Unten (Katakomben) sieht man die Oberfläche nicht: alles dort ausblenden, spart über 400 Objekte
+		var deep := player.global_position.y < -6.0
+		if _surface_nodes.is_empty():
+			for nm in ["Bodendeko", "Hideouts", "Fauna", "Ambient"]:
+				var sn := get_node_or_null(nm) as Node3D
+				if sn != null:
+					_surface_nodes.append(sn)
+			for c in get_children():
+				if c is Node3D and c.get_script() != null and (c.get_script() as Script).resource_path == "res://massif.gd":
+					_surface_nodes.append(c)
+		for sn2 in _surface_nodes:
+			if is_instance_valid(sn2):
+				(sn2 as Node3D).visible = not deep
+		# Tiere nur in der Nähe zeichnen (ihr eigenes visible bleibt unberührt, es steuert Frosch/Vogel/Netz)
+		var fau: Fauna = get_node_or_null("Fauna") as Fauna
+		if fau != null:
+			for an in fau.animals:
+				if is_instance_valid(an) and an.body != null:
+					an.body.visible = player.global_position.distance_to(an.global_position) < 60.0
 		var hn: Node = get_node_or_null("Hideouts")
 		if hn != null:
 			for hid in ["fuchsbau", "huette", "tropf", "baum", "lager"]:
 				var hc := hn.get_node_or_null(hid) as Node3D
 				if hc != null:
-					hc.visible = player.global_position.distance_to(hc.global_position) < 95.0
+					hc.visible = player.global_position.distance_to(hc.global_position) < 75.0
 	if Game.dedicated:
 		if weather == null:
 			weather = Weather.new()
