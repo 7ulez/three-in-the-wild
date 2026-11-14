@@ -68,7 +68,7 @@ func lan_center() -> Vector3:
 
 ## Mitte der Nordwest-Eckzelle: hier steht die dritte Leiter nach oben
 func exit3_pos() -> Vector3:
-	return cell_center(idx(0, 0))
+	return cell_center(idx(0, 5))
 
 
 ## Raum öffnen und der Ausgangs-Ecke einen Zugang von Süden geben (nur zusätzliche Verbindungen, bleibt zusammenhängend)
@@ -80,7 +80,7 @@ func _carve_extras() -> void:
 				east[c] = 1
 			if j < LAN_J1:
 				south[c] = 1
-	south[idx(0, 0)] = 1
+	south[idx(0, 5)] = 1
 
 
 func is_hub(c: int) -> bool:

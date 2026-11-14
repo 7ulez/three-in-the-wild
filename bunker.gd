@@ -12,8 +12,8 @@ const WALL_C: Color = Color(0.40, 0.40, 0.37)
 const CATA: int = Catacombs.CATA_LAYER
 
 const EXIT: Vector3 = Vector3(Catacombs.EXIT_X, 0.0, Catacombs.EXIT_Z)      # zweiter Schacht in der Tropfsteinhöhle
-const EXIT3: Vector3 = Vector3(SHAFT.x - 36.0, 0.0, SHAFT.z - 36.0)           # dritter Aufstieg: Nordwest-Ecke des Labyrinths, Luke im Wald
-const EXIT3_OUT: Vector3 = Vector3(SHAFT.x - 36.0, 0.05, SHAFT.z - 36.0 + 2.3)
+const EXIT3: Vector3 = Vector3(SHAFT.x - 36.0, 0.0, SHAFT.z - 16.0)           # dritter Aufstieg: Nordwest-Ecke des Labyrinths, Luke im Wald
+const EXIT3_OUT: Vector3 = Vector3(SHAFT.x - 36.0, 0.05, SHAFT.z - 16.0 + 2.3)
 const EXIT_OUT: Vector3 = Vector3(95.8, 0.05, 56.1)                           # hier steigt man in der Höhle aus dem Loch
 
 static var open: bool = false
