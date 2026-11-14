@@ -536,6 +536,8 @@ func _process(delta: float) -> void:
 		_timer = 0.0
 		var p: Player = main.player
 		rpc("sync_state", p.global_position, p.rotation.y, p.character_name, Game.player_name, p.sleeping or p.tent_lying != null, p.anim_flags())
+		if p.kart != null and is_instance_valid(p.kart):
+			rpc("kart_pose", p.kart.global_position, p.kart.rotation.y, true)
 	_authority_tick(delta)
 	if is_host():
 		_skip_t += delta
@@ -608,6 +610,18 @@ func sync_state(pos: Vector3, yaw: float, char_name: String, p_name: String, sle
 	av.anim = anim
 	av.set_look(char_name, p_name)
 	av.visible = not sleeping and not _depth_gap(pos)
+
+
+func send_kart(pos: Vector3, yaw: float, riding: bool) -> void:
+	rpc("kart_pose", pos, yaw, riding)
+
+
+@rpc("any_peer", "unreliable_ordered")
+func kart_pose(pos: Vector3, yaw: float, riding: bool) -> void:
+	if main == null or Game.dedicated or not pos.is_finite() or not is_finite(yaw):
+		return
+	for k in main.get_tree().get_nodes_in_group("kettcar"):
+		k.remote_pose(pos, yaw, riding)
 
 
 @rpc("authority", "unreliable")

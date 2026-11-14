@@ -93,6 +93,10 @@ var vape_t: float = 0.0          # Dauer der Vape-Animation
 var drink_t: float = 0.0         # Dauer der Trink-Animation
 var drink_kind: int = 0          # 1 Bier, 2 Wasser
 var hammock: Hammock = null
+var kart: Kettcar = null
+var kart_v: float = 0.0
+var kart_yaw: float = 0.0
+var _kart_net_t: float = 0.0
 var stones: int = 0
 var crouching: bool = false
 var _air_t: float = 0.0
@@ -641,7 +645,7 @@ func anim_flags() -> int:
 	f |= (_fish_anim() & 3) << 2
 	if needs != null and needs.squatting:
 		f |= 16
-	if seat != null:
+	if seat != null or kart != null:
 		f |= 32
 	if vape_t > 0.0:
 		f |= 64
@@ -1089,7 +1093,7 @@ func _physics_process(delta: float) -> void:
 		promille = maxf(promille - delta * 0.03, 0.0)
 	if vomit_t > 0.0:
 		_vomit_tick(delta)
-	elif promille > 2.2 and seat == null and hammock == null and not sleeping and randf() < delta * 0.06:
+	elif promille > 2.2 and seat == null and kart == null and hammock == null and not sleeping and randf() < delta * 0.06:
 		start_vomit()
 	vomit_tilt = lerpf(vomit_tilt, 0.85 if vomit_t > 0.0 else 0.0, minf(delta * 6.0, 1.0))
 	Player.vomit_pose(body_visual, vomit_t > 0.0, delta)
@@ -1098,6 +1102,9 @@ func _physics_process(delta: float) -> void:
 		return
 	if minigame != null:
 		velocity = Vector3.ZERO
+		return
+	if kart != null:
+		_drive_kart(delta)
 		return
 	if seat != null:
 		velocity = Vector3.ZERO
@@ -1357,7 +1364,7 @@ func _drink() -> void:
 
 ## Übergeben: kurz vornübergebeugt würgen, dann kommt es raus. Danach geht es einem besser.
 func start_vomit() -> void:
-	if vomit_t > 0.0 or seat != null or hammock != null or sleeping or trapped_t > 0.0 or (needs != null and needs.squatting):
+	if vomit_t > 0.0 or seat != null or kart != null or hammock != null or sleeping or trapped_t > 0.0 or (needs != null and needs.squatting):
 		return
 	vomit_t = 3.6
 	Game.stat_vomit += 1
@@ -1716,7 +1723,9 @@ func _update_prompt() -> void:
 			text += "\n(%s)" % ghost_reason
 	else:
 		var c: Object = _reach_target()
-		if seat != null:
+		if kart != null:
+			text = "WASD fahren · Shift schneller · E absteigen"
+		elif seat != null:
 			text = "Zum Aufstehen: E oder WASD"
 		elif held != null:
 			text = "E: %s ablegen   G: werfen" % held.item_name
@@ -1764,6 +1773,9 @@ func _interact() -> void:
 		return
 	if stir_oven != null:
 		stir_oven.stir_press(self)
+		return
+	if kart != null:
+		kart_dismount()
 		return
 	if seat != null:
 		stand_up()
@@ -2165,6 +2177,89 @@ func sit(chair: PlacedItem) -> void:
 	global_position = chair.global_position + Vector3(0, 0.45, 0)
 	head.position.y = 0.65
 	toast("Du sitzt. E oder WASD zum Aufstehen.", 2.5)
+
+
+func mount_kart(k: Kettcar) -> void:
+	if kart != null or seat != null or is_lying() or sleeping:
+		return
+	if held != null:
+		toast("Hände voll - erst ablegen.", 2.0)
+		return
+	kart = k
+	k.rider = self
+	k.collision_layer = 0
+	kart_v = 0.0
+	kart_yaw = k.rotation.y
+	rotation.y = kart_yaw
+	global_position = Vector3(k.global_position.x, maxf(k.global_position.y, 0.0) + 0.05, k.global_position.z)
+	velocity = Vector3.ZERO
+	head.position.y = 0.95
+	toast("Kettcar: WASD fahren, Shift schneller, E absteigen.", 3.0)
+
+
+func kart_dismount(place: bool = true) -> void:
+	if kart == null:
+		return
+	var k := kart
+	kart = null
+	kart_v = 0.0
+	if is_instance_valid(k):
+		k.rider = null
+		k.collision_layer = 2
+		if place:
+			var side := Vector3(cos(kart_yaw), 0.0, -sin(kart_yaw))
+			global_position = k.global_position + side * 1.0 + Vector3(0, 0.1, 0)
+		if Net.instance != null:
+			Net.instance.send_kart(k.global_position, k.rotation.y, false)
+	head.position.y = 1.6
+	velocity = Vector3.ZERO
+
+
+## Kettcar fahren: der Spieler bewegt sich, das Kettcar folgt ihm. A/D lenken (mit dem Tempo), W Gas, S bremsen/rückwärts.
+func _drive_kart(delta: float) -> void:
+	if not is_instance_valid(kart):
+		kart = null
+		head.position.y = 1.6
+		return
+	var acc := (1.0 if Input.is_physical_key_pressed(KEY_W) else 0.0) - (1.0 if Input.is_physical_key_pressed(KEY_S) else 0.0)
+	var st := (1.0 if Input.is_physical_key_pressed(KEY_D) else 0.0) - (1.0 if Input.is_physical_key_pressed(KEY_A) else 0.0)
+	if Game.touch and Game.touch_move != Vector2.ZERO:
+		acc = -Game.touch_move.y
+		st = Game.touch_move.x
+	var vmax := 11.0 if Input.is_physical_key_pressed(KEY_SHIFT) else 8.0
+	vmax *= 1.0 - 0.5 * water_d
+	if acc > 0.0:
+		kart_v = move_toward(kart_v, vmax * acc, 6.0 * delta)
+	elif acc < 0.0:
+		kart_v = move_toward(kart_v, -3.0 * -acc, (12.0 if kart_v > 0.0 else 5.0) * delta)
+	else:
+		kart_v = move_toward(kart_v, 0.0, 3.0 * delta)
+	if absf(kart_v) > vmax:
+		kart_v = move_toward(kart_v, signf(kart_v) * vmax, 8.0 * delta)
+	var grip := clampf(absf(kart_v) / 2.5, 0.0, 1.0) * signf(kart_v)
+	var dyaw := -st * 1.9 * grip * delta
+	kart_yaw += dyaw
+	rotation.y += dyaw
+	var fwd := Vector3(-sin(kart_yaw), 0.0, -cos(kart_yaw))
+	if not is_on_floor():
+		velocity.y -= GRAVITY * delta
+	else:
+		velocity.y = 0.0
+	velocity.x = fwd.x * kart_v
+	velocity.z = fwd.z * kart_v
+	var want := absf(kart_v)
+	move_and_slide()
+	var real := Vector2(velocity.x, velocity.z).length()
+	if want > 2.0 and real < want * 0.45:
+		Sfx.play("click", global_position, -6.0)
+		kart_v *= 0.35        # gegen einen Baum gefahren
+	kart.global_position = Vector3(global_position.x, global_position.y, global_position.z)
+	kart.rotation.y = kart_yaw
+	kart.ride_visual(kart_v, st, delta)
+	Player.animate_body(body_visual, 0.0, false, false, 0, false, true, vape_t > 0.0, 0, false)
+	_drink_cd = maxf(_drink_cd - delta, 0.0)
+	promille = maxf(promille - delta * 0.005, 0.0)
+	_update_prompt()
 
 
 func free_from_trap() -> void:
@@ -2623,6 +2718,8 @@ func _rg_apply() -> void:
 
 
 func teleport_to(pos: Vector3) -> void:
+	if kart != null:
+		kart_dismount(false)
 	global_position = pos
 	velocity = Vector3.ZERO
 	if held != null:
@@ -2643,6 +2740,8 @@ func consume_held() -> void:
 func respawn() -> void:
 	if held != null:
 		_drop()
+	if kart != null:
+		kart_dismount(false)
 	if seat != null:
 		stand_up()
 	if hammock != null:

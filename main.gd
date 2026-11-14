@@ -54,6 +54,12 @@ func _ready() -> void:
 	bunker.build(self)
 	_build_piers()
 	_build_cars()
+	var kettcar := Kettcar.new()
+	kettcar.name = "Kettcar"
+	add_child(kettcar)
+	kettcar.position = Kettcar.SPOT
+	kettcar.rotation.y = 2.4
+	kettcar.build()
 	_build_signs()
 	var lb := LeaderboardBoard.new()
 	add_child(lb)
@@ -554,6 +560,8 @@ func _tree_blocked(pos: Vector3) -> bool:
 	if ShootingRange.in_zone(pos):
 		return true
 	if Bunker.in_zone(pos):
+		return true
+	if Kettcar.in_zone(pos):
 		return true
 	for hp in HAMMOCK_PAIRS:
 		if Vector2(pos.x - hp.x, pos.z - hp.y).length() < 5.0:
