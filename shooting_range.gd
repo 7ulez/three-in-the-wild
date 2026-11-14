@@ -273,11 +273,13 @@ func _build_fence() -> void:
 	_held_refs.append(gate_script)
 
 
-func open_gate() -> void:
+func open_gate(announce: bool = true) -> void:
 	if gate_open:
 		return
 	gate_open = true
 	Game.range_open = true
+	if announce and Net.instance != null:
+		Net.instance.send_range_open()
 	if gate_pivot != null:
 		create_tween().tween_property(gate_pivot, "rotation_degrees:y", 105.0, 1.1).set_trans(Tween.TRANS_QUAD)
 	gate_body.collision_layer = 0
