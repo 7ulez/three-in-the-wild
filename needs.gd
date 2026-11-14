@@ -27,6 +27,33 @@ var pants_t: float = 0.0
 var accident_t: float = 0.0       # >0: gerade Missgeschick (geht in die Knie)
 var _bladder_full_t: float = 0.0
 var _warned: int = 0
+var _nag_t: float = 0.0
+
+# Der Charakter meldet sich, bevor er verhungert: Stufen bei 55 / 70 / 82 / 92 / 97 % Hunger
+const HUNGER_LINES: Dictionary = {
+	"Marian": [
+		"Ich könnte langsam was essen.",
+		"Mein Magen meldet sich. Gibt's hier irgendwo Beeren oder Pilze?",
+		"Mein Magen knurrt richtig laut. Ich brauche jetzt was zu essen!",
+		"Mir wird schwindelig. Schnell was essen, sonst kippe ich um!",
+		"Ich verhungere gleich! Iss irgendwas, JETZT!",
+	],
+	"Steffen": [
+		"Boah, Hunger. Hier muss doch irgendwo was zu beißen sein.",
+		"Mein Bauch grummelt wie ein Bär. Grill anwerfen oder Äpfel suchen!",
+		"Alter, ich brauch dringend was zwischen die Zähne!",
+		"Mir flimmert's vor den Augen. Essen, sofort!",
+		"Ich kipp gleich um vor Hunger! Gib mir irgendwas!",
+	],
+	"Julian": [
+		"Ich hätte jetzt echt Lust auf was Essbares.",
+		"Der Magen knurrt. Vielleicht Pilze, Beeren oder der Grill?",
+		"Mein Magen macht schon Geräusche wie ein Motor. Ich muss was essen!",
+		"Mir wird ganz komisch im Kopf. Ich muss sofort was essen!",
+		"Ich falle gleich um vor Hunger! Irgendwas, bitte!",
+	],
+}
+const HUNGER_STEPS: Array = [0.55, 0.7, 0.82, 0.92, 0.97]
 
 
 func setup(p: Player, layer: CanvasLayer) -> void:
@@ -153,6 +180,28 @@ func _die(reason: String) -> void:
 	beer.global_position = Vector3(1.5, 1.0, 10.0)
 
 
+## Bei steigendem Hunger sagt der Charakter etwas dazu (einmal pro Stufe), Magenknurren, und ab 92 % alle 40 s eine Erinnerung.
+func _hunger_hints(delta: float) -> void:
+	var lines: Array = HUNGER_LINES.get(player.character_name, HUNGER_LINES["Marian"])
+	var stage := 0
+	for k in range(HUNGER_STEPS.size()):
+		if hunger >= float(HUNGER_STEPS[k]):
+			stage = k + 1
+	if stage < _warned:
+		_warned = stage
+	if stage > _warned:
+		_warned = stage
+		player.toast("%s: %s" % [player.character_name, lines[stage - 1]], 5.0)
+		Sfx.play("rumble", Vector3.INF, -9.0 + float(stage), 1.6)
+		_nag_t = 40.0
+	elif stage >= 4:
+		_nag_t -= delta
+		if _nag_t <= 0.0:
+			_nag_t = 40.0
+			player.toast("%s: %s" % [player.character_name, lines[stage - 1]], 4.0)
+			Sfx.play("rumble", Vector3.INF, -7.0, 1.5)
+
+
 func _process(delta: float) -> void:
 	if player == null:
 		return
@@ -176,14 +225,11 @@ func _process(delta: float) -> void:
 		_urgent_time = 0.0
 	if hunger >= 1.0:
 		damage(delta * 0.8, "Verhungert")
-	elif hunger > 0.95 and _warned < 3:
-		_warned = 3
-		player.toast("Du verhungerst bald! Iss etwas (Pilze, Beeren, Äpfel, Grill).", 5.0)
-	elif hunger > 0.8 and _warned < 2:
-		_warned = 2
-		player.toast("Dein Magen knurrt. Such dir was zu essen.", 4.0)
-	if hunger < 0.7:
+	else:
+		_hunger_hints(delta)
+	if hunger < 0.5:
 		_warned = 0
+		_nag_t = 0.0
 	# Blase voll: nach einiger Zeit geht es in die Hose
 	if bladder >= 1.0 and not peeing:
 		_bladder_full_t += delta

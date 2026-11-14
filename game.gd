@@ -179,6 +179,7 @@ static func reset() -> void:
 	stashes_opened = {}
 	Bunker.open = false
 	Bunker.exit_open = false
+	Bunker.exit3_open = false
 	Bunker.pad = null
 	Bunker.typed = ""
 	all_done_shown = false

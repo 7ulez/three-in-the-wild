@@ -50,6 +50,39 @@ func cell_of(p: Vector3) -> int:
 	return idx(i, j)
 
 
+const LAN_I0: int = 14          # LAN-Party-Raum: 3x3 Zellen, Innenwände weg
+const LAN_I1: int = 16
+const LAN_J0: int = 3
+const LAN_J1: int = 5
+
+
+func is_lan(c: int) -> bool:
+	var i := c % N
+	var j := c / N
+	return i >= LAN_I0 and i <= LAN_I1 and j >= LAN_J0 and j <= LAN_J1
+
+
+func lan_center() -> Vector3:
+	return cell_center(idx((LAN_I0 + LAN_I1) / 2, (LAN_J0 + LAN_J1) / 2))
+
+
+## Mitte der Nordwest-Eckzelle: hier steht die dritte Leiter nach oben
+func exit3_pos() -> Vector3:
+	return cell_center(idx(0, 0))
+
+
+## Raum öffnen und der Ausgangs-Ecke einen Zugang von Süden geben (nur zusätzliche Verbindungen, bleibt zusammenhängend)
+func _carve_extras() -> void:
+	for j in range(LAN_J0, LAN_J1 + 1):
+		for i in range(LAN_I0, LAN_I1 + 1):
+			var c := idx(i, j)
+			if i < LAN_I1:
+				east[c] = 1
+			if j < LAN_J1:
+				south[c] = 1
+	south[idx(0, 0)] = 1
+
+
 func is_hub(c: int) -> bool:
 	var i := c % N
 	var j := c / N
@@ -178,6 +211,7 @@ func path(a: int, b: int) -> Array:
 func build(p_center: Vector3, seed_v: int = 4711) -> void:
 	center = p_center
 	generate(seed_v)
+	_carve_extras()
 	var half := float(N) * PITCH / 2.0
 	aabb = AABB(Vector3(center.x - half, FLOOR_Y - 1.0, center.z - half), Vector3(half * 2.0, H + 2.0, half * 2.0))
 	var rng := RandomNumberGenerator.new()
@@ -190,10 +224,18 @@ func build(p_center: Vector3, seed_v: int = 4711) -> void:
 	_box(st, Vector3(center.x, FLOOR_Y - 0.5, center.z), Vector3(ext * 2.0, 1.0, ext * 2.0), Color(0.19, 0.17, 0.15), 0.0, rng)
 	var ceil_y := CEIL_Y + 0.5
 	var hs := SHAFT_HALF
-	_box(st, Vector3(center.x, ceil_y, center.z - (ext + hs) / 2.0), Vector3(ext * 2.0, 1.0, ext - hs), Color(0.2, 0.19, 0.17), 0.0, rng)
-	_box(st, Vector3(center.x, ceil_y, center.z + (ext + hs) / 2.0), Vector3(ext * 2.0, 1.0, ext - hs), Color(0.2, 0.19, 0.17), 0.0, rng)
-	_box(st, Vector3(center.x - (ext + hs) / 2.0, ceil_y, center.z), Vector3(ext - hs, 1.0, hs * 2.0), Color(0.2, 0.19, 0.17), 0.0, rng)
-	_box(st, Vector3(center.x + (ext + hs) / 2.0, ceil_y, center.z), Vector3(ext - hs, 1.0, hs * 2.0), Color(0.2, 0.19, 0.17), 0.0, rng)
+	var cc_col := Color(0.2, 0.19, 0.17)
+	# Löcher in der Decke von West nach Ost: Nordwest-Ausgang und der Hub-Schacht
+	var e3 := exit3_pos()
+	var chs: Array = [Vector2(e3.x, e3.z), Vector2(center.x, center.z)]
+	var prev := center.x - ext
+	for hp in chs:
+		var hv: Vector2 = hp
+		_box(st, Vector3((prev + hv.x - hs) / 2.0, ceil_y, center.z), Vector3(hv.x - hs - prev, 1.0, ext * 2.0), cc_col, 0.0, rng)
+		_box(st, Vector3(hv.x, ceil_y, (center.z - ext + hv.y - hs) / 2.0), Vector3(hs * 2.0, 1.0, hv.y - hs - (center.z - ext)), cc_col, 0.0, rng)
+		_box(st, Vector3(hv.x, ceil_y, (hv.y + hs + center.z + ext) / 2.0), Vector3(hs * 2.0, 1.0, center.z + ext - (hv.y + hs)), cc_col, 0.0, rng)
+		prev = hv.x + hs
+	_box(st, Vector3((prev + center.x + ext) / 2.0, ceil_y, center.z), Vector3(center.x + ext - prev, 1.0, ext * 2.0), cc_col, 0.0, rng)
 	var wy := FLOOR_Y + H / 2.0
 	# Aussenwand rundum
 	_box(st, Vector3(center.x, wy, center.z - half - 0.5), Vector3(ext * 2.0, H, 1.0), stone, 0.1, rng)
@@ -584,7 +626,7 @@ func _build_detail() -> void:
 		for i in range(N):
 			var c := idx(i, j)
 			var cc := cell_center(c)
-			var hub := is_hub(c)
+			var hub := is_hub(c) or is_lan(c)
 			# Innenwände
 			if i < N - 1 and east[c] == 0:
 				_wall_detail(st, Vector3(cc.x + PITCH / 2.0, 0, cc.z), false, rng, both)

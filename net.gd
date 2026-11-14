@@ -468,7 +468,7 @@ func _snapshot() -> Dictionary:
 		"placed": pl, "tents": tents, "cars": cars, "goals": Game.goal_shared.duplicate(),
 		"items": item_db.values(), "stashes": Game.stashes_opened.keys(),
 		"stats": Game.stats_all.duplicate(true), "finale": Game.all_done_shown,
-		"flag": Game.flag_hoisted, "bench": maxi(Game.bench_owner, 0), "bunker": Bunker.open, "exit": Bunker.exit_open, "range": Game.range_open}
+		"flag": Game.flag_hoisted, "bench": maxi(Game.bench_owner, 0), "bunker": Bunker.open, "exit": Bunker.exit_open, "exit3": Bunker.exit3_open, "range": Game.range_open}
 
 
 @rpc("authority", "reliable")
@@ -502,6 +502,8 @@ func assign_slot(s: int, snap: Dictionary) -> void:
 		Bunker.set_open(true, false)
 	if bool(snap.get("exit", false)):
 		Bunker.set_exit_open(true, false)
+	if bool(snap.get("exit3", false)):
+		Bunker.set_exit3_open(true, false)
 	if bool(snap.get("range", false)):
 		_open_range_gate()
 	for d in snap.get("items", []):
@@ -1368,6 +1370,15 @@ func _open_range_gate() -> void:
 		sr.open_gate(false)
 	if main.player != null:
 		main.player.toast("Jemand hat das Tor zum Schießstand aufgeschlossen.", 4.0)
+
+
+func send_exit3_open() -> void:
+	rpc("remote_exit3_open")
+
+
+@rpc("any_peer", "reliable")
+func remote_exit3_open() -> void:
+	Bunker.set_exit3_open(true, false)
 
 
 func send_exit_open() -> void:
